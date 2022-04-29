@@ -12,6 +12,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 )
 
+// Remove once https://github.com/github/smimesign/pull/108 is merged.
 replace github.com/github/smimesign => github.com/wlynch/smimesign v0.2.1-0.20220422203849-fb42e64b96e7
 
 require (
