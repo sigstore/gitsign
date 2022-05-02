@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
+	"github.com/sigstore/cosign/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
 )
 
@@ -31,11 +33,17 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
-	sv, err := sign.SignerFromKeyOpts(ctx, "", "", sign.KeyOpts{
+	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
 		FulcioURL:    "https://fulcio.sigstore.dev",
 		OIDCIssuer:   "https://oauth2.sigstore.dev/auth",
 		OIDCClientID: "sigstore",
 		RekorURL:     "https://rekor.sigstore.dev",
+		// Force browser based interactive mode - Git captures both stdout and
+		// stderr when it invokes the signing tool, so we can't use the
+		// code-based flow here for now (may require an upstream Git change to
+		// support).
+		// TODO: Detect OIDC token.
+		FulcioAuthFlow: fulcio.FlowNormal,
 	})
 	if err != nil {
 		return nil, err
