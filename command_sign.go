@@ -86,14 +86,7 @@ func commandSign() error {
 		fmt.Fprintln(stderr, "error signing commit hash: ", err)
 		return err
 	}
-	/*
-		pkBytes, err := publicKeyFromCert(cert)
-		if err != nil {
-			return err
-		}
-	*/
-	_, err = cosign.TLogUpload(ctx, rClient, commitSig, []byte(commit), sv.Cert)
-	if err != nil {
+	if _, err := cosign.TLogUpload(ctx, rClient, commitSig, []byte(commit), sv.Cert); err != nil {
 		fmt.Fprintln(stderr, "error uploading tlog (commit): ", err)
 		return err
 	}
