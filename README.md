@@ -24,7 +24,7 @@ $ git config --local gpg.format x509
 All respositories:
 
 ```sh
-$ git config --global gpg.x509.program smimesign
+$ git config --global gpg.x509.program smimecosign
 $ git config --global gpg.format x509
 ```
 
