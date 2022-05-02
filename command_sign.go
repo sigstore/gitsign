@@ -20,10 +20,6 @@ import (
 
 func commandSign() error {
 	ctx := context.Background()
-
-	fmt.Fprintln(os.Stderr, os.Args)
-
-	//userIdent, err := findUserIdentity()
 	userIdent, err := fulcio.NewIdentity(ctx, stderr)
 	if err != nil {
 		return errors.Wrap(err, "failed to get identity")
@@ -48,7 +44,6 @@ func commandSign() error {
 	if _, err = io.Copy(dataBuf, f); err != nil {
 		return errors.Wrap(err, "failed to read message from stdin")
 	}
-	fmt.Fprintln(stderr, dataBuf)
 
 	sig, cert, err := signature.Sign(userIdent, dataBuf.Bytes(), signature.SignOptions{
 		Detached:           *detachSignFlag,
@@ -100,7 +95,6 @@ func commandSign() error {
 		fmt.Fprintln(stderr, "error uploading tlog (commit): ", err)
 		return err
 	}
-	//enc.Encode(resp2)
 
 	return nil
 }

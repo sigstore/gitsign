@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	defaultTSA = "https://fulcio.sigstore.dev"
+	// TODO: Use fulcio as timestamp authority.
+	defaultTSA = ""
 )
 
 var (
