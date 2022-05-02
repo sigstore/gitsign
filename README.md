@@ -264,7 +264,8 @@ We can manually validate that the commit exists in the transparency log by
 running:
 
 ```sh
-$ cosign verify-blob --cert <(echo $cert | base64 --decode) --signature <(echo $sig | base64 --decode) <(git rev-parse HEAD | tr -d '\n')
+$ uuid=$(rekor-cli search --artifact <(git rev-parse HEAD | tr -d '\n') | tail -n 1)
+$ sig=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.content)
 $ cert=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.publicKey.content)
 $ cosign verify-blob --cert <(echo $cert | base64 --decode) --signature <(echo $sig | base64 --decode) <(git rev-parse HEAD | tr -d '\n')
 tlog entry verified with uuid: d0444ed9897f31fefc820ade9a706188a3bb030055421c91e64475a8c955ae2c index: 2212633
@@ -331,7 +332,7 @@ nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
 -----END CERTIFICATE-----
 ```
 
-Notice that **the Rekor entry key uses the same cert that was used to generate
+Notice that **the Rekor entry uses the same cert that was used to generate
 the git commit signature**. This can be used to correlate the 2 messages, even
 though they signed different content!
 
