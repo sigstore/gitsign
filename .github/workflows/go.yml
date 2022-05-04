@@ -24,3 +24,15 @@ jobs:
     - name: Test
       run: go test -v ./...
       
+    - name: Setup smimecosign
+      run: |
+        set -e
+        go install .
+        mkdir /tmp/git
+        cd /tmp/git
+        git init .
+        git config --global gpg.x509.program smimecosign
+        git config --global gpg.format x509
+        git commit --allow-empty --message="Signed commit"
+        git --no-pager log --show-signature -1
+
