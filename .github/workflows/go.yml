@@ -30,7 +30,7 @@ jobs:
 
         # Setup repo + tool
         go install .
-        export PATH="$PATH:$GOPATH/bin"; echo "PATH=${PATH}"
+        export PATH="$PATH:$GOPATH/bin; echo "PATH=${PATH}"
         whereis smimecosign
         mkdir /tmp/git
         cd /tmp/git
@@ -39,6 +39,9 @@ jobs:
         git config --global user.name "smimecosign"
         git config --global gpg.x509.program smimecosign
         git config --global gpg.format x509
+
+        # Verify tool is on our path
+        smimecosign -h
 
         # Sign commit
         git commit --allow-empty -s --message="Signed commit"
