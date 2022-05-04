@@ -25,6 +25,7 @@ import (
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
+	"github.com/sigstore/cosign/pkg/providers"
 )
 
 type Identity struct {
@@ -33,6 +34,13 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
+
+	idToken := ""
+	authFlow := fulcio.FlowNormal
+	if providers.Enabled(ctx) {
+		idToken, _ = providers.Provide(ctx, "sigstore")
+		authFlow = fulcio.FlowToken
+	}
 	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
 		FulcioURL:    "https://fulcio.sigstore.dev",
 		OIDCIssuer:   "https://oauth2.sigstore.dev/auth",
@@ -42,8 +50,8 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 		// stderr when it invokes the signing tool, so we can't use the
 		// code-based flow here for now (may require an upstream Git change to
 		// support).
-		// TODO: Detect OIDC token.
-		FulcioAuthFlow: fulcio.FlowNormal,
+		FulcioAuthFlow: authFlow,
+		IDToken:        idToken,
 	})
 	if err != nil {
 		return nil, err
