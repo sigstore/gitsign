@@ -21,21 +21,22 @@ jobs:
     - name: Build
       run: go build -v ./...
 
-    - name: Test
+    - name: Unit Tests
       run: go test -v ./...
       
-    - name: Sign commit
+    - name: Test Sign commit
       run: |
         set -e
 
         # Setup repo + tool
         go install .
+        export PATH="$PATH:$GOPATH/bin"; echo $PATH
         mkdir /tmp/git
         cd /tmp/git
         git init -b main .
         git config --global user.email "test@example.com"
         git config --global user.name "smimecosign"
-        git config --global gpg.x509.program $GOPATH/bin/smimecosign
+        git config --global gpg.x509.program smimecosign
         git config --global gpg.format x509
 
         # Sign commit
