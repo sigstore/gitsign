@@ -40,11 +40,12 @@ jobs:
         git config --global user.name "smimecosign"
         git config --global gpg.x509.program smimecosign
         git config --global gpg.format x509
+        git config --global commit.gpgsign true
 
         # Verify tool is on our path
         smimecosign -h
 
         # Sign commit
-        git commit --allow-empty -s --message="Signed commit"
+        git commit --allow-empty -S --message="Signed commit"
         git --no-pager log --show-signature -1
         git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
