@@ -61,7 +61,42 @@ func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signatu
 	return sig, cert, nil
 }
 
-func Verify(data, sig []byte) ([][][]*x509.Certificate, *models.LogEntryAnon, error) {
+type VerificationSummary struct {
+	// Certificate used to sign the commit.
+	Cert *x509.Certificate
+	// Rekor log entry of the commit.
+	LogEntry *models.LogEntryAnon
+	// List of claims about what succeeded / failed during validation.
+	// This can be used to get details on what succeeded / failed during
+	// validation. This is not an exhaustive list - claims may be missing
+	// if validation ended early.
+	Claims []Claim
+}
+
+// Claim is a k/v pair representing the status of a given ClaimCondition.
+type Claim struct {
+	Key   ClaimCondition
+	Value bool
+}
+
+type ClaimCondition string
+
+const (
+	ClaimParsedSignature     ClaimCondition = "Parsed Git signature"
+	ClaimValidatedSignature  ClaimCondition = "Validated Git signature"
+	ClaimLocatedRekorEntry   ClaimCondition = "Located Rekor entry"
+	ClaimValidatedRekorEntry ClaimCondition = "Validated Rekor entry"
+)
+
+func NewClaim(c ClaimCondition, ok bool) Claim {
+	return Claim{
+		Key:   c,
+		Value: ok,
+	}
+}
+
+func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error) {
+	claims := []Claim{}
 	// Try decoding as PEM
 	var der []byte
 	if blk, _ := pem.Decode(sig); blk != nil {
@@ -72,13 +107,16 @@ func Verify(data, sig []byte) ([][][]*x509.Certificate, *models.LogEntryAnon, er
 	// Parse signature
 	sd, err := cms.ParseSignedData(der)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to parse signature")
+		claims = append(claims, NewClaim(ClaimParsedSignature, false))
+		return nil, errors.Wrap(err, "failed to parse signature")
 	}
+	claims = append(claims, NewClaim(ClaimParsedSignature, true))
 
 	// Generate verification options.
 	certs, err := sd.GetCertificates()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error getting signature certs")
+		claims = append(claims, NewClaim(ClaimValidatedSignature, false))
+		return nil, errors.Wrap(err, "error getting signature certs")
 	}
 	opts := x509.VerifyOptions{
 		Roots:     fulcioroots.Get(),
@@ -88,23 +126,31 @@ func Verify(data, sig []byte) ([][][]*x509.Certificate, *models.LogEntryAnon, er
 		CurrentTime: certs[0].NotBefore,
 	}
 
-	chains, err := sd.VerifyDetached(data, opts)
+	_, err = sd.VerifyDetached(data, opts)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to verify signature")
+		claims = append(claims, NewClaim(ClaimValidatedSignature, false))
+		return nil, errors.Wrap(err, "failed to verify signature")
 	}
+	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
 	commit, err := commitHash(data, sig)
 	if err != nil {
-		return nil, nil, err
+		claims = append(claims, NewClaim(ClaimLocatedRekorEntry, false))
+		return nil, err
 	}
 
-	ctx := context.Background()
 	tlog, err := verifyTlog(ctx, commit, certs[0])
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+	claims = append(claims, NewClaim(ClaimLocatedRekorEntry, true))
+	claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))
 
-	return chains, tlog, nil
+	return &VerificationSummary{
+		Cert:     certs[0],
+		LogEntry: tlog,
+		Claims:   claims,
+	}, nil
 }
 
 func verifyTlog(ctx context.Context, commit string, cert *x509.Certificate) (*models.LogEntryAnon, error) {

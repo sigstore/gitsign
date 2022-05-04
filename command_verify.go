@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -45,9 +46,10 @@ func verifyAttached() error {
 	}
 
 	chains, err := signature.Verify(buf.Bytes(), nil, false, verifyOpts())
+	cert := chains[0][0][0]
 	if err != nil {
 		if len(chains) > 0 {
-			emitBadSig(chains)
+			emitBadSig(cert)
 		} else {
 			// TODO: We're omitting a bunch of arguments here.
 			sErrSig.emit()
@@ -56,13 +58,12 @@ func verifyAttached() error {
 	}
 
 	var (
-		cert = chains[0][0][0]
 		fpr  = certHexFingerprint(cert)
 		subj = cert.Subject.String()
 	)
 
 	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s\n", fpr)
-	emitGoodSig(chains)
+	emitGoodSig(cert)
 
 	// TODO: Maybe split up signature checking and certificate checking so we can
 	// output something more meaningful.
@@ -102,10 +103,10 @@ func verifyDetached() error {
 		return errors.Wrap(err, "failed to read message file")
 	}
 
-	chains, tlog, err := git.Verify(buf.Bytes(), sig.Bytes())
+	summary, err := git.Verify(context.Background(), buf.Bytes(), sig.Bytes())
 	if err != nil {
-		if len(chains) > 0 {
-			emitBadSig(chains)
+		if summary.Cert != nil {
+			emitBadSig(summary.Cert)
 		} else {
 			// TODO: We're omitting a bunch of arguments here.
 			sErrSig.emit()
@@ -113,18 +114,20 @@ func verifyDetached() error {
 		return errors.Wrap(err, "failed to verify signature")
 	}
 
-	var (
-		cert = chains[0][0][0]
-		fpr  = certHexFingerprint(cert)
-	)
+	fpr := certHexFingerprint(summary.Cert)
 
-	fmt.Fprintln(stderr, "tlog index:", *tlog.LogIndex)
-	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s | %v\n", fpr, cert.Issuer)
-	emitGoodSig(chains)
+	fmt.Fprintln(stderr, "tlog index:", *summary.LogEntry.LogIndex)
+	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s | %v\n", fpr, summary.Cert.Issuer)
+	emitGoodSig(summary.Cert)
 
 	// TODO: Maybe split up signature checking and certificate checking so we can
 	// output something more meaningful.
-	fmt.Fprintf(stderr, "smimesign: Good signature from %v\n", cert.EmailAddresses)
+	fmt.Fprintf(stderr, "smimesign: Good signature from %v\n", summary.Cert.EmailAddresses)
+
+	for _, c := range summary.Claims {
+		fmt.Fprintf(stderr, "%s: %t\n", string(c.Key), c.Value)
+	}
+
 	emitTrustFully()
 
 	return nil
