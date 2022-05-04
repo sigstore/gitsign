@@ -38,7 +38,11 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 	idToken := ""
 	authFlow := fulcio.FlowNormal
 	if providers.Enabled(ctx) {
-		idToken, _ = providers.Provide(ctx, "sigstore")
+		var err error
+		idToken, err = providers.Provide(ctx, "sigstore")
+		if err != nil {
+			fmt.Fprintln(w, "error getting id token:", err)
+		}
 		authFlow = fulcio.FlowToken
 	}
 	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
@@ -54,6 +58,7 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 		IDToken:        idToken,
 	})
 	if err != nil {
+		fmt.Fprintln(w, "error getting signer:", err)
 		return nil, err
 	}
 	return &Identity{

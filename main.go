@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	// Enable OIDC providers
-	_ "github.com/sigstore/cosign/pkg/providers/all"
+	_ "github.com/sigstore/cosign/pkg/providers/github"
 )
 
 const (
@@ -56,6 +56,9 @@ func runCommand() error {
 	getopt.SetParameters("[files]")
 	getopt.Parse()
 	fileArgs = getopt.Args()
+
+	f, _ := os.Create("/tmp/git-log.txt")
+	stderr = io.MultiWriter(stderr, f)
 
 	if *helpFlag {
 		getopt.Usage()
