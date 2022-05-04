@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	// Enable OIDC providers
-	_ "github.com/sigstore/cosign/pkg/providers/github"
+	_ "github.com/sigstore/cosign/pkg/providers/all"
 )
 
 const (
