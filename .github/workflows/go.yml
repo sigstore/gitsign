@@ -30,7 +30,8 @@ jobs:
 
         # Setup repo + tool
         go install .
-        export PATH="$PATH:$GOPATH/bin"; echo $PATH
+        export PATH="$PATH:$GOPATH/bin"; echo "PATH=${PATH}"
+        whereis smimecosign
         mkdir /tmp/git
         cd /tmp/git
         git init -b main .
