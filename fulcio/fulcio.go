@@ -21,6 +21,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/cmd/cosign/cli/options"
@@ -34,22 +35,22 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
-
+	clientID := envOrValue("COSIGN_OIDC_CLIENT_ID", "sigstore")
 	idToken := ""
 	authFlow := fulcio.FlowNormal
 	if providers.Enabled(ctx) {
 		var err error
-		idToken, err = providers.Provide(ctx, "sigstore")
+		idToken, err = providers.Provide(ctx, clientID)
 		if err != nil {
 			fmt.Fprintln(w, "error getting id token:", err)
 		}
 		authFlow = fulcio.FlowToken
 	}
 	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
-		FulcioURL:    "https://fulcio.sigstore.dev",
-		OIDCIssuer:   "https://oauth2.sigstore.dev/auth",
-		OIDCClientID: "sigstore",
-		RekorURL:     "https://rekor.sigstore.dev",
+		FulcioURL:    envOrValue("COSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"),
+		OIDCIssuer:   envOrValue("COSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth"),
+		OIDCClientID: clientID,
+		RekorURL:     envOrValue("COSIGN_REKOR_URL", "https://rekor.sigstore.dev"),
 		// Force browser based interactive mode - Git captures both stdout and
 		// stderr when it invokes the signing tool, so we can't use the
 		// code-based flow here for now (may require an upstream Git change to
@@ -65,6 +66,13 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 		sv:     sv,
 		stderr: w,
 	}, nil
+}
+
+func envOrValue(env, value string) string {
+	if v := os.Getenv(env); v != "" {
+		return v
+	}
+	return value
 }
 
 // Certificate gets the identity's certificate.

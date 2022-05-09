@@ -28,6 +28,15 @@ $ git config --global gpg.x509.program smimecosign
 $ git config --global gpg.format x509
 ```
 
+### Cosign configuration options
+
+| Environment Variable  | Default                          | Description                                |
+| --------------------- | -------------------------------- | ------------------------------------------ |
+| COSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                   |
+| COSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application             |
+| COSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token |
+| COSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                    |
+
 ## Usage
 
 Once configured, you can sign commits as usual with `git commit -S` (or
@@ -60,6 +69,11 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
 - Due to how Git invokes signing tools, `smimecosign` does not work in device
   mode - a browser session is required to sign commits.
+
+## Security
+
+Should you discover any security issues, please refer to sigstores [security
+process](https://github.com/sigstore/community/blob/main/SECURITY.md)
 
 ## Advanced
 
@@ -332,11 +346,6 @@ nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
 -----END CERTIFICATE-----
 ```
 
-Notice that **the Rekor entry uses the same cert that was used to generate
-the git commit signature**. This can be used to correlate the 2 messages, even
+Notice that **the Rekor entry uses the same cert that was used to generate the
+git commit signature**. This can be used to correlate the 2 messages, even
 though they signed different content!
-
-## Security
-
-Should you discover any security issues, please refer to sigstores [security
-process](https://github.com/sigstore/community/blob/main/SECURITY.md)
