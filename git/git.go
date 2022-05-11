@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 
 	cms "github.com/github/smimesign/ietf-cms"
-	"github.com/github/smimesign/signature"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/pkg/errors"
@@ -15,6 +14,7 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/wlynch/smimecosign/fulcio"
 	"github.com/wlynch/smimecosign/rekor"
+	"github.com/wlynch/smimecosign/signature"
 )
 
 func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
