@@ -6,10 +6,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/github/smimesign/signature"
 	"github.com/pkg/errors"
 	"github.com/wlynch/smimecosign/fulcio"
 	"github.com/wlynch/smimecosign/git"
+	"github.com/wlynch/smimecosign/signature"
 )
 
 func commandSign() error {

@@ -8,10 +8,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/github/smimesign/signature"
 	"github.com/pkg/errors"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/wlynch/smimecosign/git"
+	"github.com/wlynch/smimecosign/signature"
 )
 
 func commandVerify() error {
