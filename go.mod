@@ -9,17 +9,13 @@ require (
 	github.com/go-openapi/swag v0.21.1
 	github.com/pborman/getopt/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/sigstore/cosign v1.8.0
+	github.com/sigstore/cosign v1.8.1-0.20220502185546-8efb042c0427
 	github.com/sigstore/rekor v0.4.1-0.20220114213500-23f583409af3
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 )
 
-replace (
-	// Remove once https://github.com/github/smimesign/pull/108 is merged.
-	github.com/github/smimesign => github.com/wlynch/smimesign v0.2.1-0.20220502200102-5d7d5b14387f
-	// Needed to allow forcing interactive mode.
-	github.com/sigstore/cosign => github.com/sigstore/cosign v1.8.1-0.20220502185546-8efb042c0427
-)
+// Remove once https://github.com/github/smimesign/pull/108 is merged.
+replace github.com/github/smimesign => github.com/wlynch/smimesign v0.2.1-0.20220502200102-5d7d5b14387f
 
 require (
 	bitbucket.org/creachadair/shell v0.0.6 // indirect
