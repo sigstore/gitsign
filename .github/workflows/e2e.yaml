@@ -28,7 +28,7 @@ jobs:
       pull-requests: none
       repository-projects: none
       security-events: none
-      status: none
+      statuses: none
 
     steps:
     - uses: actions/checkout@v3
