@@ -3,10 +3,10 @@
 [![CI](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml)
 [![E2E](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml)
 
-Keyless Git signing with cosign!
+Keyless Git signing with Sigstore!
 
 This is heavily inspired by <https://github.com/github/smimesign>, but uses
-keyless cosign to sign Git commits with your own GitHub / OIDC identity.
+keyless Sigstore to sign Git commits with your own GitHub / OIDC identity.
 
 ## Installation
 
@@ -33,7 +33,7 @@ $ git config --global gpg.x509.program gitsign  # Use gitsign for signing
 $ git config --global gpg.format x509  # gitsign expects x509 args
 ```
 
-### Cosign configuration options
+### Environment Variables
 
 | Environment Variable   | Default                          | Description                                |
 | ---------------------- | -------------------------------- | ------------------------------------------ |
