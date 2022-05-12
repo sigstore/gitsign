@@ -8,7 +8,7 @@ require (
 	github.com/go-openapi/runtime v0.24.0
 	github.com/go-openapi/strfmt v0.21.2
 	github.com/go-openapi/swag v0.21.1
-	github.com/pborman/getopt/v2 v2.1.0
+	github.com/pborman/getopt v0.0.0-20180811024354-2b5b3bfb099b
 	github.com/pkg/errors v0.9.1
 	github.com/sigstore/cosign v1.8.1-0.20220502185546-8efb042c0427
 	github.com/sigstore/rekor v0.4.1-0.20220114213500-23f583409af3
