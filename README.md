@@ -1,4 +1,4 @@
-# smimecosign
+# gitsign
 
 Keyless Git signing with cosign!
 
@@ -8,7 +8,7 @@ keyless cosign to sign Git commits with your own GitHub / OIDC identity.
 ## Installation
 
 ```sh
-$ go install github.com/wlynch/smimecosign@latest
+$ go install github.com/sigstore/gitsign@latest
 ```
 
 ## Configuration
@@ -17,14 +17,14 @@ Single Repository:
 
 ```sh
 $ cd /path/to/my/repository
-$ git config --local gpg.x509.program smimecosign
+$ git config --local gpg.x509.program gitsign
 $ git config --local gpg.format x509
 ```
 
 All respositories:
 
 ```sh
-$ git config --global gpg.x509.program smimecosign
+$ git config --global gpg.x509.program gitsign
 $ git config --global gpg.format x509
 ```
 
@@ -67,7 +67,7 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
 ## Limitations
 
-- Due to how Git invokes signing tools, `smimecosign` does not work in device
+- Due to how Git invokes signing tools, `gitsign` does not work in device
   mode - a browser session is required to sign commits.
 
 ## Security
@@ -270,7 +270,7 @@ nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
 
 ### Verifying the Transparency Log
 
-As part of signature verification, `smimecosign` not only checks that the given
+As part of signature verification, `gitsign` not only checks that the given
 signature matches the commit, but also that the commit exists within the Rekor
 transparency log.
 

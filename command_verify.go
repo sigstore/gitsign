@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
-	"github.com/wlynch/smimecosign/git"
-	"github.com/wlynch/smimecosign/signature"
+	"github.com/sigstore/gitsign/git"
+	"github.com/sigstore/gitsign/signature"
 )
 
 func commandVerify() error {

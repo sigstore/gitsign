@@ -36,18 +36,18 @@ jobs:
         go install .
         export PATH="$PATH:$GOPATH/bin"
         echo "PATH=${PATH}"
-        whereis smimecosign
+        whereis gitsign
         mkdir /tmp/git
         cd /tmp/git
         git init -b main .
         git config --global user.email "test@example.com"
-        git config --global user.name "smimecosign"
-        git config --global gpg.x509.program smimecosign
+        git config --global user.name "gitsign"
+        git config --global gpg.x509.program gitsign
         git config --global gpg.format x509
         git config --global commit.gpgsign true
 
         # Verify tool is on our path
-        smimecosign -h
+        gitsign -h
 
         # Sign commit
         git commit --allow-empty -S --message="Signed commit"
