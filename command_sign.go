@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/sigstore/gitsign/fulcio"
-	"github.com/sigstore/gitsign/git"
-	"github.com/sigstore/gitsign/signature"
+	"github.com/sigstore/gitsign/internal/fulcio"
+	"github.com/sigstore/gitsign/internal/git"
+	"github.com/sigstore/gitsign/internal/signature"
 )
 
 func commandSign() error {
