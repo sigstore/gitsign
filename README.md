@@ -72,13 +72,29 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
 ## Limitations
 
-- Due to how Git invokes signing tools, `gitsign` does not work in device
-  mode - a browser session is required to sign commits.
+- When Git invokes signing tools, both stdout and stderr are captured which
+  means `gitsign` cannot push back messages to shells interactively. Because of
+  this, device mode does not work with `gitsign` - a browser capable session is
+  required to sign commits.
+
+## Debugging
+
+If there is an error during signing, you may see an error like:
+
+```
+error: gpg failed to sign the data
+fatal: failed to write commit object
+```
+
+Because of [`Limitations`](#limitations) with Git signing tools, since `gitsign`
+cannot write back to stderr it writes logs for the last operation to
+`${TMPDIR}/gitsign.log` instead. The value of `{$TMPDIR}` is defined by
+[`os.Tempdir`](https://pkg.go.dev/os#TempDir) (generally `/tmp` or `%TMP%`).
 
 ## Security
 
-Should you discover any security issues, please refer to sigstores [security
-process](https://github.com/sigstore/community/blob/main/SECURITY.md)
+Should you discover any security issues, please refer to sigstores
+[security process](https://github.com/sigstore/community/blob/main/SECURITY.md)
 
 ## Advanced
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 
 	"github.com/pborman/getopt/v2"
@@ -57,8 +58,14 @@ func runCommand() error {
 	getopt.Parse()
 	fileArgs = getopt.Args()
 
-	f, _ := os.Create("/tmp/git-log.txt")
-	stderr = io.MultiWriter(stderr, f)
+	// Since Git eats both stdout and stderr, we don't have a good way of
+	// getting error information back from clients if things go wrong.
+	// As a janky way to preserve error message, tee stderr to
+	// a temp file.
+	if f, err := os.Create(filepath.Join(os.TempDir(), "gitsign.log")); err == nil {
+		defer f.Close()
+		stderr = io.MultiWriter(stderr, f)
+	}
 
 	if *helpFlag {
 		getopt.Usage()
