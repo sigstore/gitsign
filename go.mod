@@ -1,4 +1,4 @@
-module github.com/wlynch/smimecosign
+module github.com/sigstore/gitsign
 
 go 1.18
 
