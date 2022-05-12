@@ -1,6 +1,6 @@
 # gitsign
 
-[![CI](https://github.com/sigstore/gitsign/actions/workflows/ci.yml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/ci.yml)
+[![CI](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml)
 [![E2E](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml)
 
 Keyless Git signing with cosign!
