@@ -30,12 +30,12 @@ $ git config --global gpg.format x509
 
 ### Cosign configuration options
 
-| Environment Variable  | Default                          | Description                                |
-| --------------------- | -------------------------------- | ------------------------------------------ |
-| COSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                   |
-| COSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application             |
-| COSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token |
-| COSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                    |
+| Environment Variable   | Default                          | Description                                |
+| ---------------------- | -------------------------------- | ------------------------------------------ |
+| GITSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                   |
+| GITSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application             |
+| GITSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token |
+| GITSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                    |
 
 ## Usage
 
