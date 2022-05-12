@@ -29,6 +29,10 @@ jobs:
       security-events: none
       statuses: none
 
+    env:
+      # Output logs to file in case we need to inspect errors.
+      GITSIGN_LOG: "/tmp/gitsign.log"
+
     steps:
     - uses: actions/checkout@v3
 
@@ -66,4 +70,4 @@ jobs:
         git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
     - name: Debug log
       if: failure()
-      run: cat /tmp/gitsign.log
+      run: cat ${GITSIGN_LOG}
