@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  e2e:
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # Enable OIDC
