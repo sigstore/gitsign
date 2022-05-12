@@ -35,12 +35,13 @@ $ git config --global gpg.format x509  # gitsign expects x509 args
 
 ### Environment Variables
 
-| Environment Variable   | Default                          | Description                                |
-| ---------------------- | -------------------------------- | ------------------------------------------ |
-| GITSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                   |
-| GITSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application             |
-| GITSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token |
-| GITSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                    |
+| Environment Variable   | Default                          | Description                                                                                                   |
+| ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
+| GITSIGN_LOG            |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
+| GITSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application                                                                                |
+| GITSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
+| GITSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                                                                                       |
 
 ## Usage
 
@@ -86,10 +87,9 @@ error: gpg failed to sign the data
 fatal: failed to write commit object
 ```
 
-Because of [`Limitations`](#limitations) with Git signing tools, since `gitsign`
-cannot write back to stderr it writes logs for the last operation to
-`${TMPDIR}/gitsign.log` instead. The value of `{$TMPDIR}` is defined by
-[`os.Tempdir`](https://pkg.go.dev/os#TempDir) (generally `/tmp` or `%TMP%`).
+Because of [`Limitations`](#limitations) with Git signing tools, `gitsign`
+cannot write back to stderr. Instead, you can use the `GITSIGN_LOG` environment
+variable to tee logs into a readable location for debugging.
 
 ## Security
 
