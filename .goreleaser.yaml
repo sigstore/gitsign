@@ -1,0 +1,60 @@
+builds:
+- env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - freebsd
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ldflags:
+  - "-s -w"
+  - "-extldflags=-zrelro"
+  - "-extldflags=-znow"
+
+nfpms:
+- id: default
+  package_name: gitsign
+  vendor: Sigstore
+  homepage: https://github.com/sigstore/gitsign
+  maintainer:  Billy Lynch <info@sigstore.dev>
+  description: Keyless git commit signing using OIDC identity
+  formats:
+  - apk
+  - deb
+  - rpm
+
+archives:
+- id: binary
+  format: binary
+
+gomod:
+  proxy: true
+
+checksum:
+  name_template: 'checksums.txt'
+
+source:
+  enabled: true
+
+sboms:
+- id: binaries
+  artifacts: binary
+- id: packages
+  artifacts: package
+
+signs:
+- cmd: cosign
+  env:
+  - COSIGN_EXPERIMENTAL=1
+  certificate: '${artifact}.pem'
+  signature: '${artifact}.sig'
+  args:
+    - sign-blob
+    - '--output-certificate=${certificate}'
+    - '--output-signature=${signature}'
+    - '${artifact}'
+  artifacts: binary
+  output: true
