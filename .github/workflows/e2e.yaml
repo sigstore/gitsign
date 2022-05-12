@@ -22,7 +22,6 @@ jobs:
       contents: read
       deployments: none
       issues: none
-      metadata: none
       packages: none
       pages: none
       pull-requests: none
