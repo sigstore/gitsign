@@ -35,7 +35,7 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
-	clientID := envOrValue("COSIGN_OIDC_CLIENT_ID", "sigstore")
+	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
 	idToken := ""
 	authFlow := fulcio.FlowNormal
 	if providers.Enabled(ctx) {
@@ -47,10 +47,10 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 		authFlow = fulcio.FlowToken
 	}
 	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
-		FulcioURL:    envOrValue("COSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"),
-		OIDCIssuer:   envOrValue("COSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth"),
+		FulcioURL:    envOrValue("GITSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"),
+		OIDCIssuer:   envOrValue("GITSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth"),
 		OIDCClientID: clientID,
-		RekorURL:     envOrValue("COSIGN_REKOR_URL", "https://rekor.sigstore.dev"),
+		RekorURL:     envOrValue("GITSIGN_REKOR_URL", "https://rekor.sigstore.dev"),
 		// Force browser based interactive mode - Git captures both stdout and
 		// stderr when it invokes the signing tool, so we can't use the
 		// code-based flow here for now (may require an upstream Git change to
