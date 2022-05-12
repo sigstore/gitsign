@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sigstore/gitsign/internal"
 	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/crypto/openpgp/s2k"
 )
@@ -199,21 +200,21 @@ func emitSigCreated(cert *x509.Certificate, isDetached bool) {
 	// gpgsm seems to always use 0x00
 	sigClass = 0
 	now = time.Now().Unix()
-	fpr = certHexFingerprint(cert)
+	fpr = internal.CertHexFingerprint(cert)
 
 	sSigCreated.emitf("%s %d %d %02x %d %s", sigType, pkAlgo, hashAlgo, sigClass, now, fpr)
 }
 
 func emitGoodSig(cert *x509.Certificate) {
 	subj := cert.Subject.String()
-	fpr := certHexFingerprint(cert)
+	fpr := internal.CertHexFingerprint(cert)
 
 	sGoodSig.emitf("%s %s", fpr, subj)
 }
 
 func emitBadSig(cert *x509.Certificate) {
 	subj := cert.Subject.String()
-	fpr := certHexFingerprint(cert)
+	fpr := internal.CertHexFingerprint(cert)
 
 	sBadSig.emitf("%s %s", fpr, subj)
 }

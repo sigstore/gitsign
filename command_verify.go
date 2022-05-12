@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
+	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/git"
 	"github.com/sigstore/gitsign/internal/signature"
 )
@@ -58,7 +59,7 @@ func verifyAttached() error {
 	}
 
 	var (
-		fpr  = certHexFingerprint(cert)
+		fpr  = internal.CertHexFingerprint(cert)
 		subj = cert.Subject.String()
 	)
 
@@ -114,7 +115,7 @@ func verifyDetached() error {
 		return errors.Wrap(err, "failed to verify signature")
 	}
 
-	fpr := certHexFingerprint(summary.Cert)
+	fpr := internal.CertHexFingerprint(summary.Cert)
 
 	fmt.Fprintln(stderr, "tlog index:", *summary.LogEntry.LogIndex)
 	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s | %v\n", fpr, summary.Cert.Issuer)
