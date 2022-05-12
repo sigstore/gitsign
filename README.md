@@ -20,15 +20,17 @@ Single Repository:
 
 ```sh
 $ cd /path/to/my/repository
-$ git config --local gpg.x509.program gitsign
-$ git config --local gpg.format x509
+$ git config --local commit.gpgsign true  # Sign all commits
+$ git config --local gpg.x509.program gitsign  # Use gitsign for signing
+$ git config --local gpg.format x509  # gitsign expects x509 args
 ```
 
 All respositories:
 
 ```sh
-$ git config --global gpg.x509.program gitsign
-$ git config --global gpg.format x509
+$ git config --global commit.gpgsign true  # Sign all commits
+$ git config --global gpg.x509.program gitsign  # Use gitsign for signing
+$ git config --global gpg.format x509  # gitsign expects x509 args
 ```
 
 ### Cosign configuration options
