@@ -1,0 +1,70 @@
+name: E2E
+
+on:
+  push:
+    branches: ['main']
+  pull_request_target:
+    branches: ['main']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Enable OIDC
+
+      # The rest of these are sanity-check settings, since I'm not sure if the
+      # org default is permissive or restricted. 
+      # See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+      # for more details.
+      actions: none
+      checks: none
+      contents: read
+      deployments: none
+      issues: none
+      metadata: none
+      packages: none
+      pages: none
+      pull-requests: none
+      repository-projects: none
+      security-events: none
+      status: none
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+      
+    - name: Test Sign and Verify commit
+      run: |
+        set -e
+
+        # Setup repo + tool
+        go install .
+        export PATH="$PATH:$GOPATH/bin"
+        echo "PATH=${PATH}"
+        whereis gitsign
+        mkdir /tmp/git
+        cd /tmp/git
+        git init -b main .
+        git config --global user.email "test@example.com"
+        git config --global user.name "gitsign"
+        git config --global gpg.x509.program gitsign
+        git config --global gpg.format x509
+        git config --global commit.gpgsign true
+
+        # Verify tool is on our path
+        gitsign -h
+
+        # Sign commit
+        git commit --allow-empty -S --message="Signed commit"
+
+        # Verify commit
+        git --no-pager log --show-signature -1
+        git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+    - name: Debug log
+      if: failure()
+      run: cat /tmp/git-log.txt
