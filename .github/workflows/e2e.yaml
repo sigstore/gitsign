@@ -66,4 +66,4 @@ jobs:
         git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
     - name: Debug log
       if: failure()
-      run: cat /tmp/git-log.txt
+      run: cat /tmp/gitsign.log
