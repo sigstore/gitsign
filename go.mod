@@ -1,6 +1,6 @@
 module github.com/sigstore/gitsign
 
-go 1.18
+go 1.17
 
 require (
 	github.com/github/smimesign v0.2.0
