@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/git"
@@ -110,7 +111,7 @@ func verifyDetached() error {
 		f = stdin
 	} else {
 		if f, err = os.Open(fileArgs[1]); err != nil {
-			errors.Wrapf(err, "failed to open message file (%s)", fileArgs[1])
+			return errors.Wrapf(err, "failed to open message file (%s)", fileArgs[1])
 		}
 		defer f.Close()
 	}

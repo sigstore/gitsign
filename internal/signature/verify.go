@@ -43,7 +43,7 @@ func Verify(body, sig []byte, detached bool, opts x509.VerifyOptions) ([][][]*x5
 
 	if detached {
 		return sd.VerifyDetached(body, opts)
-	} else {
-		return sd.Verify(opts)
 	}
+
+	return sd.Verify(opts)
 }

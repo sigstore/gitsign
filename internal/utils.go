@@ -16,7 +16,7 @@
 package internal
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505
 	"crypto/x509"
 	"encoding/hex"
 )
@@ -32,6 +32,6 @@ func certFingerprint(cert *x509.Certificate) []byte {
 		return nil
 	}
 
-	fpr := sha1.Sum(cert.Raw)
+	fpr := sha1.Sum(cert.Raw) // nolint:gosec
 	return fpr[:]
 }

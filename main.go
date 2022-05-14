@@ -105,25 +105,29 @@ func runCommand() error {
 	if *signFlag {
 		if *verifyFlag {
 			return errors.New("specify --help, --sign, or --verify")
-		} else if len(*localUserOpt) == 0 {
-			return errors.New("specify a USER-ID to sign with")
-		} else {
-			return commandSign()
 		}
+		if len(*localUserOpt) == 0 {
+			return errors.New("specify a USER-ID to sign with")
+		}
+
+		return commandSign()
 	}
 
 	if *verifyFlag {
 		if *signFlag {
 			return errors.New("specify --help, --sign, or --verify")
-		} else if len(*localUserOpt) > 0 {
-			return errors.New("local-user cannot be specified for verification")
-		} else if *detachSignFlag {
-			return errors.New("detach-sign cannot be specified for verification")
-		} else if *armorFlag {
-			return errors.New("armor cannot be specified for verification")
-		} else {
-			return commandVerify()
 		}
+		if len(*localUserOpt) > 0 {
+			return errors.New("local-user cannot be specified for verification")
+		}
+		if *detachSignFlag {
+			return errors.New("detach-sign cannot be specified for verification")
+		}
+		if *armorFlag {
+			return errors.New("armor cannot be specified for verification")
+		}
+
+		return commandVerify()
 	}
 
 	return errors.New("specify --help, --sign, --verify, or --list-keys")

@@ -23,9 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sigstore/gitsign/internal"
 	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/crypto/openpgp/s2k"
+
+	"github.com/sigstore/gitsign/internal"
 )
 
 // This file implements gnupg's "status protocol". When the --status-fd argument
@@ -163,8 +164,8 @@ func (s status) emitf(format string, args ...interface{}) {
 	}
 
 	const prefix = "[GNUPG:] "
-	statusFile.WriteString(prefix)
-	statusFile.WriteString(string(s))
+	_, _ = statusFile.WriteString(prefix)
+	_, _ = statusFile.WriteString(string(s))
 	fmt.Fprintf(statusFile, " "+format+"\n", args...)
 }
 
@@ -176,7 +177,7 @@ func (s status) emit() {
 	}
 
 	const prefix = "[GNUPG:] "
-	statusFile.WriteString(prefix + string(s) + "\n")
+	_, _ = statusFile.WriteString(prefix + string(s) + "\n")
 }
 
 func emitSigCreated(cert *x509.Certificate, isDetached bool) {

@@ -109,14 +109,14 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 			Type:  "SIGNED MESSAGE",
 			Bytes: der,
 		}), cert, nil
-	} else {
-		return der, cert, nil
 	}
+
+	return der, cert, nil
 }
 
 // certsForSignature determines which certificates to include in the signature
 // based on the --include-certs option specified by the user.
-func certsForSignature(chain []*x509.Certificate, include int) ([]*x509.Certificate, error) {
+func certsForSignature(chain []*x509.Certificate, include int) ([]*x509.Certificate, error) { // nolint:unparam
 	if include < -3 {
 		include = -2 // default
 	}

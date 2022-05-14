@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/git"
 	"github.com/sigstore/gitsign/internal/signature"
@@ -35,7 +36,7 @@ func commandSign() error {
 	}
 
 	// Git is looking for "\n[GNUPG:] SIG_CREATED ", meaning we need to print a
-	// line before SIG_CREATED. BEGIN_SIGNING seems appropraite. GPG emits this,
+	// line before SIG_CREATED. BEGIN_SIGNING seems appropriate. GPG emits this,
 	// though GPGSM does not.
 	sBeginSigning.emit()
 
