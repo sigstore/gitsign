@@ -1,6 +1,12 @@
+project_name: gitsign
+
 builds:
-- env:
+- id: gitsign
+  mod_timestamp: '{{ .CommitTimestamp }}'
+  env:
   - CGO_ENABLED=0
+  flags:
+  - -trimpath
   goos:
   - linux
   - darwin
@@ -58,3 +64,12 @@ signs:
     - '${artifact}'
   artifacts: binary
   output: true
+
+release:
+  prerelease: allow
+  draft: true # allow for manual edits
+  github:
+    owner: sigstore
+    name: gitsign
+  footer: |
+    ### Thanks to all contributors!
