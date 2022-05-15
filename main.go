@@ -40,10 +40,23 @@ var (
 	// these are changed in tests
 	stdin  io.ReadCloser  = os.Stdin
 	stdout io.WriteCloser = os.Stdout
-	stderr io.Writer      = os.Stderr
+	stderr *os.File       = os.Stderr
 )
 
+func setupTTY() {
+	var err error
+	stderr, err = os.OpenFile(os.Getenv("GPG_TTY"), os.O_RDWR, 0)
+	if err != nil {
+		stderr, err = os.OpenFile(os.Getenv("TTY"), os.O_RDWR, 0)
+		if err != nil {
+			stderr = os.Stderr
+		}
+	}
+	os.Stderr = stderr
+}
+
 func main() {
+	setupTTY()
 	if err := runCommand(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -56,17 +69,6 @@ func runCommand() error {
 	getopt.SetParameters("[files]")
 	getopt.Parse()
 	fileArgs = getopt.Args()
-
-	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
-		// Since Git eats both stdout and stderr, we don't have a good way of
-		// getting error information back from clients if things go wrong.
-		// As a janky way to preserve error message, tee stderr to
-		// a temp file.
-		if f, err := os.Create(logPath); err == nil {
-			defer f.Close()
-			stderr = io.MultiWriter(stderr, f)
-		}
-	}
 
 	if *helpFlag {
 		getopt.Usage()
