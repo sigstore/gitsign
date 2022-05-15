@@ -37,7 +37,7 @@ type Identity struct {
 func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
 	idToken := ""
-	authFlow := fulcio.FlowNormal
+	authFlow := ""
 	if providers.Enabled(ctx) {
 		var err error
 		idToken, err = providers.Provide(ctx, clientID)

@@ -53,6 +53,7 @@ func setupTTY() {
 		}
 	}
 	os.Stderr = stderr
+	os.Stdout = stderr
 }
 
 func main() {
