@@ -1,3 +1,18 @@
+//
+// Copyright 2022 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package signature
 
 import (
@@ -94,14 +109,14 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 			Type:  "SIGNED MESSAGE",
 			Bytes: der,
 		}), cert, nil
-	} else {
-		return der, cert, nil
 	}
+
+	return der, cert, nil
 }
 
 // certsForSignature determines which certificates to include in the signature
 // based on the --include-certs option specified by the user.
-func certsForSignature(chain []*x509.Certificate, include int) ([]*x509.Certificate, error) {
+func certsForSignature(chain []*x509.Certificate, include int) ([]*x509.Certificate, error) { // nolint:unparam
 	if include < -3 {
 		include = -2 // default
 	}

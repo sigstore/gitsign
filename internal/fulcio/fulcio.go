@@ -1,10 +1,11 @@
-// Copyright 2022 Billy Lynch
+//
+// Copyright 2022 The Sigstore Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -96,7 +97,6 @@ func (i *Identity) CertificateChain() ([]*x509.Certificate, error) {
 	}
 
 	return append([]*x509.Certificate{cert}, chain...), nil
-
 }
 
 // Signer gets a crypto.Signer that uses the identity's private key.
@@ -105,6 +105,7 @@ func (i *Identity) Signer() (crypto.Signer, error) {
 	if !ok {
 		return nil, fmt.Errorf("could not use signer %T as crypto.Signer", i.sv.SignerVerifier)
 	}
+
 	return s, nil
 }
 
@@ -116,7 +117,7 @@ func (i *Identity) Delete() error {
 
 // Close any manually managed memory held by the Identity.
 func (i *Identity) Close() {
-	return
+	// noop
 }
 
 func (i *Identity) PublicKey() (crypto.PublicKey, error) {

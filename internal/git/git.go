@@ -1,3 +1,18 @@
+//
+// Copyright 2022 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package git
 
 import (
@@ -10,12 +25,15 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/pkg/errors"
+
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
+
+const rekorDefaultURL = "https://rekor.sigstore.dev"
 
 func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
 	sig, cert, err := signature.Sign(ident, data, opts)
@@ -29,7 +47,7 @@ func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signatu
 	// using the same key, this is probably okay? e.g. even if you could cause a SHA1 collision,
 	// you would still need the underlying commit to be valid and using the same key which seems hard.
 
-	rekor, err := rekor.New("https://rekor.sigstore.dev")
+	rekor, err := rekor.New(rekorDefaultURL)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error creating rekor client")
 	}
@@ -97,15 +115,14 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 	// Parse signature
 	sd, err := cms.ParseSignedData(der)
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimParsedSignature, false))
 		return nil, errors.Wrap(err, "failed to parse signature")
 	}
+
 	claims = append(claims, NewClaim(ClaimParsedSignature, true))
 
 	// Generate verification options.
 	certs, err := sd.GetCertificates()
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimValidatedSignature, false))
 		return nil, errors.Wrap(err, "error getting signature certs")
 	}
 	opts := x509.VerifyOptions{
@@ -118,33 +135,29 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 
 	_, err = sd.VerifyDetached(data, opts)
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimValidatedSignature, false))
 		return nil, errors.Wrap(err, "failed to verify signature")
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
 	commit, err := commitHash(data, sig)
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimLocatedRekorEntry, false))
 		return nil, err
 	}
 
 	rekor, err := rekor.New("https://rekor.sigstore.dev")
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimLocatedRekorEntry, false))
 		return nil, err
 	}
 	tlog, err := rekor.Get(ctx, commit, certs[0])
 	if err != nil {
-		claims = append(claims, NewClaim(ClaimLocatedRekorEntry, false))
 		return nil, errors.Wrap(err, "failed to locate rekor entry")
 	}
 	claims = append(claims, NewClaim(ClaimLocatedRekorEntry, true))
 
 	if err := rekor.Verify(ctx, tlog); err != nil {
-		claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))
 		return nil, errors.Wrap(err, "failed to validate rekor entry")
 	}
+
 	claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))
 
 	return &VerificationSummary{
@@ -157,13 +170,13 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 func commitHash(data, sig []byte) (string, error) {
 	// Precompute commit hash to store in tlog
 	obj := &plumbing.MemoryObject{}
-	obj.Write(data)
+	_, _ = obj.Write(data)
 	obj.SetType(plumbing.CommitObject)
 
 	// go-git will compute a hash on decode and preserve that. To work around this,
 	// decode into one object then copy everything but the commit into a separate object.
 	base := object.Commit{}
-	base.Decode(obj)
+	_ = base.Decode(obj)
 	c := object.Commit{
 		Author:       base.Author,
 		Committer:    base.Committer,
@@ -174,5 +187,6 @@ func commitHash(data, sig []byte) (string, error) {
 	}
 	out := &plumbing.MemoryObject{}
 	err := c.Encode(out)
+
 	return out.Hash().String(), err
 }

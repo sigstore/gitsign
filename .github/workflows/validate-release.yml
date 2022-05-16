@@ -1,22 +1,17 @@
-name: release
+name: validate-release
 
-# run only on tags
 on:
   push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write # needed to write releases
-  id-token: write # needed for keyless signing
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  workflow_dispatch:
 
 jobs:
-  release:
+  validate-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
-        with:
-          fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
 
       - uses: actions/setup-go@fcdc43634adb5f7ae75a9d7a9b9361790f7293e2 # v3.1.0
         with:
@@ -35,6 +30,6 @@ jobs:
       - uses: goreleaser/goreleaser-action@b953231f81b8dfd023c58e0854a721e35037f28b # v29.1
         with:
           version: latest
-          args: release --rm-dist
+          args: release --rm-dist --snapshot --skip-sign
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

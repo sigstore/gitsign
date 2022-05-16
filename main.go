@@ -1,3 +1,18 @@
+//
+// Copyright 2022 The Sigstore Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -90,25 +105,29 @@ func runCommand() error {
 	if *signFlag {
 		if *verifyFlag {
 			return errors.New("specify --help, --sign, or --verify")
-		} else if len(*localUserOpt) == 0 {
-			return errors.New("specify a USER-ID to sign with")
-		} else {
-			return commandSign()
 		}
+		if len(*localUserOpt) == 0 {
+			return errors.New("specify a USER-ID to sign with")
+		}
+
+		return commandSign()
 	}
 
 	if *verifyFlag {
 		if *signFlag {
 			return errors.New("specify --help, --sign, or --verify")
-		} else if len(*localUserOpt) > 0 {
-			return errors.New("local-user cannot be specified for verification")
-		} else if *detachSignFlag {
-			return errors.New("detach-sign cannot be specified for verification")
-		} else if *armorFlag {
-			return errors.New("armor cannot be specified for verification")
-		} else {
-			return commandVerify()
 		}
+		if len(*localUserOpt) > 0 {
+			return errors.New("local-user cannot be specified for verification")
+		}
+		if *detachSignFlag {
+			return errors.New("detach-sign cannot be specified for verification")
+		}
+		if *armorFlag {
+			return errors.New("armor cannot be specified for verification")
+		}
+
+		return commandVerify()
 	}
 
 	return errors.New("specify --help, --sign, --verify, or --list-keys")

@@ -22,3 +22,7 @@ build:
 .PHONY: install
 install:
 	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/sigstore/gitsign
+
+.PHONY: unit-test
+unit-test:
+	go test -v ./...
