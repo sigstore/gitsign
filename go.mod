@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/go-openapi/runtime v0.24.0
+	github.com/go-openapi/runtime v0.24.1
 	github.com/go-openapi/strfmt v0.21.2
 	github.com/go-openapi/swag v0.21.1
 	github.com/pborman/getopt v0.0.0-20180811024354-2b5b3bfb099b
