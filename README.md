@@ -11,7 +11,7 @@ keyless Sigstore to sign Git commits with your own GitHub / OIDC identity.
 ## Installation
 
 ```sh
-$ go install github.com/sigstore/gitsign@latest
+go install github.com/sigstore/gitsign@latest
 ```
 
 ## Configuration
@@ -19,18 +19,18 @@ $ go install github.com/sigstore/gitsign@latest
 Single Repository:
 
 ```sh
-$ cd /path/to/my/repository
-$ git config --local commit.gpgsign true  # Sign all commits
-$ git config --local gpg.x509.program gitsign  # Use gitsign for signing
-$ git config --local gpg.format x509  # gitsign expects x509 args
+cd /path/to/my/repository
+git config --local commit.gpgsign true  # Sign all commits
+git config --local gpg.x509.program gitsign  # Use gitsign for signing
+git config --local gpg.format x509  # gitsign expects x509 args
 ```
 
 All respositories:
 
 ```sh
-$ git config --global commit.gpgsign true  # Sign all commits
-$ git config --global gpg.x509.program gitsign  # Use gitsign for signing
-$ git config --global gpg.format x509  # gitsign expects x509 args
+git config --global commit.gpgsign true  # Sign all commits
+git config --global gpg.x509.program gitsign  # Use gitsign for signing
+git config --global gpg.format x509  # gitsign expects x509 args
 ```
 
 ### Environment Variables
