@@ -84,12 +84,12 @@ Date:   Mon May 2 16:51:44 2022 -0400
   GitHub doesn't recognize gitsign signatures as verfied at the moment:
 
   1. The sigstore CA root is not a part of GitHub's trust root.
-  2. Because gitsign's ephemeral keys are only valid, using standard x509
-     verification would consider the certificate invalid after expiration.
-     Verification needs to include validation via Rekor to verify the cert was
-     valid at the time it was used.
+  2. Because gitsign's ephemeral keys are only valid for a short time, using
+     standard x509 verification would consider the certificate invalid after
+     expiration. Verification needs to include validation via Rekor to verify
+     the cert was valid at the time it was used.
 
-  We hope to work with GitHub to gets these types of signatures recognized as
+  We hope to work with GitHub to get these types of signatures recognized as
   verified in the future!
 
 ## Debugging
