@@ -23,8 +23,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
-
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/git"
@@ -50,7 +48,7 @@ func verifyAttached() error {
 	// Read in signature
 	if len(fileArgs) == 1 {
 		if f, err = os.Open(fileArgs[0]); err != nil {
-			return errors.Wrapf(err, "failed to open signature file (%s)", fileArgs[0])
+			return fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
 		}
 		defer f.Close()
 	} else {
@@ -59,7 +57,7 @@ func verifyAttached() error {
 
 	buf := new(bytes.Buffer)
 	if _, err = io.Copy(buf, f); err != nil {
-		return errors.Wrap(err, "failed to read signature")
+		return fmt.Errorf("failed to read signature: %w", err)
 	}
 
 	chains, err := signature.Verify(buf.Bytes(), nil, false, verifyOpts())
@@ -71,7 +69,7 @@ func verifyAttached() error {
 			// TODO: We're omitting a bunch of arguments here.
 			sErrSig.emit()
 		}
-		return errors.Wrap(err, "failed to verify signature")
+		return fmt.Errorf("failed to verify signature: %w", err)
 	}
 
 	var (
@@ -98,12 +96,12 @@ func verifyDetached() error {
 
 	// Read in signature
 	if f, err = os.Open(fileArgs[0]); err != nil {
-		return errors.Wrapf(err, "failed to open signature file (%s)", fileArgs[0])
+		return fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
 	}
 	defer f.Close()
 	sig := new(bytes.Buffer)
 	if _, err = io.Copy(sig, f); err != nil {
-		return errors.Wrap(err, "failed to read signature file")
+		return fmt.Errorf("failed to read signature file: %w", err)
 	}
 
 	// Read in signed data
@@ -111,13 +109,13 @@ func verifyDetached() error {
 		f = stdin
 	} else {
 		if f, err = os.Open(fileArgs[1]); err != nil {
-			return errors.Wrapf(err, "failed to open message file (%s)", fileArgs[1])
+			return fmt.Errorf("failed to open message file (%s): %w", fileArgs[1], err)
 		}
 		defer f.Close()
 	}
 	buf := new(bytes.Buffer)
 	if _, err = io.Copy(buf, f); err != nil {
-		return errors.Wrap(err, "failed to read message file")
+		return fmt.Errorf("failed to read message file: %w", err)
 	}
 
 	summary, err := git.Verify(context.Background(), buf.Bytes(), sig.Bytes())
@@ -128,7 +126,7 @@ func verifyDetached() error {
 			// TODO: We're omitting a bunch of arguments here.
 			sErrSig.emit()
 		}
-		return errors.Wrap(err, "failed to verify signature")
+		return fmt.Errorf("failed to verify signature: %w", err)
 	}
 
 	fpr := internal.CertHexFingerprint(summary.Cert)

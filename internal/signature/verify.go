@@ -18,9 +18,9 @@ package signature
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 
 	cms "github.com/github/smimesign/ietf-cms"
-	"github.com/pkg/errors"
 )
 
 // Verify verifies a signature for a given identity.
@@ -38,7 +38,7 @@ func Verify(body, sig []byte, detached bool, opts x509.VerifyOptions) ([][][]*x5
 	// Parse signature
 	sd, err := cms.ParseSignedData(der)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse signature")
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
 
 	if detached {

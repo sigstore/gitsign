@@ -20,11 +20,11 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 
 	cms "github.com/github/smimesign/ietf-cms"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/pkg/errors"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/fulcio"
@@ -38,7 +38,7 @@ const rekorDefaultURL = "https://rekor.sigstore.dev"
 func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
 	sig, cert, err := signature.Sign(ident, data, opts)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to sign message")
+		return nil, nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	// This uploads the commit SHA + sig(commit SHA) to the tlog using the same
@@ -49,21 +49,21 @@ func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signatu
 
 	rekor, err := rekor.New(rekorDefaultURL)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error creating rekor client")
+		return nil, nil, fmt.Errorf("error creating rekor client: %w", err)
 	}
 
 	commit, err := commitHash(data, sig)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error generating commit hash")
+		return nil, nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
 
 	sv := ident.SignerVerifier()
 	commitSig, err := sv.SignMessage(bytes.NewBufferString(commit))
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error signing commit hash")
+		return nil, nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
 	if _, err := rekor.Write(ctx, commitSig, []byte(commit), sv.Cert); err != nil {
-		return nil, nil, errors.Wrap(err, "error uploading tlog (commit)")
+		return nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 
 	return sig, cert, nil
@@ -115,7 +115,7 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 	// Parse signature
 	sd, err := cms.ParseSignedData(der)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse signature")
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
 
 	claims = append(claims, NewClaim(ClaimParsedSignature, true))
@@ -123,7 +123,7 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 	// Generate verification options.
 	certs, err := sd.GetCertificates()
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting signature certs")
+		return nil, fmt.Errorf("error getting signature certs: %w", err)
 	}
 	opts := x509.VerifyOptions{
 		Roots:     fulcioroots.Get(),
@@ -135,7 +135,7 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 
 	_, err = sd.VerifyDetached(data, opts)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to verify signature")
+		return nil, fmt.Errorf("failed to verify signature: %w", err)
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
@@ -150,12 +150,12 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 	}
 	tlog, err := rekor.Get(ctx, commit, certs[0])
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to locate rekor entry")
+		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
 	}
 	claims = append(claims, NewClaim(ClaimLocatedRekorEntry, true))
 
 	if err := rekor.Verify(ctx, tlog); err != nil {
-		return nil, errors.Wrap(err, "failed to validate rekor entry")
+		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
 	}
 
 	claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))

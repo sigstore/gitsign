@@ -23,13 +23,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
-	"github.com/pkg/errors"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/rekor"
 	"github.com/sigstore/cosign/pkg/cosign"
@@ -128,7 +128,7 @@ func (c *Client) findTLogEntriesByPayloadAndPK(ctx context.Context, payload, pub
 func publicKeyFromCert(cert *x509.Certificate) ([]byte, error) {
 	pk, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling public key")
+		return nil, fmt.Errorf("error marshalling public key: %w", err)
 	}
 	return pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",

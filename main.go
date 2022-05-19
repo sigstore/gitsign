@@ -16,13 +16,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"runtime/debug"
 
 	"github.com/pborman/getopt/v2"
-	"github.com/pkg/errors"
 
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
