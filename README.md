@@ -79,11 +79,12 @@ Date:   Mon May 2 16:51:44 2022 -0400
   required to sign commits.
 - [GitHub Verified Badge](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
 
-  ![unverified](./images/unverified.png)
+  <img src="./images/unverified.png" width="400" />
 
   GitHub doesn't recognize gitsign signatures as verfied at the moment:
 
-  1. The sigstore CA root is not a part of GitHub's trust root.
+  1. The sigstore CA root is not a part of
+     [GitHub's trust root](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#smime-commit-signature-verification).
   2. Because gitsign's ephemeral keys are only valid for a short time, using
      standard x509 verification would consider the certificate invalid after
      expiration. Verification needs to include validation via Rekor to verify
