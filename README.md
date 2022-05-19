@@ -35,13 +35,14 @@ git config --global gpg.format x509  # gitsign expects x509 args
 
 ### Environment Variables
 
-| Environment Variable   | Default                          | Description                                                                                                   |
-| ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GITSIGN_FULCIO_URL     | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
-| GITSIGN_LOG            |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
-| GITSIGN_OIDC_CLIENT_ID | sigstore                         | OIDC client ID for application                                                                                |
-| GITSIGN_OIDC_ISSUER    | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
-| GITSIGN_REKOR_URL      | https://rekor.sigstore.dev       | Address of Rekor server                                                                                       |
+| Environment Variable      | Default                          | Description                                                                                                   |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
+| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
+| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                |
+| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
+| GITSIGN_OIDC_REDIRECT_URL | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
+| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                                       |
 
 ## Usage
 
