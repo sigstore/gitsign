@@ -20,9 +20,9 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 
 	cms "github.com/github/smimesign/ietf-cms"
-	"github.com/pkg/errors"
 )
 
 type SignOptions struct {
@@ -63,20 +63,20 @@ type Identity interface {
 func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certificate, error) {
 	cert, err := ident.Certificate()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get idenity certificate")
+		return nil, nil, fmt.Errorf("failed to get idenity certificate: %w", err)
 	}
 	signer, err := ident.Signer()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get idenity signer")
+		return nil, nil, fmt.Errorf("failed to get idenity signer: %w", err)
 	}
 
 	sd, err := cms.NewSignedData(body)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create signed data")
+		return nil, nil, fmt.Errorf("failed to create signed data: %w", err)
 	}
 
 	if err := sd.Sign([]*x509.Certificate{cert}, signer); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to sign message")
+		return nil, nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 	if opts.Detached {
 		sd.Detached()
@@ -84,24 +84,24 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 
 	if len(opts.TimestampAuthority) > 0 {
 		if err = sd.AddTimestamps(opts.TimestampAuthority); err != nil {
-			return nil, nil, errors.Wrap(err, "failed to add timestamp")
+			return nil, nil, fmt.Errorf("failed to add timestamp: %w", err)
 		}
 	}
 
 	chain, err := ident.CertificateChain()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get idenity certificate chain")
+		return nil, nil, fmt.Errorf("failed to get idenity certificate chain: %w", err)
 	}
 	if chain, err = certsForSignature(chain, opts.IncludeCerts); err != nil {
 		return nil, nil, err
 	}
 	if err := sd.SetCertificates(chain); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to set certificates")
+		return nil, nil, fmt.Errorf("failed to set certificates: %w", err)
 	}
 
 	der, err := sd.ToDER()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to serialize signature")
+		return nil, nil, fmt.Errorf("failed to serialize signature: %w", err)
 	}
 
 	if opts.Armor {

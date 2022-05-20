@@ -18,10 +18,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
-
-	"github.com/pkg/errors"
 
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/git"
@@ -32,7 +32,7 @@ func commandSign() error {
 	ctx := context.Background()
 	userIdent, err := fulcio.NewIdentity(ctx, stderr)
 	if err != nil {
-		return errors.Wrap(err, "failed to get identity")
+		return fmt.Errorf("failed to get identity: %w", err)
 	}
 
 	// Git is looking for "\n[GNUPG:] SIG_CREATED ", meaning we need to print a
@@ -43,7 +43,7 @@ func commandSign() error {
 	var f io.ReadCloser
 	if len(fileArgs) == 1 {
 		if f, err = os.Open(fileArgs[0]); err != nil {
-			return errors.Wrapf(err, "failed to open message file (%s)", fileArgs[0])
+			return fmt.Errorf("failed to open message file (%s): %w", fileArgs[0], err)
 		}
 		defer f.Close()
 	} else {
@@ -52,7 +52,7 @@ func commandSign() error {
 
 	dataBuf := new(bytes.Buffer)
 	if _, err = io.Copy(dataBuf, f); err != nil {
-		return errors.Wrap(err, "failed to read message from stdin")
+		return fmt.Errorf("failed to read message from stdin: %w", err)
 	}
 
 	sig, cert, err := git.Sign(ctx, userIdent, dataBuf.Bytes(), signature.SignOptions{
@@ -62,7 +62,7 @@ func commandSign() error {
 		IncludeCerts:       *includeCertsOpt,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to sign message")
+		return fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	emitSigCreated(cert, *detachSignFlag)
