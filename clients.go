@@ -19,8 +19,8 @@ import (
 	"github.com/sigstore/gitsign/internal/rekor"
 )
 
-// NewRekorClient returns a new Rekor client respecting gitsign environment
+// newRekorClient returns a new Rekor client respecting gitsign environment
 // variables, or using the default if not set.
-func NewRekorClient() (*rekor.Client, error) {
+func newRekorClient() (*rekor.Client, error) {
 	return rekor.New(internal.EnvOrValue("GITSIGN_REKOR_URL", "https://rekor.sigstore.dev"))
 }

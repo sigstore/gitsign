@@ -118,7 +118,7 @@ func verifyDetached() error {
 		return fmt.Errorf("failed to read message file: %w", err)
 	}
 
-	rekor, err := NewRekorClient()
+	rekor, err := newRekorClient()
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
