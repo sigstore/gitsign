@@ -55,7 +55,12 @@ func commandSign() error {
 		return fmt.Errorf("failed to read message from stdin: %w", err)
 	}
 
-	sig, cert, err := git.Sign(ctx, userIdent, dataBuf.Bytes(), signature.SignOptions{
+	rekor, err := NewRekorClient()
+	if err != nil {
+		return fmt.Errorf("failed to create rekor client: %w", err)
+	}
+
+	sig, cert, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
 		Detached:           *detachSignFlag,
 		TimestampAuthority: *tsaOpt,
 		Armor:              *armorFlag,

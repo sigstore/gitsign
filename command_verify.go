@@ -118,7 +118,12 @@ func verifyDetached() error {
 		return fmt.Errorf("failed to read message file: %w", err)
 	}
 
-	summary, err := git.Verify(context.Background(), buf.Bytes(), sig.Bytes())
+	rekor, err := NewRekorClient()
+	if err != nil {
+		return fmt.Errorf("failed to create rekor client: %w", err)
+	}
+
+	summary, err := git.Verify(context.Background(), rekor, buf.Bytes(), sig.Bytes())
 	if err != nil {
 		if summary.Cert != nil {
 			emitBadSig(summary.Cert)

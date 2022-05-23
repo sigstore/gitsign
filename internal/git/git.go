@@ -33,9 +33,7 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
-const rekorDefaultURL = "https://rekor.sigstore.dev"
-
-func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
+func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
 	sig, cert, err := signature.Sign(ident, data, opts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign message: %w", err)
@@ -46,11 +44,6 @@ func Sign(ctx context.Context, ident *fulcio.Identity, data []byte, opts signatu
 	// Since the commit SHA ~= hash(commit data + sig(commit data)) and we're
 	// using the same key, this is probably okay? e.g. even if you could cause a SHA1 collision,
 	// you would still need the underlying commit to be valid and using the same key which seems hard.
-
-	rekor, err := rekor.New(rekorDefaultURL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error creating rekor client: %w", err)
-	}
 
 	commit, err := commitHash(data, sig)
 	if err != nil {
@@ -103,7 +96,7 @@ func NewClaim(c ClaimCondition, ok bool) Claim {
 	}
 }
 
-func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error) {
+func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*VerificationSummary, error) {
 	claims := []Claim{}
 	// Try decoding as PEM
 	var der []byte
@@ -144,10 +137,6 @@ func Verify(ctx context.Context, data, sig []byte) (*VerificationSummary, error)
 		return nil, err
 	}
 
-	rekor, err := rekor.New("https://rekor.sigstore.dev")
-	if err != nil {
-		return nil, err
-	}
 	tlog, err := rekor.Get(ctx, commit, certs[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
