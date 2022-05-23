@@ -120,7 +120,7 @@ func verifyDetached() error {
 
 	summary, err := git.Verify(context.Background(), buf.Bytes(), sig.Bytes())
 	if err != nil {
-		if summary.Cert != nil {
+		if summary != nil && summary.Cert != nil {
 			emitBadSig(summary.Cert)
 		} else {
 			// TODO: We're omitting a bunch of arguments here.
