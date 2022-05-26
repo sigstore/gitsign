@@ -35,14 +35,14 @@ git config --global gpg.format x509  # gitsign expects x509 args
 
 ### Environment Variables
 
-| Environment Variable      | Default                               | Description                                                                                                   |
-| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev           | Address of Fulcio server                                                                                      |
-| GITSIGN_LOG               |                                       | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
-| GITSIGN_OIDC_CLIENT_ID    | sigstore                              | OIDC client ID for application                                                                                |
-| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth      | OIDC provider to be used to issue ID token                                                                    |
-| GITSIGN_OIDC_REDIRECT_URL |                                       | OIDC Redirect URL                                                                                             |
-| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev            | Address of Rekor server                                                                                       |
+| Environment Variable      | Default                          | Description                                                                                                   |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
+| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
+| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                |
+| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
+| GITSIGN_OIDC_REDIRECT_URL |                                  | OIDC Redirect URL                                                                                             |
+| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                                       |
 
 ## Usage
 
@@ -106,6 +106,42 @@ fatal: failed to write commit object
 Because of [`Limitations`](#limitations) with Git signing tools, `gitsign`
 cannot write back to stderr. Instead, you can use the `GITSIGN_LOG` environment
 variable to tee logs into a readable location for debugging.
+
+## Privacy
+
+### What data does gitsign store?
+
+Gitsign stores data in 2 places:
+
+1. Within the Git commit
+
+   The commit itself contains a signed digest of the user commit content (e.g.
+   author, committer, message, parents, etc.) along with the code signing
+   certificate. This data is stored within the commit itself as part of your
+   repository. See
+   [Inspecting the Git commit signature](#inspecting-the-git-commit-signature)
+   for more details.
+
+2. Within the Rekor transparency log
+
+   To be able to verify signatures for ephemeral certs past their `Not After`
+   time, gitsign records commits and the code signing certificates to
+   [Rekor](https://docs.sigstore.dev/rekor/overview/). This data is a
+   [HashedRekord](https://github.com/sigstore/rekor/blob/e375eb461cae524270889b57a249ff086bea6c05/types.md#hashed-rekord)
+   containing a SHA256 hash of the commit SHA, as well as the code signing
+   certificate. See
+   [Verifying the Transparency Log](#verifying-the-transparency-log) for more
+   details.
+
+   By default, data is written to the
+   [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
+   particular, users and organizations may be sensitive to the data contained
+   within code signing certificatesm returned by Fulcio, which may include user
+   emails or repo identifiers. See
+   [OIDC usage in Fulcio](https://github.com/sigstore/fulcio/blob/6ac6b8c94c3ec6106d68c0f92225016a3a6eef79/docs/oidc.md)
+   for more details for what data is contained in the code signing certs, and
+   [Deploy a Rekor Server Manually](https://docs.sigstore.dev/rekor/installation/#deploy-a-rekor-server-manually)
+   for how to run your own Rekor instance.
 
 ## Security
 
@@ -316,6 +352,28 @@ running:
 
 ```sh
 $ uuid=$(rekor-cli search --artifact <(git rev-parse HEAD | tr -d '\n') | tail -n 1)
+$ rekor-cli get --uuid=$uuid --format=json | jq .
+LogID: c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d
+Index: 2212633
+IntegratedTime: 2022-05-02T20:51:49Z
+UUID: d0444ed9897f31fefc820ade9a706188a3bb030055421c91e64475a8c955ae2c
+Body: {
+  "HashedRekordObj": {
+    "data": {
+      "hash": {
+        "algorithm": "sha256",
+        "value": "05b4f02a24d1c4c2c95dacaee30de2a6ce4b5b88fa981f4e7b456b76ea103141"
+      }
+    },
+    "signature": {
+      "content": "MEYCIQCeZwhnq9dgS7ZvU2K5m785V6PqqWAsmkNzAOsf8F++gAIhAKfW2qReBZL34Xrzd7r4JzUlJbf5eoeUZvKT+qsbbskL",
+      "publicKey": {
+        "content": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNGVENDQVp1Z0F3SUJBZ0lVQUxZY1ZSbUZTcG05VnhJTjdIVzdtaHBPeSs4d0NnWUlLb1pJemowRUF3TXcKS2pFVk1CTUdBMVVFQ2hNTWMybG5jM1J2Y21VdVpHVjJNUkV3RHdZRFZRUURFd2h6YVdkemRHOXlaVEFlRncweQpNakExTURJeU1EVXhORGRhRncweU1qQTFNREl5TVRBeE5EWmFNQUF3V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPClBRTUJCd05DQUFUc1lFdG5xaWpaTlBPRG5CZWx5S1dIWHQ3YndtWElpK2JjeEcrY2gyQUZRaGozdHcyUEJ2RmkKenBwWm5YRVNWUnZEMU1lUXBmWUt0QnF6RHFjOVRoSTRvNEhJTUlIRk1BNEdBMVVkRHdFQi93UUVBd0lIZ0RBVApCZ05WSFNVRUREQUtCZ2dyQmdFRkJRY0RBekFNQmdOVkhSTUJBZjhFQWpBQU1CMEdBMVVkRGdRV0JCU2dzZW9ECnhRaEtjSk1oMnFPZ0MweFZTZE1HUFRBZkJnTlZIU01FR0RBV2dCUll3QjVma1VXbFpxbDZ6SkNoa3lMUUtzWEYKK2pBaUJnTlZIUkVCQWY4RUdEQVdnUlJpYVd4c2VVQmphR0ZwYm1kMVlYSmtMbVJsZGpBc0Jnb3JCZ0VFQVlPLwpNQUVCQkI1b2RIUndjem92TDJkcGRHaDFZaTVqYjIwdmJHOW5hVzR2YjJGMWRHZ3dDZ1lJS29aSXpqMEVBd01ECmFBQXdaUUl4QUsrKzliL25CZlVWNGdlRlNBRE9nUjQrdW5zaDArU2tpdWJsT0o4QmloWnNUTk9VcjNmd2ZXNngKblBrcCtTeTFFd0l3ZE91bFdvcDNvSlYvUW83ZmF1MG1sc3kwTUNtM2xCZ3l4bzJscEFhSTRnRlJ4R0UyR2hwVgo3TitrQ29TMUEyNFMKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
+      }
+    }
+  }
+}
+
 $ sig=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.content)
 $ cert=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.publicKey.content)
 $ cosign verify-blob --cert <(echo $cert | base64 --decode) --signature <(echo $sig | base64 --decode) <(git rev-parse HEAD | tr -d '\n')
