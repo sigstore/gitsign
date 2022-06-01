@@ -45,6 +45,7 @@ git config --global gpg.format x509  # gitsign expects x509 args
 
 | Environment Variable      | Default                          | Description                                                                                                   |
 | ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_CREDENTIAL_CACHE  |                                  | Path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                            |
 | GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
 | GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
 | GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                |

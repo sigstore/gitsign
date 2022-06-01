@@ -59,19 +59,6 @@ var (
 )
 
 func main() {
-	if err := runCommand(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
-func runCommand() error {
-	// Parse CLI args
-	getopt.HelpColumn = 40
-	getopt.SetParameters("[files]")
-	getopt.Parse()
-	fileArgs = getopt.Args()
-
 	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
 		// Since Git eats both stdout and stderr, we don't have a good way of
 		// getting error information back from clients if things go wrong.
@@ -82,6 +69,19 @@ func runCommand() error {
 			stderr = io.MultiWriter(stderr, f)
 		}
 	}
+
+	if err := runCommand(); err != nil {
+		fmt.Fprintln(stderr, err)
+		os.Exit(1)
+	}
+}
+
+func runCommand() error {
+	// Parse CLI args
+	getopt.HelpColumn = 40
+	getopt.SetParameters("[files]")
+	getopt.Parse()
+	fileArgs = getopt.Args()
 
 	if *helpFlag {
 		getopt.Usage()

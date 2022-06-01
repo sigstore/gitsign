@@ -30,6 +30,7 @@ import (
 
 func commandSign() error {
 	ctx := context.Background()
+
 	userIdent, err := fulcio.NewIdentity(ctx, stderr)
 	if err != nil {
 		return fmt.Errorf("failed to get identity: %w", err)

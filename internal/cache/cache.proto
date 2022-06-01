@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "github.com/sigstore/gitsign/internal/cache/cache_go_proto";
+
+package sigtore.gitsign.cache;
+
+message StoreCredentialRequest {
+    string id = 1;
+    Credential credential = 2;
+}
+
+message StoreCredentialResponse{}
+
+message GetCredentialRequest {
+    string id = 1;
+}
+
+message Credential {
+    bytes private_key = 1;
+    bytes cert_pem = 2;
+    bytes cert_chain = 3;
+}
+
+service CredentialStore {
+  rpc StoreCredential(StoreCredentialRequest) returns (StoreCredentialResponse) {}
+  rpc GetCredential(GetCredentialRequest) returns (Credential) {}
+}
