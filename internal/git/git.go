@@ -118,12 +118,20 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*Verif
 	if err != nil {
 		return nil, fmt.Errorf("error getting signature certs: %w", err)
 	}
+	// TODO: This is very brittle, since the DER encoding will sort the
+	// certificates in the signature, which means that this ordering can
+	// change depending on the issuer.
+	// See https://en.wikipedia.org/wiki/X.690#DER_encoding
+	// We should find a better way to identify the leaf cert that was used
+	// to generate the signature.
+	cert := certs[len(certs)-1]
+
 	opts := x509.VerifyOptions{
 		Roots:     fulcioroots.Get(),
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		// cosign hack: ignore the current time for now - we'll use the tlog to
 		// verify whether the commit was signed at a valid time.
-		CurrentTime: certs[0].NotBefore,
+		CurrentTime: cert.NotBefore,
 	}
 
 	_, err = sd.VerifyDetached(data, opts)
@@ -137,7 +145,7 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*Verif
 		return nil, err
 	}
 
-	tlog, err := rekor.Get(ctx, commit, certs[0])
+	tlog, err := rekor.Get(ctx, commit, cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
 	}
@@ -150,7 +158,7 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*Verif
 	claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))
 
 	return &VerificationSummary{
-		Cert:     certs[0],
+		Cert:     cert,
 		LogEntry: tlog,
 		Claims:   claims,
 	}, nil
