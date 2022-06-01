@@ -92,7 +92,10 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get idenity certificate chain: %w", err)
 	}
-	if chain, err = certsForSignature(chain, opts.IncludeCerts); err != nil {
+	// TODO: look into adding back support for opts.IncludeCerts here.
+	// This was removed due to unstable ordering in the cert chain when
+	// intermediates were included.
+	if chain, err = certsForSignature(chain, 1); err != nil {
 		return nil, nil, err
 	}
 	if err := sd.SetCertificates(chain); err != nil {

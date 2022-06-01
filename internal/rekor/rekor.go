@@ -101,7 +101,6 @@ func (c *Client) Get(ctx context.Context, commit string, cert *x509.Certificate)
 		}
 		for _, c := range tlogCerts {
 			if cert.Equal(c) {
-				fmt.Println("certs do not match!")
 				return e, nil
 			}
 		}

@@ -155,7 +155,8 @@ func verifyDetached() error {
 
 func verifyOpts() x509.VerifyOptions {
 	return x509.VerifyOptions{
-		Roots:     fulcioroots.Get(),
-		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		Roots:         fulcioroots.Get(),
+		Intermediates: fulcioroots.GetIntermediates(),
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}
 }

@@ -118,17 +118,12 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*Verif
 	if err != nil {
 		return nil, fmt.Errorf("error getting signature certs: %w", err)
 	}
-	// TODO: This is very brittle, since the DER encoding will sort the
-	// certificates in the signature, which means that this ordering can
-	// change depending on the issuer.
-	// See https://en.wikipedia.org/wiki/X.690#DER_encoding
-	// We should find a better way to identify the leaf cert that was used
-	// to generate the signature.
-	cert := certs[len(certs)-1]
+	cert := certs[0]
 
 	opts := x509.VerifyOptions{
-		Roots:     fulcioroots.Get(),
-		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+		Roots:         fulcioroots.Get(),
+		Intermediates: fulcioroots.GetIntermediates(),
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		// cosign hack: ignore the current time for now - we'll use the tlog to
 		// verify whether the commit was signed at a valid time.
 		CurrentTime: cert.NotBefore,
