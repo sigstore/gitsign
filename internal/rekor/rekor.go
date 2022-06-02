@@ -31,8 +31,8 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 
-	"github.com/sigstore/cosign/cmd/cosign/cli/rekor"
 	"github.com/sigstore/cosign/pkg/cosign"
+	rekor "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/index"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -57,7 +57,7 @@ type Client struct {
 }
 
 func New(url string) (*Client, error) {
-	c, err := rekor.NewClient(url)
+	c, err := rekor.GetRekorClient(url, rekor.WithUserAgent("gitsign"))
 	if err != nil {
 		return nil, err
 	}

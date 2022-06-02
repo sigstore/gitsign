@@ -18,6 +18,9 @@ package fulcio
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -25,9 +28,9 @@ import (
 	"os"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
-	"github.com/sigstore/cosign/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
 	"github.com/sigstore/cosign/pkg/providers"
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Identity struct {
@@ -47,25 +50,37 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 		}
 		authFlow = fulcio.FlowToken
 	}
-	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
-		FulcioURL:       envOrValue("GITSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"),
-		OIDCIssuer:      envOrValue("GITSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth"),
-		OIDCClientID:    clientID,
-		OIDCRedirectURL: os.Getenv("GITSIGN_OIDC_REDIRECT_URL"),
-		RekorURL:        envOrValue("GITSIGN_REKOR_URL", "https://rekor.sigstore.dev"),
-		// Force browser based interactive mode - Git captures both stdout and
-		// stderr when it invokes the signing tool, so we can't use the
-		// code-based flow here for now (may require an upstream Git change to
-		// support).
-		FulcioAuthFlow: authFlow,
-		IDToken:        idToken,
-	})
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generating private key: %w", err)
+	}
+
+	fClient, err := fulcio.NewClient(envOrValue("GITSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"))
+	if err != nil {
+		return nil, fmt.Errorf("error creating Fulcio client: %w", err)
+	}
+
+	issuer := envOrValue("GITSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth")
+	redirectURL := os.Getenv("GITSIGN_OIDC_REDIRECT_URL")
+
+	cert, err := fulcio.GetCert(ctx, priv, idToken, authFlow, issuer, clientID, "", redirectURL, fClient)
 	if err != nil {
 		fmt.Fprintln(w, "error getting signer:", err)
 		return nil, err
 	}
+
+	sv, err := signature.LoadECDSASignerVerifier(priv, crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Identity{
-		sv:     sv,
+		sv: &sign.SignerVerifier{
+			Cert:           cert.CertPEM,
+			Chain:          cert.ChainPEM,
+			SignerVerifier: sv,
+		},
 		stderr: w,
 	}, nil
 }
