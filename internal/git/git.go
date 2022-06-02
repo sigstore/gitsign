@@ -24,9 +24,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sigstore/gitsign/internal/fulcio"
-	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/gitsign/pkg/git"
+	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 

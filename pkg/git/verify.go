@@ -24,7 +24,7 @@ import (
 	cms "github.com/github/smimesign/ietf-cms"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
-	"github.com/sigstore/gitsign/internal/rekor"
+	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
@@ -80,7 +80,7 @@ func VerifySignature(data, sig []byte, detached bool) (*x509.Certificate, error)
 
 // VerifyRekor verifies the given commit + cert exists in the Rekor transparency log.
 func VerifyRekor(ctx context.Context, rekor rekor.Verifier, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
-	tlog, err := rekor.Get(ctx, commitSHA, cert)
+	tlog, err := rekor.Get(ctx, []byte(commitSHA), cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
 	}
