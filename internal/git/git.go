@@ -19,17 +19,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 
-	cms "github.com/github/smimesign/ietf-cms"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/internal/signature"
+	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
@@ -83,9 +80,7 @@ type Claim struct {
 type ClaimCondition string
 
 const (
-	ClaimParsedSignature     ClaimCondition = "Parsed Git signature"
 	ClaimValidatedSignature  ClaimCondition = "Validated Git signature"
-	ClaimLocatedRekorEntry   ClaimCondition = "Located Rekor entry"
 	ClaimValidatedRekorEntry ClaimCondition = "Validated Rekor entry"
 )
 
@@ -96,42 +91,12 @@ func NewClaim(c ClaimCondition, ok bool) Claim {
 	}
 }
 
-func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*VerificationSummary, error) {
+func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detached bool) (*VerificationSummary, error) {
 	claims := []Claim{}
-	// Try decoding as PEM
-	var der []byte
-	if blk, _ := pem.Decode(sig); blk != nil {
-		der = blk.Bytes
-	} else {
-		der = sig
-	}
-	// Parse signature
-	sd, err := cms.ParseSignedData(der)
+
+	cert, err := git.VerifySignature(data, sig, detached)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature: %w", err)
-	}
-
-	claims = append(claims, NewClaim(ClaimParsedSignature, true))
-
-	// Generate verification options.
-	certs, err := sd.GetCertificates()
-	if err != nil {
-		return nil, fmt.Errorf("error getting signature certs: %w", err)
-	}
-	cert := certs[0]
-
-	opts := x509.VerifyOptions{
-		Roots:         fulcioroots.Get(),
-		Intermediates: fulcioroots.GetIntermediates(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-		// cosign hack: ignore the current time for now - we'll use the tlog to
-		// verify whether the commit was signed at a valid time.
-		CurrentTime: cert.NotBefore,
-	}
-
-	_, err = sd.VerifyDetached(data, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify signature: %w", err)
+		return nil, err
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
@@ -140,16 +105,10 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte) (*Verif
 		return nil, err
 	}
 
-	tlog, err := rekor.Get(ctx, commit, cert)
+	tlog, err := git.VerifyRekor(ctx, rekor, commit, cert)
 	if err != nil {
-		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
-	}
-	claims = append(claims, NewClaim(ClaimLocatedRekorEntry, true))
-
-	if err := rekor.Verify(ctx, tlog); err != nil {
 		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
 	}
-
 	claims = append(claims, NewClaim(ClaimValidatedRekorEntry, true))
 
 	return &VerificationSummary{
