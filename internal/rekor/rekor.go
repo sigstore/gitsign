@@ -36,6 +36,7 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/index"
 	"github.com/sigstore/rekor/pkg/generated/models"
+	"github.com/sigstore/rekor/pkg/sharding"
 	"github.com/sigstore/rekor/pkg/types"
 	hashedrekord "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	rekord "github.com/sigstore/rekor/pkg/types/rekord/v0.0.1"
@@ -80,6 +81,12 @@ func (c *Client) Get(ctx context.Context, commit string, cert *x509.Certificate)
 	}
 
 	for _, u := range uuids {
+		// Normalize Rekor ID
+		u, err := sharding.GetUUIDFromIDString(u)
+		if err != nil {
+			return nil, fmt.Errorf("invalid rekor UUID: %w", err)
+		}
+
 		e, err := cosign.GetTlogEntry(ctx, c.Rekor, u)
 		if err != nil {
 			return nil, err
@@ -94,7 +101,6 @@ func (c *Client) Get(ctx context.Context, commit string, cert *x509.Certificate)
 		}
 		for _, c := range tlogCerts {
 			if cert.Equal(c) {
-				fmt.Println("certs do not match!")
 				return e, nil
 			}
 		}
