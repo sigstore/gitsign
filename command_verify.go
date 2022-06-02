@@ -18,104 +18,30 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/git"
-	"github.com/sigstore/gitsign/internal/signature"
 )
 
 func commandVerify() error {
+	ctx := context.Background()
 	sNewSig.emit()
 
-	if len(fileArgs) < 2 {
-		return verifyAttached()
-	}
-
-	return verifyDetached()
-}
-
-func verifyAttached() error {
 	var (
-		f   io.ReadCloser
-		err error
+		data, sig []byte
+		err       error
 	)
-
-	// Read in signature
-	if len(fileArgs) == 1 {
-		if f, err = os.Open(fileArgs[0]); err != nil {
-			return fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
-		}
-		defer f.Close()
+	detached := len(fileArgs) >= 2
+	if detached {
+		data, sig, err = readDetached()
 	} else {
-		f = stdin
+		sig, err = readAttached()
 	}
-
-	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, f); err != nil {
-		return fmt.Errorf("failed to read signature: %w", err)
-	}
-
-	chains, err := signature.Verify(buf.Bytes(), nil, false, verifyOpts())
-	cert := chains[0][0][0]
 	if err != nil {
-		if len(chains) > 0 {
-			emitBadSig(cert)
-		} else {
-			// TODO: We're omitting a bunch of arguments here.
-			sErrSig.emit()
-		}
-		return fmt.Errorf("failed to verify signature: %w", err)
-	}
-
-	var (
-		fpr  = internal.CertHexFingerprint(cert)
-		subj = cert.Subject.String()
-	)
-
-	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s\n", fpr)
-	emitGoodSig(cert)
-
-	// TODO: Maybe split up signature checking and certificate checking so we can
-	// output something more meaningful.
-	fmt.Fprintf(stderr, "smimesign: Good signature from \"%s\"\n", subj)
-	emitTrustFully()
-
-	return nil
-}
-
-func verifyDetached() error {
-	var (
-		f   io.ReadCloser
-		err error
-	)
-
-	// Read in signature
-	if f, err = os.Open(fileArgs[0]); err != nil {
-		return fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
-	}
-	defer f.Close()
-	sig := new(bytes.Buffer)
-	if _, err = io.Copy(sig, f); err != nil {
-		return fmt.Errorf("failed to read signature file: %w", err)
-	}
-
-	// Read in signed data
-	if fileArgs[1] == "-" {
-		f = stdin
-	} else {
-		if f, err = os.Open(fileArgs[1]); err != nil {
-			return fmt.Errorf("failed to open message file (%s): %w", fileArgs[1], err)
-		}
-		defer f.Close()
-	}
-	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, f); err != nil {
-		return fmt.Errorf("failed to read message file: %w", err)
+		return fmt.Errorf("failed to read signature data (detached: %T): %w", detached, err)
 	}
 
 	rekor, err := newRekorClient()
@@ -123,7 +49,7 @@ func verifyDetached() error {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
 
-	summary, err := git.Verify(context.Background(), rekor, buf.Bytes(), sig.Bytes())
+	summary, err := git.Verify(ctx, rekor, data, sig, detached)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			emitBadSig(summary.Cert)
@@ -137,12 +63,12 @@ func verifyDetached() error {
 	fpr := internal.CertHexFingerprint(summary.Cert)
 
 	fmt.Fprintln(stderr, "tlog index:", *summary.LogEntry.LogIndex)
-	fmt.Fprintf(stderr, "smimesign: Signature made using certificate ID 0x%s | %v\n", fpr, summary.Cert.Issuer)
+	fmt.Fprintf(stderr, "gitsign: Signature made using certificate ID 0x%s | %v\n", fpr, summary.Cert.Issuer)
 	emitGoodSig(summary.Cert)
 
 	// TODO: Maybe split up signature checking and certificate checking so we can
 	// output something more meaningful.
-	fmt.Fprintf(stderr, "smimesign: Good signature from %v\n", summary.Cert.EmailAddresses)
+	fmt.Fprintf(stderr, "gitsign: Good signature from %v\n", summary.Cert.EmailAddresses)
 
 	for _, c := range summary.Claims {
 		fmt.Fprintf(stderr, "%s: %t\n", string(c.Key), c.Value)
@@ -153,10 +79,59 @@ func verifyDetached() error {
 	return nil
 }
 
-func verifyOpts() x509.VerifyOptions {
-	return x509.VerifyOptions{
-		Roots:         fulcioroots.Get(),
-		Intermediates: fulcioroots.GetIntermediates(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+func readAttached() ([]byte, error) {
+	var (
+		f   io.ReadCloser
+		err error
+	)
+
+	// Read in signature
+	if len(fileArgs) == 1 {
+		if f, err = os.Open(fileArgs[0]); err != nil {
+			return nil, fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
+		}
+		defer f.Close()
+	} else {
+		f = stdin
 	}
+
+	sig := new(bytes.Buffer)
+	if _, err = io.Copy(sig, f); err != nil {
+		return nil, fmt.Errorf("failed to read signature: %w", err)
+	}
+
+	return sig.Bytes(), nil
+}
+
+func readDetached() ([]byte, []byte, error) {
+	var (
+		f   io.ReadCloser
+		err error
+	)
+
+	// Read in signature
+	if f, err = os.Open(fileArgs[0]); err != nil {
+		return nil, nil, fmt.Errorf("failed to open signature file (%s): %w", fileArgs[0], err)
+	}
+	defer f.Close()
+	sig := new(bytes.Buffer)
+	if _, err = io.Copy(sig, f); err != nil {
+		return nil, nil, fmt.Errorf("failed to read signature file: %w", err)
+	}
+
+	// Read in signed data
+	if fileArgs[1] == "-" {
+		f = stdin
+	} else {
+		if f, err = os.Open(fileArgs[1]); err != nil {
+			return nil, nil, fmt.Errorf("failed to open message file (%s): %w", fileArgs[1], err)
+		}
+		defer f.Close()
+	}
+	buf := new(bytes.Buffer)
+	if _, err = io.Copy(buf, f); err != nil {
+		return nil, nil, fmt.Errorf("failed to read message file: %w", err)
+	}
+
+	return buf.Bytes(), sig.Bytes(), nil
 }
