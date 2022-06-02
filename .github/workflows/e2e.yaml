@@ -42,9 +42,9 @@ jobs:
         # target since it was originally intended for trusted workloads.
         # However, we need to use this to have access to the OIDC creds
         # for the e2e tests, so insert our own logic here.
-        # This is effectively a ternary of the form ${{ <condition> <true> || <false> }}.
+        # This is effectively a ternary of the form ${{ <condition> && <true> || <false> }}.
         # See https://docs.github.com/en/actions/learn-github-actions/expressions for more details.
-        ref: ${{ startsWith(${{ github.event_name }}, "pull_request") "refs/pull/${{ github.event.number }}/merge" }} || ${{ github.ref }} }}
+        ref: ${{ startsWith(github.event_name, 'pull_request') && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
 
     - name: Set up Go
       uses: actions/setup-go@b22fbbc2921299758641fab08929b4ac52b32923 # v3.1.0
