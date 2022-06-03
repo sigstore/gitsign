@@ -1,11 +1,10 @@
-//
-// Copyright 2022 The Sigstore Authors.
+// Copyright 2022 The Sigstore authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,130 +15,88 @@
 package fulcio
 
 import (
-	"context"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
-	"encoding/pem"
-	"fmt"
-	"io"
-	"os"
+	"net/url"
+	"reflect"
+	"strings"
 
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
-	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
-	"github.com/sigstore/cosign/pkg/providers"
-	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/sigstore/fulcio/pkg/api"
+	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
 
-type Identity struct {
-	sv     *sign.SignerVerifier
-	stderr io.Writer
+// Client provides a fulcio client with helpful options for configuring OIDC
+// flows.
+type Client struct {
+	api.Client
+	oidc OIDCOptions
 }
 
-func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
-	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
-	idToken := ""
-	authFlow := fulcio.FlowNormal
-	if providers.Enabled(ctx) {
-		var err error
-		idToken, err = providers.Provide(ctx, clientID)
-		if err != nil {
-			fmt.Fprintln(w, "error getting id token:", err)
-		}
-		authFlow = fulcio.FlowToken
-	}
+// OIDCOptions contains settings for OIDC operations.
+type OIDCOptions struct {
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	TokenGetter  oauthflow.TokenGetter
+}
 
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("generating private key: %w", err)
-	}
-
-	fClient, err := fulcio.NewClient(envOrValue("GITSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"))
-	if err != nil {
-		return nil, fmt.Errorf("error creating Fulcio client: %w", err)
-	}
-
-	issuer := envOrValue("GITSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth")
-	redirectURL := os.Getenv("GITSIGN_OIDC_REDIRECT_URL")
-
-	cert, err := fulcio.GetCert(ctx, priv, idToken, authFlow, issuer, clientID, "", redirectURL, fClient)
-	if err != nil {
-		fmt.Fprintln(w, "error getting signer:", err)
-		return nil, err
-	}
-
-	sv, err := signature.LoadECDSASignerVerifier(priv, crypto.SHA256)
+func NewClient(fulcioURL string, opts OIDCOptions) (*Client, error) {
+	u, err := url.Parse(fulcioURL)
 	if err != nil {
 		return nil, err
 	}
-
-	return &Identity{
-		sv: &sign.SignerVerifier{
-			Cert:           cert.CertPEM,
-			Chain:          cert.ChainPEM,
-			SignerVerifier: sv,
-		},
-		stderr: w,
+	client := api.NewClient(u, api.WithUserAgent("gitsign"))
+	return &Client{
+		Client: client,
+		oidc:   opts,
 	}, nil
 }
 
-func envOrValue(env, value string) string {
-	if v := os.Getenv(env); v != "" {
-		return v
-	}
-	return value
-}
-
-// Certificate gets the identity's certificate.
-func (i *Identity) Certificate() (*x509.Certificate, error) {
-	p, _ := pem.Decode(i.sv.Cert)
-	cert, err := x509.ParseCertificate(p.Bytes)
-	return cert, err
-}
-
-// CertificateChain attempts to get the identity's full certificate chain.
-func (i *Identity) CertificateChain() ([]*x509.Certificate, error) {
-	p, _ := pem.Decode(i.sv.Chain)
-	chain, err := x509.ParseCertificates(p.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	// the cert itself needs to be appended to the chain
-	cert, err := i.Certificate()
+// GetCert exchanges the given private key for a Fulcio certificate.
+func (c *Client) GetCert(priv crypto.Signer) (*api.CertificateResponse, error) {
+	pubBytes, err := x509.MarshalPKIXPublicKey(priv.Public())
 	if err != nil {
 		return nil, err
 	}
 
-	return append([]*x509.Certificate{cert}, chain...), nil
-}
-
-// Signer gets a crypto.Signer that uses the identity's private key.
-func (i *Identity) Signer() (crypto.Signer, error) {
-	s, ok := i.sv.SignerVerifier.(crypto.Signer)
-	if !ok {
-		return nil, fmt.Errorf("could not use signer %T as crypto.Signer", i.sv.SignerVerifier)
+	tok, err := oauthflow.OIDConnect(c.oidc.Issuer, c.oidc.ClientID, c.oidc.ClientSecret, c.oidc.RedirectURL, c.oidc.TokenGetter)
+	if err != nil {
+		return nil, err
 	}
 
-	return s, nil
+	// Sign the email address as part of the request
+	h := sha256.Sum256([]byte(tok.Subject))
+	proof, err := priv.Sign(rand.Reader, h[:], nil)
+	if err != nil {
+		return nil, err
+	}
+
+	cr := api.CertificateRequest{
+		PublicKey: api.Key{
+			Algorithm: keyAlgorithm(priv),
+			Content:   pubBytes,
+		},
+		SignedEmailAddress: proof,
+	}
+
+	return c.SigningCert(cr, tok.RawString)
 }
 
-// Delete deletes this identity from the system.
-func (i *Identity) Delete() error {
-	// Does nothing - keys are ephemeral
-	return nil
-}
-
-// Close any manually managed memory held by the Identity.
-func (i *Identity) Close() {
-	// noop
-}
-
-func (i *Identity) PublicKey() (crypto.PublicKey, error) {
-	return i.sv.SignerVerifier.PublicKey()
-}
-
-func (i *Identity) SignerVerifier() *sign.SignerVerifier {
-	return i.sv
+// keyAlgorithm returns a string representation of the type of signer.
+// Currently this is dervived from the package name -
+// e.g. crypto/ecdsa.PrivateKey -> ecdsa.
+// if Signer is nil, "" is returned.
+func keyAlgorithm(signer crypto.Signer) string {
+	// This is a bit of a hack, but let's us use the package name as an approximation for
+	// algorithm type.
+	// e.g. *ecdsa.PrivateKey -> ecdsa
+	t := reflect.TypeOf(signer)
+	if t == nil {
+		return ""
+	}
+	s := strings.Split(strings.TrimPrefix(t.String(), "*"), ".")
+	return s[0]
 }
