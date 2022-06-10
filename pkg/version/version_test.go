@@ -17,12 +17,11 @@ package version
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestVersionText(t *testing.T) {
 	sut := GetVersionInfo()
-	require.NotEmpty(t, sut)
-	require.Equal(t, gitVersion, sut.GitVersion)
+	if sut.GitVersion != gitVersion {
+		t.Errorf("GetVersionInfo: got %q, want %q", sut, gitVersion)
+	}
 }
