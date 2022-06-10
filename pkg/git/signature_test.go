@@ -19,13 +19,10 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/signature"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type identity struct {
@@ -50,11 +47,11 @@ func (i *identity) Signer() (crypto.Signer, error) {
 // been more thoroghly vetted in other packages (i.e. ietf-cms).
 func TestSignVerify(t *testing.T) {
 	ca := fakeca.New()
-	initFulcioRoots(t, ca.Certificate)
-
 	id := &identity{
 		base: ca,
 	}
+	roots := x509.NewCertPool()
+	roots.AddCert(ca.Certificate)
 	data := []byte("tacocat")
 
 	for _, detached := range []bool{true, false} {
@@ -65,32 +62,14 @@ func TestSignVerify(t *testing.T) {
 				// Fake CA outputs self-signed certs, so we need to use -1 to make sure
 				// the self-signed cert itself is included in the chain, otherwise
 				// Verify cannot find a cert to use for verification.
-				IncludeCerts: -1,
+				IncludeCerts: 0,
 			})
 			if err != nil {
 				t.Fatalf("Sign() = %v", err)
 			}
-			if _, err := VerifySignature(data, sig, detached); err != nil {
+			if _, err := VerifySignature(data, sig, detached, roots, ca.ChainPool()); err != nil {
 				t.Fatalf("Verify() = %v", err)
 			}
 		})
 	}
-}
-
-func initFulcioRoots(t *testing.T, cert *x509.Certificate) {
-	t.Helper()
-
-	pem, _ := cryptoutils.MarshalCertificateToPEM(cert)
-	tmp, err := os.CreateTemp(t.TempDir(), "fulcio_root_*.cert")
-	if err != nil {
-		t.Fatalf("failed to create temp cert file: %v", err)
-	}
-	defer tmp.Close()
-	if _, err := tmp.Write(pem); err != nil {
-		t.Fatalf("failed to write cert file: %v", err)
-	}
-	t.Setenv("SIGSTORE_ROOT_FILE", tmp.Name())
-
-	// Call fulcioroots to set up the root init.
-	_ = fulcioroots.Get()
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
+	"github.com/sigstore/sigstore/pkg/fulcioroots"
 )
 
 func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
@@ -94,7 +95,16 @@ func NewClaim(c ClaimCondition, ok bool) Claim {
 func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detached bool) (*VerificationSummary, error) {
 	claims := []Claim{}
 
-	cert, err := git.VerifySignature(data, sig, detached)
+	root, err := fulcioroots.Get()
+	if err != nil {
+		return nil, fmt.Errorf("getting fulcio root certificate: %w", err)
+	}
+	intermediates, err := fulcioroots.GetIntermediates()
+	if err != nil {
+		return nil, fmt.Errorf("getting fulcio intermediate certificates: %w", err)
+	}
+
+	cert, err := git.VerifySignature(data, sig, detached, root, intermediates)
 	if err != nil {
 		return nil, err
 	}

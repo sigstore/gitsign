@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	cms "github.com/github/smimesign/ietf-cms"
-
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 )
 
 // VerifySignature verifies for a given Git data + signature pair.
@@ -32,7 +30,7 @@ import (
 // work.
 //
 // Signatures should be CMS/PKCS7 formatted.
-func VerifySignature(data, sig []byte, detached bool) (*x509.Certificate, error) {
+func VerifySignature(data, sig []byte, detached bool, rootCerts, intermediates *x509.CertPool) (*x509.Certificate, error) {
 	// Try decoding as PEM
 	var der []byte
 	if blk, _ := pem.Decode(sig); blk != nil {
@@ -54,8 +52,8 @@ func VerifySignature(data, sig []byte, detached bool) (*x509.Certificate, error)
 	cert := certs[0]
 
 	opts := x509.VerifyOptions{
-		Roots:         fulcioroots.Get(),
-		Intermediates: fulcioroots.GetIntermediates(),
+		Roots:         rootCerts,
+		Intermediates: intermediates,
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 		// cosign hack: ignore the current time for now - we'll use the tlog to
 		// verify whether the commit was signed at a valid time.
