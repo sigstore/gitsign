@@ -19,6 +19,7 @@ builds:
   - "-s -w"
   - "-extldflags=-zrelro"
   - "-extldflags=-znow"
+  - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
 
 nfpms:
 - id: default

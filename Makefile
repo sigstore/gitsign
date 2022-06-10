@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LDFLAGS ?=
+GIT_VERSION ?= $(shell git describe --tags --always --dirty)
+
+LDFLAGS=-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion=$(GIT_VERSION)
 
 .PHONY: build
 build:

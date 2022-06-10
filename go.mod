@@ -15,6 +15,7 @@ require (
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7
 	github.com/sigstore/rekor v0.8.0
 	github.com/sigstore/sigstore v1.2.1-0.20220526001230-8dc4fa90a468
+	github.com/stretchr/testify v1.7.1
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
 )
@@ -44,6 +45,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20210823021906-dc406ceaf94b // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/cli v20.10.16+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker v20.10.16+incompatible // indirect
@@ -116,6 +118,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
