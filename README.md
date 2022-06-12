@@ -25,7 +25,7 @@ git config --local gpg.x509.program gitsign  # Use gitsign for signing
 git config --local gpg.format x509  # gitsign expects x509 args
 ```
 
-All respositories:
+All repositories:
 
 ```sh
 git config --global commit.gpgsign true  # Sign all commits
@@ -136,7 +136,7 @@ Gitsign stores data in 2 places:
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
    particular, users and organizations may be sensitive to the data contained
-   within code signing certificatesm returned by Fulcio, which may include user
+   within code signing certificates returned by Fulcio, which may include user
    emails or repo identifiers. See
    [OIDC usage in Fulcio](https://github.com/sigstore/fulcio/blob/6ac6b8c94c3ec6106d68c0f92225016a3a6eef79/docs/oidc.md)
    for more details for what data is contained in the code signing certs, and
