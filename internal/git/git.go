@@ -52,7 +52,7 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
-	if _, err := rekor.Write(ctx, commitSig, commit, cert); err != nil {
+	if _, err := rekor.Write(ctx, commit, commitSig, cert); err != nil {
 		return nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 

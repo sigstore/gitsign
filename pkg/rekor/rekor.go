@@ -49,7 +49,7 @@ type Verifier interface {
 
 // Writer represents a mechanism to write content to Rekor.
 type Writer interface {
-	Write(ctx context.Context, sig []byte, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
+	Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
 // Client implements a basic rekor implementation for writing and verifying Rekor data.
@@ -67,7 +67,7 @@ func New(url string, opts ...rekor.Option) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Write(ctx context.Context, sig []byte, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+func (c *Client) Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	pem, err := cryptoutils.MarshalCertificateToPEM(cert)
 	if err != nil {
 		return nil, err
