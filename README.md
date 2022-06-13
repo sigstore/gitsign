@@ -10,6 +10,14 @@ keyless Sigstore to sign Git commits with your own GitHub / OIDC identity.
 
 ## Installation
 
+Using Homebrew:
+
+```sh
+brew install sigstore/tap/gitsign
+```
+
+Using Go:
+
 ```sh
 go install github.com/sigstore/gitsign@latest
 ```
