@@ -52,7 +52,7 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
-	if _, err := rekor.Write(ctx, commitSig, []byte(commit), sv.Cert); err != nil {
+	if _, err := rekor.Write(ctx, commitSig, commit, cert); err != nil {
 		return nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 
@@ -105,7 +105,7 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detache
 		return nil, err
 	}
 
-	tlog, err := git.VerifyRekor(ctx, rekor, commit, cert)
+	tlog, err := rekor.Verify(ctx, commit, cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
 	}

@@ -16,7 +16,6 @@
 package git
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -24,8 +23,6 @@ import (
 	cms "github.com/github/smimesign/ietf-cms"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
-	"github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
 // VerifySignature verifies for a given Git data + signature pair.
@@ -76,18 +73,4 @@ func VerifySignature(data, sig []byte, detached bool) (*x509.Certificate, error)
 	}
 
 	return cert, nil
-}
-
-// VerifyRekor verifies the given commit + cert exists in the Rekor transparency log.
-func VerifyRekor(ctx context.Context, rekor rekor.Verifier, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
-	tlog, err := rekor.Get(ctx, []byte(commitSHA), cert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to locate rekor entry: %w", err)
-	}
-
-	if err := rekor.Verify(ctx, tlog); err != nil {
-		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
-	}
-
-	return tlog, nil
 }
