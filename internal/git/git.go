@@ -24,9 +24,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sigstore/gitsign/internal/fulcio"
-	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/gitsign/pkg/git"
+	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
@@ -52,7 +52,7 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
-	if _, err := rekor.Write(ctx, commitSig, []byte(commit), sv.Cert); err != nil {
+	if _, err := rekor.Write(ctx, commit, commitSig, cert); err != nil {
 		return nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 
@@ -105,7 +105,7 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detache
 		return nil, err
 	}
 
-	tlog, err := git.VerifyRekor(ctx, rekor, commit, cert)
+	tlog, err := rekor.Verify(ctx, commit, cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
 	}

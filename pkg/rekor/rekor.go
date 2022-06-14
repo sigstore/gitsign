@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,21 +42,23 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
+// Verifier represents a mechanism to get and verify Rekor entries for the given Git commit.
 type Verifier interface {
-	Get(ctx context.Context, commit string, cert *x509.Certificate) (*models.LogEntryAnon, error)
-	Verify(context.Context, *models.LogEntryAnon) error
+	Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
+// Writer represents a mechanism to write content to Rekor.
 type Writer interface {
-	Write(ctx context.Context, sig, data, cert []byte) (*models.LogEntryAnon, error)
+	Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
+// Client implements a basic rekor implementation for writing and verifying Rekor data.
 type Client struct {
 	*client.Rekor
 }
 
-func New(url string) (*Client, error) {
-	c, err := rekor.GetRekorClient(url, rekor.WithUserAgent("gitsign"))
+func New(url string, opts ...rekor.Option) (*Client, error) {
+	c, err := rekor.GetRekorClient(url, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,16 +67,21 @@ func New(url string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Write(ctx context.Context, sig, data, cert []byte) (*models.LogEntryAnon, error) {
-	return cosign.TLogUpload(ctx, c.Rekor, sig, data, cert)
-}
-
-func (c *Client) Get(ctx context.Context, commit string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
-	pk, err := publicKeyFromCert(cert)
+func (c *Client) Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	pem, err := cryptoutils.MarshalCertificateToPEM(cert)
 	if err != nil {
 		return nil, err
 	}
-	uuids, err := c.findTLogEntriesByPayloadAndPK(ctx, []byte(commit), pk)
+	return cosign.TLogUpload(ctx, c.Rekor, sig, []byte(commitSHA), pem)
+}
+
+func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	pem, err := cryptoutils.MarshalCertificateToPEM(cert)
+	if err != nil {
+		return nil, err
+	}
+
+	uuids, err := c.findTLogEntriesByPayloadAndPK(ctx, data, pem)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +99,7 @@ func (c *Client) Get(ctx context.Context, commit string, cert *x509.Certificate)
 		}
 
 		// Verify that the cert used in the tlog matches the cert
-		// used to sign the commit.
+		// used to sign the data.
 		tlogCerts, err := extractCerts(e)
 		if err != nil {
 			fmt.Println("could not extract cert", err)
@@ -131,19 +137,12 @@ func (c *Client) findTLogEntriesByPayloadAndPK(ctx context.Context, payload, pub
 	return searchIndex.GetPayload(), nil
 }
 
-func publicKeyFromCert(cert *x509.Certificate) ([]byte, error) {
-	pk, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	e, err := c.get(ctx, []byte(commitSHA), cert)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling public key: %w", err)
+		return nil, err
 	}
-	return pem.EncodeToMemory(&pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: pk,
-	}), nil
-}
-
-func (c *Client) Verify(ctx context.Context, e *models.LogEntryAnon) error {
-	return cosign.VerifyTLogEntry(ctx, c.Rekor, e)
+	return e, cosign.VerifyTLogEntry(ctx, c.Rekor, e)
 }
 
 // extractCerts is taken from cosign's cmd/cosign/cli/verify/verify_blob.go.
