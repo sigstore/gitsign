@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime/debug"
 
 	"github.com/pborman/getopt/v2"
 
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
+	"github.com/sigstore/gitsign/pkg/version"
 )
 
 const (
@@ -89,16 +89,9 @@ func runCommand() error {
 	}
 
 	if *versionFlag {
-		version := "unknown"
-		info, ok := debug.ReadBuildInfo()
-		if ok {
-			for _, s := range info.Settings {
-				if s.Key == "vcs.revision" {
-					version = s.Value
-				}
-			}
-		}
-		fmt.Println(version)
+		v := version.GetVersionInfo()
+		fmt.Printf("gitsign version %s\n", v.GitVersion)
+
 		return nil
 	}
 
