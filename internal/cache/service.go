@@ -65,7 +65,6 @@ func (s *Service) GetCredential(req GetCredentialRequest, resp *Credential) erro
 	cred, ok := i.(*Credential)
 	if !ok {
 		return fmt.Errorf("unknown credential type %T", i)
-
 	}
 	*resp = *cred
 	return nil

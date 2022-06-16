@@ -59,19 +59,8 @@ var (
 )
 
 func main() {
-	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
-		// Since Git eats both stdout and stderr, we don't have a good way of
-		// getting error information back from clients if things go wrong.
-		// As a janky way to preserve error message, tee stderr to
-		// a temp file.
-		if f, err := os.Create(logPath); err == nil {
-			defer f.Close()
-			stderr = io.MultiWriter(stderr, f)
-		}
-	}
-
 	if err := runCommand(); err != nil {
-		fmt.Fprintln(stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -82,6 +71,17 @@ func runCommand() error {
 	getopt.SetParameters("[files]")
 	getopt.Parse()
 	fileArgs = getopt.Args()
+
+	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
+		// Since Git eats both stdout and stderr, we don't have a good way of
+		// getting error information back from clients if things go wrong.
+		// As a janky way to preserve error message, tee stderr to
+		// a temp file.
+		if f, err := os.Create(logPath); err == nil {
+			defer f.Close()
+			stderr = io.MultiWriter(stderr, f)
+		}
+	}
 
 	if *helpFlag {
 		getopt.Usage()

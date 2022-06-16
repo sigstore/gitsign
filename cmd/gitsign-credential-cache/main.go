@@ -47,7 +47,9 @@ func main() {
 		log.Fatalf("error opening socket: %v", err)
 	}
 	srv := rpc.NewServer()
-	srv.Register(cache.NewService())
+	if err := srv.Register(cache.NewService()); err != nil {
+		log.Fatalf("error registering RPC service: %v", err)
+	}
 	for {
 		srv.Accept(l)
 	}
