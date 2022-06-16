@@ -29,9 +29,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
@@ -54,10 +54,18 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error creating RPC socket client: %w", err)
 		}
+		roots, err := fulcioroots.Get()
+		if err != nil {
+			return nil, fmt.Errorf("error getting fulcio roots: %w", err)
+		}
+		intermediates, err := fulcioroots.GetIntermediates()
+		if err != nil {
+			return nil, fmt.Errorf("error getting fulcio intermediates: %w", err)
+		}
 		cacheClient = &cache.Client{
 			Client:        rpcClient,
-			Roots:         fulcioroots.Get(),
-			Intermediates: fulcioroots.GetIntermediates(),
+			Roots:         roots,
+			Intermediates: intermediates,
 		}
 		sv, cert, chain, err := cacheClient.GetSignerVerifier(ctx)
 		if err == nil && sv != nil {
