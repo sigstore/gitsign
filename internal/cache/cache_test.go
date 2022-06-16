@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
@@ -32,8 +33,7 @@ import (
 func TestCache(t *testing.T) {
 	ctx := context.Background()
 
-	path := t.TempDir() + "cache.sock"
-
+	path := filepath.Join(t.TempDir(), "cache.sock")
 	l, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
