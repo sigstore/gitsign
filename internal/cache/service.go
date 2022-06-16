@@ -1,44 +1,58 @@
 package cache
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	cachepb "github.com/sigstore/gitsign/internal/cache/cache_go_proto"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type Service struct {
-	cachepb.UnimplementedCredentialStoreServer
 	store *cache.Cache
 }
 
 func NewService() *Service {
-	return &Service{
+	s := &Service{
 		store: cache.New(10*time.Minute, 1*time.Minute),
 	}
+	return s
 }
 
-func (s *Service) StoreCredential(ctx context.Context, req *cachepb.StoreCredentialRequest) (*cachepb.StoreCredentialResponse, error) {
-	fmt.Println("Store", req.GetId())
-	if err := s.store.Add(req.GetId(), req.GetCredential(), 10*time.Minute); err != nil {
-		return nil, err
-	}
-	return &cachepb.StoreCredentialResponse{}, nil
+type Credential struct {
+	PrivateKey []byte
+	Cert       []byte
+	Chain      []byte
 }
 
-func (s *Service) GetCredential(ctx context.Context, req *cachepb.GetCredentialRequest) (*cachepb.Credential, error) {
-	fmt.Println("Get", req.GetId())
-	i, ok := s.store.Get(req.GetId())
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "%q not found", req.GetId())
+type StoreCredentialRequest struct {
+	ID         string
+	Credential *Credential
+}
+
+func (s *Service) StoreCredential(req StoreCredentialRequest, resp *Credential) error {
+	fmt.Println("Get", req.ID)
+	if err := s.store.Add(req.ID, req.Credential, 10*time.Minute); err != nil {
+		return err
 	}
-	cred, ok := i.(*cachepb.Credential)
+	*resp = *req.Credential
+	return nil
+}
+
+type GetCredentialRequest struct {
+	ID string
+}
+
+func (s *Service) GetCredential(req GetCredentialRequest, resp *Credential) error {
+	fmt.Println("Get", req.ID)
+	i, ok := s.store.Get(req.ID)
 	if !ok {
-		return nil, status.Errorf(codes.FailedPrecondition, "found unexpected cache type %T", i)
+		return fmt.Errorf("%q not found", req.ID)
 	}
-	return cred, nil
+	cred, ok := i.(*Credential)
+	if !ok {
+		return fmt.Errorf("unknown credential type %T", i)
+
+	}
+	*resp = *cred
+	return nil
 }

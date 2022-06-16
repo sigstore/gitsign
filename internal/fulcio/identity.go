@@ -25,17 +25,15 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net/rpc"
 	"os"
 	"path/filepath"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioroots"
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
-	cachepb "github.com/sigstore/gitsign/internal/cache/cache_go_proto"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Identity struct {
@@ -52,14 +50,14 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error resolving cache path: %w", err)
 		}
-		conn, err := grpc.DialContext(ctx, "unix://"+absPath, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		rpcClient, err := rpc.Dial("unix", absPath)
 		if err != nil {
-			return nil, fmt.Errorf("error connecting client to socket: %w", err)
+			return nil, fmt.Errorf("error creating RPC socket client: %w", err)
 		}
 		cacheClient = &cache.Client{
-			CredentialStoreClient: cachepb.NewCredentialStoreClient(conn),
-			Roots:                 fulcioroots.Get(),
-			Intermediates:         fulcioroots.GetIntermediates(),
+			Client:        rpcClient,
+			Roots:         fulcioroots.Get(),
+			Intermediates: fulcioroots.GetIntermediates(),
 		}
 		sv, cert, chain, err := cacheClient.GetSignerVerifier(ctx)
 		if err == nil && sv != nil {

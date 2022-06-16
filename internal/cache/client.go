@@ -5,16 +5,16 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"net/rpc"
 	"os"
 	"time"
 
-	cachepb "github.com/sigstore/gitsign/internal/cache/cache_go_proto"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Client struct {
-	cachepb.CredentialStoreClient
+	Client        *rpc.Client
 	Roots         *x509.CertPool
 	Intermediates *x509.CertPool
 }
@@ -25,10 +25,10 @@ func (c *Client) GetSignerVerifier(ctx context.Context) (signature.SignerVerifie
 		return nil, nil, nil, err
 	}
 
-	resp, err := c.GetCredential(ctx, &cachepb.GetCredentialRequest{
-		Id: id,
-	})
-	if err != nil {
+	resp := new(Credential)
+	if err := c.Client.Call("Service.GetCredential", GetCredentialRequest{
+		ID: id,
+	}, resp); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -43,7 +43,7 @@ func (c *Client) GetSignerVerifier(ctx context.Context) (signature.SignerVerifie
 	}
 
 	// Check that the cert is in fact still valid.
-	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(resp.CertPem)
+	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(resp.Cert)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error unmarshalling cert: %w", err)
 	}
@@ -61,7 +61,7 @@ func (c *Client) GetSignerVerifier(ctx context.Context) (signature.SignerVerifie
 		}
 	}
 
-	return sv, resp.CertPem, resp.CertChain, nil
+	return sv, resp.Cert, resp.Chain, nil
 }
 
 type PrivateKey interface {
@@ -79,13 +79,16 @@ func (c *Client) StoreCert(ctx context.Context, priv PrivateKey, cert, chain []b
 		return err
 	}
 
-	_, err = c.StoreCredential(ctx, &cachepb.StoreCredentialRequest{
-		Id: id,
-		Credential: &cachepb.Credential{
+	if err := c.Client.Call("Service.StoreCredential", StoreCredentialRequest{
+		ID: id,
+		Credential: &Credential{
 			PrivateKey: privPEM,
-			CertPem:    cert,
-			CertChain:  chain,
+			Cert:       cert,
+			Chain:      chain,
 		},
-	})
+	}, new(Credential)); err != nil {
+		return err
+	}
+
 	return err
 }

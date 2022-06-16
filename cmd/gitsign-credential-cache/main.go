@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/rpc"
 	"os"
 	"path/filepath"
 
 	"github.com/sigstore/gitsign/internal/cache"
-	cachepb "github.com/sigstore/gitsign/internal/cache/cache_go_proto"
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -27,17 +26,15 @@ func main() {
 	if _, err := os.Stat(path); err == nil {
 		os.Remove(path)
 	}
-	fmt.Print(path)
+	fmt.Println(path)
 
-	lis, err := net.Listen("unix", path)
+	l, err := net.Listen("unix", path)
 	if err != nil {
-		log.Fatalln("error connecting server to socket", err)
+		log.Fatalf("error opening socket: %v", err)
 	}
-	defer lis.Close()
-
-	s := grpc.NewServer()
-	cachepb.RegisterCredentialStoreServer(s, cache.NewService())
-	if err := s.Serve(lis); err != nil {
-		log.Fatal(err)
+	srv := rpc.NewServer()
+	srv.Register(cache.NewService())
+	for {
+		srv.Accept(l)
 	}
 }

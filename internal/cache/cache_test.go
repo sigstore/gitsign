@@ -6,67 +6,64 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"net"
+	"net/rpc"
 	"os"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
 	"github.com/google/go-cmp/cmp"
-	pb "github.com/sigstore/gitsign/internal/cache/cache_go_proto"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestCache(t *testing.T) {
 	ctx := context.Background()
 
-	l, err := net.Listen("tcp", ":0")
+	path := t.TempDir() + "cache.sock"
+
+	l, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := grpc.NewServer()
-	pb.RegisterCredentialStoreServer(s, NewService())
+	srv := rpc.NewServer()
+	srv.Register(NewService())
 	go func() {
-		s.Serve(l)
+		for {
+			srv.Accept(l)
+		}
 	}()
 
-	conn, err := grpc.DialContext(ctx, l.Addr().String(), grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
+	rpcClient, _ := rpc.Dial("unix", path)
+	defer rpcClient.Close()
 	ca := fakeca.New()
 	client := &Client{
-		CredentialStoreClient: pb.NewCredentialStoreClient(conn),
-		Roots:                 ca.ChainPool(),
+		Client: rpcClient,
+		Roots:  ca.ChainPool(),
 	}
 
-	if _, _, _, err := client.GetSignerVerifier(ctx); status.Code(err) != codes.NotFound {
-		t.Fatalf("expected NotFound, got %v %v", err, status.Code(err))
+	if _, _, _, err := client.GetSignerVerifier(ctx); err == nil {
+		t.Fatal("GetSignerVerifier: expected err, got not")
 	}
 
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	certPEM, _ := cryptoutils.MarshalCertificateToPEM(ca.Certificate)
 
 	if err := client.StoreCert(ctx, priv, certPEM, nil); err != nil {
-		t.Fatal(err)
+		t.Fatalf("StoreCert: %v", err)
 	}
 
 	id, _ := os.Getwd()
-	resp, err := client.GetCredential(ctx, &pb.GetCredentialRequest{Id: id})
-	if err != nil {
+	cred := new(Credential)
+	if err := client.Client.Call("Service.GetCredential", &GetCredentialRequest{ID: id}, cred); err != nil {
 		t.Fatal(err)
 	}
 
 	privPEM, _ := cryptoutils.MarshalPrivateKeyToPEM(priv)
-	want := &pb.Credential{
+	want := &Credential{
 		PrivateKey: privPEM,
-		CertPem:    certPEM,
+		Cert:       certPEM,
 	}
 
-	if diff := cmp.Diff(want, resp, protocmp.Transform()); diff != "" {
+	if diff := cmp.Diff(want, cred); diff != "" {
 		t.Error(diff)
 	}
 
