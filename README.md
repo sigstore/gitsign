@@ -1,4 +1,4 @@
-# gitsign
+# Gitsign
 
 [![CI](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/ci.yaml)
 [![E2E](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml)
@@ -90,11 +90,11 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
   <img src="./images/unverified.png" width="400" />
 
-  GitHub doesn't recognize gitsign signatures as verfied at the moment:
+  GitHub doesn't recognize Gitsign signatures as verfied at the moment:
 
   1. The sigstore CA root is not a part of
      [GitHub's trust root](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#smime-commit-signature-verification).
-  2. Because gitsign's ephemeral keys are only valid for a short time, using
+  2. Because Gitsign's ephemeral keys are only valid for a short time, using
      standard x509 verification would consider the certificate invalid after
      expiration. Verification needs to include validation via Rekor to verify
      the cert was valid at the time it was used.
@@ -117,7 +117,7 @@ variable to tee logs into a readable location for debugging.
 
 ## Privacy
 
-### What data does gitsign store?
+### What data does Gitsign store?
 
 Gitsign stores data in 2 places:
 
@@ -133,7 +133,7 @@ Gitsign stores data in 2 places:
 2. Within the Rekor transparency log
 
    To be able to verify signatures for ephemeral certs past their `Not After`
-   time, gitsign records commits and the code signing certificates to
+   time, Gitsign records commits and the code signing certificates to
    [Rekor](https://docs.sigstore.dev/rekor/overview/). This data is a
    [HashedRekord](https://github.com/sigstore/rekor/blob/e375eb461cae524270889b57a249ff086bea6c05/types.md#hashed-rekord)
    containing a SHA256 hash of the commit SHA, as well as the code signing
