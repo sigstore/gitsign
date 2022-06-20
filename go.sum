@@ -2020,8 +2020,8 @@ github.com/sigstore/cosign v1.8.1-0.20220601172726-ae90c7495df6/go.mod h1:6BrdWn
 github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7 h1:XE7A9lJ+wYhmUFBWYTaw3Ph943zHB4iBYd5R0SX0ZOA=
 github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7/go.mod h1:ANQivY/lfOp9hN92S813LEthkm/kit96hzeIF3SNoZA=
 github.com/sigstore/rekor v0.4.1-0.20220114213500-23f583409af3/go.mod h1:u9clLqaVjqV9pExVL1XkM37dGyMCOX/LMocS9nsnWDY=
-github.com/sigstore/rekor v0.8.0 h1:L7H5CYf066V9v8spyeopYgrFgOcVplp26Jefrvof/J0=
-github.com/sigstore/rekor v0.8.0/go.mod h1:RmPJN+AMMu6VFR0RgndY7iEiaRCcwtA9i8yjPUiWQ7s=
+github.com/sigstore/rekor v0.8.1 h1:eEy5gc37CZEhUTJl6tM4vTCscYVo3midwyV//s0wsew=
+github.com/sigstore/rekor v0.8.1/go.mod h1:RmPJN+AMMu6VFR0RgndY7iEiaRCcwtA9i8yjPUiWQ7s=
 github.com/sigstore/sigstore v1.0.2-0.20211210190220-04746d994282/go.mod h1:SuM+QIHtnnR9eGsURRLv5JfxM6KeaU0XKA1O7FmLs4Q=
 github.com/sigstore/sigstore v1.1.0/go.mod h1:gDpcHw4VwpoL5C6N1Ud1YtBsc+ikRDwDelDlWRyYoE8=
 github.com/sigstore/sigstore v1.2.1-0.20220424143412-3d41663116d5/go.mod h1:OvpZniSE9oRPnW7+mhxljRt2RAQU+TwcnhYbqQsPwPc=
