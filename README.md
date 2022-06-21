@@ -90,7 +90,7 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
   <img src="./images/unverified.png" width="400" />
 
-  GitHub doesn't recognize Gitsign signatures as verfied at the moment:
+  GitHub doesn't recognize Gitsign signatures as verified at the moment:
 
   1. The sigstore CA root is not a part of
      [GitHub's trust root](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#smime-commit-signature-verification).
