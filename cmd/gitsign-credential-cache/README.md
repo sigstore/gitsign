@@ -14,18 +14,20 @@ data.
 - If you're running on a shared system
   - if other admins have access to the cache socket they can access your keys.
 - If you're running in an environment that has ambient OIDC credentials (e.g.
-  GCE/GKE, AWS, GitHub Actions, etc.) - Gitsign will automatically use the
+  GCE/GKE, AWS, GitHub Actions, etc.), Gitsign will automatically use the
   environment's OIDC credentials. You don't need caching.
 
 If you understand the risks, read on!
 
 ## What's stored in the cache
-
+	
 - Ephemeral Private Key
 - Fulcio Code Signing certificate + chain
 
-Data is stored keyed to your Git working directory (i.e. different repo paths
+All data is stored in memory, keyed to your Git working directory (i.e. different repo paths
 will cache different keys)
+
+The data that is cached would allow any user with access to sign artifacts as you, until the signing certificate expires, typically in ten minutes.
 
 ## Usage
 
