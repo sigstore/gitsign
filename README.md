@@ -29,6 +29,7 @@ Single Repository:
 ```sh
 cd /path/to/my/repository
 git config --local commit.gpgsign true  # Sign all commits
+git config --local tag.gpgsign true  # Sign all tags
 git config --local gpg.x509.program gitsign  # Use gitsign for signing
 git config --local gpg.format x509  # gitsign expects x509 args
 ```
@@ -37,9 +38,12 @@ All respositories:
 
 ```sh
 git config --global commit.gpgsign true  # Sign all commits
+git config --global tag.gpgsign true  # Sign all tags
 git config --global gpg.x509.program gitsign  # Use gitsign for signing
 git config --global gpg.format x509  # gitsign expects x509 args
 ```
+
+To learn more about these options, see [`git-config`](https://git-scm.com/docs/git-config#Documentation/git-config.txt).
 
 ### Environment Variables
 
