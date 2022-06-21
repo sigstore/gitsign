@@ -30,7 +30,6 @@ Single Repository:
 cd /path/to/my/repository
 git config --local commit.gpgsign true  # Sign all commits
 git config --local tag.gpgsign true  # Sign all tags
-git config --local push.gpgsign true  # Sign all pushes
 git config --local gpg.x509.program gitsign  # Use gitsign for signing
 git config --local gpg.format x509  # gitsign expects x509 args
 ```
@@ -40,7 +39,6 @@ All respositories:
 ```sh
 git config --global commit.gpgsign true  # Sign all commits
 git config --global tag.gpgsign true  # Sign all tags
-git config --global push.gpgsign true  # Sign all pushes
 git config --global gpg.x509.program gitsign  # Use gitsign for signing
 git config --global gpg.format x509  # gitsign expects x509 args
 ```
