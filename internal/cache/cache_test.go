@@ -54,7 +54,7 @@ func TestCache(t *testing.T) {
 		Roots:  ca.ChainPool(),
 	}
 
-	if _, _, _, err := client.GetSignerVerifier(ctx); err == nil {
+	if _, err := client.GetSignerVerifier(ctx); err == nil {
 		t.Fatal("GetSignerVerifier: expected err, got not")
 	}
 
@@ -81,14 +81,14 @@ func TestCache(t *testing.T) {
 		t.Error(diff)
 	}
 
-	sv, gotCert, _, err := client.GetSignerVerifier(ctx)
+	got, err := client.GetSignerVerifier(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sv == nil {
-		t.Error("SignerVerifier was nil")
+	if got == nil {
+		t.Fatal("SignerVerifier was nil")
 	}
-	if ok := cmp.Equal(certPEM, gotCert); !ok {
+	if ok := cmp.Equal(certPEM, got.Cert); !ok {
 		t.Error("stored cert does not match")
 	}
 }

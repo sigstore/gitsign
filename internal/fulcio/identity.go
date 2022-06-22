@@ -31,13 +31,14 @@ import (
 
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/signerverifier"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Identity struct {
-	sv     *CertSignerVerifier
+	sv     *signerverifier.CertSignerVerifier
 	stderr io.Writer
 }
 
@@ -67,14 +68,10 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 			Roots:         roots,
 			Intermediates: intermediates,
 		}
-		sv, cert, chain, err := cacheClient.GetSignerVerifier(ctx)
+		sv, err := cacheClient.GetSignerVerifier(ctx)
 		if err == nil && sv != nil {
 			return &Identity{
-				sv: &CertSignerVerifier{
-					SignerVerifier: sv,
-					Cert:           cert,
-					Chain:          chain,
-				},
+				sv:     sv,
 				stderr: debug,
 			}, nil
 		}
@@ -128,7 +125,7 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 	}
 
 	return &Identity{
-		sv: &CertSignerVerifier{
+		sv: &signerverifier.CertSignerVerifier{
 			SignerVerifier: sv,
 			Cert:           cert.CertPEM,
 			Chain:          cert.ChainPEM,
@@ -192,6 +189,6 @@ func (i *Identity) PublicKey() (crypto.PublicKey, error) {
 	return i.sv.SignerVerifier.PublicKey()
 }
 
-func (i *Identity) SignerVerifier() *CertSignerVerifier {
+func (i *Identity) SignerVerifier() *signerverifier.CertSignerVerifier {
 	return i.sv
 }

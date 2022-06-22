@@ -25,9 +25,14 @@ type Service struct {
 	store *cache.Cache
 }
 
+const (
+	defaultExpiration = 10 * time.Minute
+	cleanupInterval   = 1 * time.Minute
+)
+
 func NewService() *Service {
 	s := &Service{
-		store: cache.New(10*time.Minute, 1*time.Minute),
+		store: cache.New(defaultExpiration, cleanupInterval),
 	}
 	return s
 }

@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/sigstore/gitsign/internal/signerverifier"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
@@ -33,33 +34,33 @@ type Client struct {
 	Intermediates *x509.CertPool
 }
 
-func (c *Client) GetSignerVerifier(ctx context.Context) (signature.SignerVerifier, []byte, []byte, error) {
+func (c *Client) GetSignerVerifier(ctx context.Context) (*signerverifier.CertSignerVerifier, error) {
 	id, err := os.Getwd()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	resp := new(Credential)
 	if err := c.Client.Call("Service.GetCredential", GetCredentialRequest{
 		ID: id,
 	}, resp); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	privateKey, err := cryptoutils.UnmarshalPEMToPrivateKey(resp.PrivateKey, cryptoutils.SkipPassword)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error unmarshalling private key: %w", err)
+		return nil, fmt.Errorf("error unmarshalling private key: %w", err)
 	}
 
 	sv, err := signature.LoadSignerVerifier(privateKey, crypto.SHA256)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error creating SignerVerifier: %w", err)
+		return nil, fmt.Errorf("error creating SignerVerifier: %w", err)
 	}
 
 	// Check that the cert is in fact still valid.
 	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(resp.Cert)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error unmarshalling cert: %w", err)
+		return nil, fmt.Errorf("error unmarshalling cert: %w", err)
 	}
 	// There should really only be 1 cert, but check them all anyway.
 	for _, cert := range certs {
@@ -71,11 +72,15 @@ func (c *Client) GetSignerVerifier(ctx context.Context) (signature.SignerVerifie
 			// Just make sure it's not about to expire.
 			CurrentTime: time.Now().Add(30 * time.Second),
 		}); err != nil {
-			return nil, nil, nil, fmt.Errorf("stored cert no longer valid: %w", err)
+			return nil, fmt.Errorf("stored cert no longer valid: %w", err)
 		}
 	}
 
-	return sv, resp.Cert, resp.Chain, nil
+	return &signerverifier.CertSignerVerifier{
+		SignerVerifier: sv,
+		Cert:           resp.Cert,
+		Chain:          resp.Chain,
+	}, nil
 }
 
 type PrivateKey interface {

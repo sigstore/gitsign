@@ -26,12 +26,12 @@ import (
 )
 
 func main() {
-	home, err := os.UserHomeDir()
+	user, err := os.UserCacheDir()
 	if err != nil {
-		log.Fatalf("error getting user home directory: %v", err)
+		log.Fatalf("error getting user cache directory: %v", err)
 	}
 
-	dir := filepath.Join(home, ".sigstore", "gitsign")
+	dir := filepath.Join(user, ".sigstore", "gitsign")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		log.Fatalf("error creating %s: %v", dir, err)
 	}
