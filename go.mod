@@ -10,6 +10,7 @@ require (
 	github.com/go-openapi/strfmt v0.21.2
 	github.com/go-openapi/swag v0.21.1
 	github.com/google/go-cmp v0.5.8
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pborman/getopt v0.0.0-20180811024354-2b5b3bfb099b
 	github.com/sigstore/cosign v1.8.1-0.20220601172726-ae90c7495df6
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7

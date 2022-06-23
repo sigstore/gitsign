@@ -49,6 +49,7 @@ To learn more about these options, see [`git-config`](https://git-scm.com/docs/g
 
 | Environment Variable      | Default                          | Description                                                                                                   |
 | ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_CREDENTIAL_CACHE  |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                   |
 | GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
 | GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
 | GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                |

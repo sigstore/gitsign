@@ -25,26 +25,68 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net/rpc"
 	"os"
+	"path/filepath"
 
 	"github.com/sigstore/cosign/pkg/providers"
+	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/signerverifier"
+	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Identity struct {
-	sv     *CertSignerVerifier
+	sv     *signerverifier.CertSignerVerifier
 	stderr io.Writer
 }
 
-func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
+func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
+	var cacheClient *cache.Client
+
+	cachePath := os.Getenv("GITSIGN_CREDENTIAL_CACHE")
+	if cachePath != "" {
+		absPath, err := filepath.Abs(cachePath)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving cache path: %w", err)
+		}
+		rpcClient, err := rpc.Dial("unix", absPath)
+		if err != nil {
+			return nil, fmt.Errorf("error creating RPC socket client: %w", err)
+		}
+		roots, err := fulcioroots.Get()
+		if err != nil {
+			return nil, fmt.Errorf("error getting fulcio roots: %w", err)
+		}
+		intermediates, err := fulcioroots.GetIntermediates()
+		if err != nil {
+			return nil, fmt.Errorf("error getting fulcio intermediates: %w", err)
+		}
+		cacheClient = &cache.Client{
+			Client:        rpcClient,
+			Roots:         roots,
+			Intermediates: intermediates,
+		}
+		sv, err := cacheClient.GetSignerVerifier(ctx)
+		if err == nil && sv != nil {
+			return &Identity{
+				sv:     sv,
+				stderr: debug,
+			}, nil
+		}
+		// Only print error on failure - if there's a problem fetching
+		// from the cache just fall through to normal OIDC.
+		fmt.Fprintf(debug, "error getting cached creds: %v\n", err)
+	}
+
 	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
 	var authFlow oauthflow.TokenGetter = oauthflow.DefaultIDTokenGetter
 	if providers.Enabled(ctx) {
 		var err error
 		idToken, err := providers.Provide(ctx, clientID)
 		if err != nil {
-			fmt.Fprintln(w, "error getting id token:", err)
+			fmt.Fprintln(debug, "error getting id token:", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
 	}
@@ -67,8 +109,14 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 
 	cert, err := client.GetCert(priv)
 	if err != nil {
-		fmt.Fprintln(w, "error getting signer:", err)
+		fmt.Fprintln(debug, "error getting signer:", err)
 		return nil, err
+	}
+
+	if cachePath != "" {
+		if err := cacheClient.StoreCert(ctx, priv, cert.CertPEM, cert.ChainPEM); err != nil {
+			fmt.Fprintf(debug, "error storing cert in cache: %v", err)
+		}
 	}
 
 	sv, err := signature.LoadECDSASignerVerifier(priv, crypto.SHA256)
@@ -77,12 +125,12 @@ func NewIdentity(ctx context.Context, w io.Writer) (*Identity, error) {
 	}
 
 	return &Identity{
-		sv: &CertSignerVerifier{
+		sv: &signerverifier.CertSignerVerifier{
 			SignerVerifier: sv,
 			Cert:           cert.CertPEM,
 			Chain:          cert.ChainPEM,
 		},
-		stderr: w,
+		stderr: debug,
 	}, nil
 }
 
@@ -141,6 +189,6 @@ func (i *Identity) PublicKey() (crypto.PublicKey, error) {
 	return i.sv.SignerVerifier.PublicKey()
 }
 
-func (i *Identity) SignerVerifier() *CertSignerVerifier {
+func (i *Identity) SignerVerifier() *signerverifier.CertSignerVerifier {
 	return i.sv
 }
