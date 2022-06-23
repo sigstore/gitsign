@@ -21,11 +21,16 @@ import (
 	"net/rpc"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/sigstore/gitsign/internal/cache"
 )
 
 func main() {
+	// Override default umask so created files are always scoped to the
+	// current user.
+	syscall.Umask(0077)
+
 	user, err := os.UserCacheDir()
 	if err != nil {
 		log.Fatalf("error getting user cache directory: %v", err)
