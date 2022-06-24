@@ -57,7 +57,7 @@ jobs:
         set -e
 
         # Setup repo + tool
-        go install .
+        make install-gitsign
         export PATH="$PATH:$GOPATH/bin"
         echo "PATH=${PATH}"
         whereis gitsign

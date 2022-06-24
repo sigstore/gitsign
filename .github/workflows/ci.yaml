@@ -21,7 +21,7 @@ jobs:
         check-latest: true
 
     - name: Build
-      run: make build
+      run: make build-all
 
     - name: Unit Tests
       run: make unit-test
