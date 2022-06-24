@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mattn/go-tty"
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/signerverifier"
@@ -80,10 +81,21 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 		fmt.Fprintf(debug, "error getting cached creds: %v\n", err)
 	}
 
+	defaultFlow := oauthflow.DefaultIDTokenGetter
+	// Git captures stdin/stdout/stderr - we need to R/W directly from the
+	// TTY in order to get user input/output.
+	// A TTY may not be available in all environments (e.g. in CI), so only
+	// set the input/output if we can actually open it.
+	tty, err := tty.Open()
+	if err == nil {
+		defer tty.Close()
+		defaultFlow.Input = tty.Input()
+		defaultFlow.Output = tty.Output()
+	}
+
 	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
-	var authFlow oauthflow.TokenGetter = oauthflow.DefaultIDTokenGetter
+	var authFlow oauthflow.TokenGetter = defaultFlow
 	if providers.Enabled(ctx) {
-		var err error
 		idToken, err := providers.Provide(ctx, clientID)
 		if err != nil {
 			fmt.Fprintln(debug, "error getting id token:", err)
