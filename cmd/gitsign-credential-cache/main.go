@@ -23,13 +23,29 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/pborman/getopt/v2"
+
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/pkg/version"
+)
+
+var (
+	// Action flags
+	versionFlag = getopt.BoolLong("version", 'v', "print the version number")
 )
 
 func main() {
+	getopt.Parse()
 	// Override default umask so created files are always scoped to the
 	// current user.
 	syscall.Umask(0077)
+
+	if *versionFlag {
+		v := version.GetVersionInfo()
+		fmt.Printf("gitsign-credential-cache version %s\n", v.GitVersion)
+
+		os.Exit(0)
+	}
 
 	user, err := os.UserCacheDir()
 	if err != nil {

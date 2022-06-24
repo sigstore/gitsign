@@ -34,7 +34,6 @@ const (
 )
 
 var (
-
 	// Action flags
 	helpFlag    = getopt.BoolLong("help", 'h', "print this help message")
 	versionFlag = getopt.BoolLong("version", 'v', "print the version number")
