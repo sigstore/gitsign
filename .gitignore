@@ -1,5 +1,6 @@
 # Vim swap files
 *.swp
 dist/*
-gitsign
 .vscode/*
+gitsign
+gitsign-credential-cache
