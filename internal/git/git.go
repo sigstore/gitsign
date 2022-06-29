@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -43,7 +44,7 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 	// using the same key, this is probably okay? e.g. even if you could cause a SHA1 collision,
 	// you would still need the underlying commit to be valid and using the same key which seems hard.
 
-	commit, err := commitHash(data, sig)
+	commit, err := objectHash(data, sig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
@@ -110,7 +111,7 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detache
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
-	commit, err := commitHash(data, sig)
+	commit, err := objectHash(data, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -128,26 +129,75 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detache
 	}, nil
 }
 
-func commitHash(data, sig []byte) (string, error) {
+type encoder interface {
+	Encode(o plumbing.EncodedObject) error
+}
+
+func objectHash(data, sig []byte) (string, error) {
 	// Precompute commit hash to store in tlog
 	obj := &plumbing.MemoryObject{}
-	_, _ = obj.Write(data)
+	if _, err := obj.Write(data); err != nil {
+		return "", err
+	}
+
+	var (
+		encoder encoder
+		err     error
+	)
+	// We're making big assumptions here about the ordering of fields
+	// in Git objects. Unfortunately go-git does loose parsing of objects,
+	// so it will happily decode objects that don't match the unmarshal type.
+	// We should see if there's a better way to detect object types.
+	switch {
+	case bytes.HasPrefix(data, []byte("tree ")):
+		encoder, err = commit(obj, sig)
+	case bytes.HasPrefix(data, []byte("object ")):
+		encoder, err = tag(obj, sig)
+	default:
+		return "", errors.New("could not determine Git object type")
+	}
+	if err != nil {
+		return "", err
+	}
+
+	// go-git will compute a hash on decode and preserve even if we alter the
+	// object data. To work around this, re-encode the object into a new object
+	// to force a new hash to be computed.
+	out := &plumbing.MemoryObject{}
+	err = encoder.Encode(out)
+	return out.Hash().String(), err
+}
+
+func commit(obj *plumbing.MemoryObject, sig []byte) (*object.Commit, error) {
 	obj.SetType(plumbing.CommitObject)
 
-	// go-git will compute a hash on decode and preserve that. To work around this,
-	// decode into one object then copy everything but the commit into a separate object.
 	base := object.Commit{}
-	_ = base.Decode(obj)
-	c := object.Commit{
+	if err := base.Decode(obj); err != nil {
+		return nil, err
+	}
+	return &object.Commit{
 		Author:       base.Author,
 		Committer:    base.Committer,
 		PGPSignature: string(sig),
 		Message:      base.Message,
 		TreeHash:     base.TreeHash,
 		ParentHashes: base.ParentHashes,
-	}
-	out := &plumbing.MemoryObject{}
-	err := c.Encode(out)
+	}, nil
+}
 
-	return out.Hash().String(), err
+func tag(obj *plumbing.MemoryObject, sig []byte) (*object.Tag, error) {
+	obj.SetType(plumbing.TagObject)
+
+	base := object.Tag{}
+	if err := base.Decode(obj); err != nil {
+		return nil, err
+	}
+	return &object.Tag{
+		Tagger:       base.Tagger,
+		Name:         base.Name,
+		TargetType:   base.TargetType,
+		Target:       base.Target,
+		Message:      base.Message,
+		PGPSignature: string(sig),
+	}, nil
 }

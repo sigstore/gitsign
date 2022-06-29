@@ -60,30 +60,55 @@ To learn more about these options, see
 
 ## Usage
 
+### Signing Commits
+
 Once configured, you can sign commits as usual with `git commit -S` (or
 `git config --global commit.gpgsign true` to enable signing for all commits).
 
 ```sh
 $ git commit --allow-empty --message="Signed commit"
-[main cb6eee1] Signed commit
+Your browser will now be opened to:
+https://oauth2.sigstore.dev/auth/auth?access_type=online&client_id=sigstore&...
+[main 040b9af] Signed commit
 ```
 
 This will redirect you through the Sigstore Keyless flow to authenticate and
 sign the commit.
 
-Commits can then be verified using `git log`:
+Commits can then be verified using `git verify-commit`:
 
 ```sh
-$ git --no-pager log --show-signature -1
-commit 227e796042fdd170e58b7e3b7627a1badd320224 (HEAD -> main)
-searching tlog for commit: 227e796042fdd170e58b7e3b7627a1badd320224
-tlog index: 2212633
-smimesign: Signature made using certificate ID 0x815ada5516906a862af8f528d69d3c86e4774b4f | CN=sigstore,O=sigstore.dev
-smimesign: Good signature from "" ([billy@chainguard.dev])
-Author: Billy Lynch <billy@chainguard.dev>
-Date:   Mon May 2 16:51:44 2022 -0400
+$ git verify-commit HEAD
+tlog index: 2801760
+gitsign: Signature made using certificate ID 0xf805288664f2e851dcb34e6a03b1a5232eb574ae | CN=sigstore-intermediate,O=sigstore.dev
+gitsign: Good signature from [billy@chainguard.dev]
+Validated Git signature: true
+Validated Rekor entry: true
+```
 
-    Signed commit
+### Signing Tags
+
+Once configured, you can sign commits as usual with `git tag -s` (or
+`git config --global tag.gpgsign true` to enable signing for all tags).
+
+```sh
+$ git tag v0.0.1
+Your browser will now be opened to:
+https://oauth2.sigstore.dev/auth/auth?access_type=online&client_id=sigstore&...
+```
+
+This will redirect you through the Sigstore Keyless flow to authenticate and
+sign the tag.
+
+Tags can then be verified using `git verify-tag`:
+
+```sh
+$ git verify-tag v0.0.1
+tlog index: 2802961
+gitsign: Signature made using certificate ID 0xe56a5a962ed59f9e3730d6696137eceb8b4ee8ea | CN=sigstore-intermediate,O=sigstore.dev
+gitsign: Good signature from [billy@chainguard.dev]
+Validated Git signature: true
+Validated Rekor entry: true
 ```
 
 ## Limitations
@@ -456,3 +481,7 @@ nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
 Notice that **the Rekor entry uses the same cert that was used to generate the
 git commit signature**. This can be used to correlate the 2 messages, even
 though they signed different content!
+
+Note that for Git tags, the annotated tag object SHA is what is used (i.e. the
+output of `git rev-parse <tag>`), **not** the SHA of the underlying tagged
+commit.
