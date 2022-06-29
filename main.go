@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/mattn/go-tty"
 	"github.com/pborman/getopt/v2"
 
 	// Enable OIDC providers
@@ -55,22 +56,21 @@ var (
 	stdin  io.ReadCloser  = os.Stdin
 	stdout io.WriteCloser = os.Stdout
 	stderr io.Writer      = os.Stderr
+	// Normally Git will capture stdin/stdout/stderr - if we want to handle user I/O
+	// we need to interface with the TTY directly. These values will be initialized
+	// at runtime to whatever makes the most sense for the environment.
+	ttyin  io.Reader
+	ttyout io.Writer
 )
 
 func main() {
-	if err := runCommand(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if err := wrapIO(runCommand); err != nil {
 		os.Exit(1)
 	}
 }
 
-func runCommand() error {
-	// Parse CLI args
-	getopt.HelpColumn = 40
-	getopt.SetParameters("[files]")
-	getopt.Parse()
-	fileArgs = getopt.Args()
-
+// wrapIO initializes user input/output based on the environment.
+func wrapIO(fn func() error) error {
 	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
 		// Since Git eats both stdout and stderr, we don't have a good way of
 		// getting error information back from clients if things go wrong.
@@ -81,6 +81,40 @@ func runCommand() error {
 			stderr = io.MultiWriter(stderr, f)
 		}
 	}
+
+	// A TTY may not be available in all environments (e.g. in CI), so only
+	// set the input/output if we can actually open it.
+	tty, err := tty.Open()
+	if err == nil {
+		defer tty.Close()
+		ttyin = tty.Input()
+		ttyout = tty.Output()
+	} else {
+		// If we can't connect to a TTY, fall back to stderr for output (which
+		// will also log to file if GITSIGN_LOG is set).
+		ttyout = stderr
+	}
+
+	// Log any panics to ttyout, since otherwise they will be lost to os.Stderr.
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintln(ttyout, r)
+		}
+	}()
+
+	if err := fn(); err != nil {
+		fmt.Fprintln(ttyout, err)
+		return err
+	}
+	return nil
+}
+
+func runCommand() error {
+	// Parse CLI args
+	getopt.HelpColumn = 40
+	getopt.SetParameters("[files]")
+	getopt.Parse()
+	fileArgs = getopt.Args()
 
 	if *helpFlag {
 		getopt.Usage()

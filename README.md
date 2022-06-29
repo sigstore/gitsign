@@ -43,19 +43,20 @@ git config --global gpg.x509.program gitsign  # Use gitsign for signing
 git config --global gpg.format x509  # gitsign expects x509 args
 ```
 
-To learn more about these options, see [`git-config`](https://git-scm.com/docs/git-config#Documentation/git-config.txt).
+To learn more about these options, see
+[`git-config`](https://git-scm.com/docs/git-config#Documentation/git-config.txt).
 
 ### Environment Variables
 
-| Environment Variable      | Default                          | Description                                                                                                   |
-| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GITSIGN_CREDENTIAL_CACHE  |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                   |
-| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                      |
-| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging, since Git will not forward stderr output to user terminals. |
-| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                |
-| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                    |
-| GITSIGN_OIDC_REDIRECT_URL |                                  | OIDC Redirect URL                                                                                             |
-| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                                       |
+| Environment Variable      | Default                          | Description                                                                                   |
+| ------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| GITSIGN_CREDENTIAL_CACHE  |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.   |
+| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                      |
+| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment. |
+| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                |
+| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                    |
+| GITSIGN_OIDC_REDIRECT_URL |                                  | OIDC Redirect URL                                                                             |
+| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                       |
 
 ## Usage
 
@@ -87,10 +88,6 @@ Date:   Mon May 2 16:51:44 2022 -0400
 
 ## Limitations
 
-- When Git invokes signing tools, both stdout and stderr are captured which
-  means `gitsign` cannot push back messages to shells interactively. Because of
-  this, device mode does not work with `gitsign` - a browser capable session is
-  required to sign commits.
 - [GitHub Verified Badge](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
 
   <img src="./images/unverified.png" width="400" />
@@ -116,9 +113,11 @@ error: gpg failed to sign the data
 fatal: failed to write commit object
 ```
 
-Because of [`Limitations`](#limitations) with Git signing tools, `gitsign`
-cannot write back to stderr. Instead, you can use the `GITSIGN_LOG` environment
-variable to tee logs into a readable location for debugging.
+When Git invokes signing tools, both stdout and stderr are captured which means
+`gitsign` cannot push back messages to shells interactively. If a TTY is
+available, `gitsign` will output information to the TTY output directly. If a
+TTY is not available (e.g. in CI runners, etc.), you can use the `GITSIGN_LOG`
+environment variable to tee logs into a readable location for debugging.
 
 ## Privacy
 
