@@ -29,21 +29,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mattn/go-tty"
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/signerverifier"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
+	"github.com/sigstore/sigstore/pkg/oauth"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Identity struct {
-	sv     *signerverifier.CertSignerVerifier
-	stderr io.Writer
+	sv *signerverifier.CertSignerVerifier
 }
 
-func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
+func NewIdentity(ctx context.Context, in io.Reader, out io.Writer) (*Identity, error) {
 	var cacheClient *cache.Client
 
 	cachePath := os.Getenv("GITSIGN_CREDENTIAL_CACHE")
@@ -72,33 +71,24 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 		sv, err := cacheClient.GetSignerVerifier(ctx)
 		if err == nil && sv != nil {
 			return &Identity{
-				sv:     sv,
-				stderr: debug,
+				sv: sv,
 			}, nil
 		}
 		// Only print error on failure - if there's a problem fetching
 		// from the cache just fall through to normal OIDC.
-		fmt.Fprintf(debug, "error getting cached creds: %v\n", err)
-	}
-
-	defaultFlow := oauthflow.DefaultIDTokenGetter
-	// Git captures stdin/stdout/stderr - we need to R/W directly from the
-	// TTY in order to get user input/output.
-	// A TTY may not be available in all environments (e.g. in CI), so only
-	// set the input/output if we can actually open it.
-	tty, err := tty.Open()
-	if err == nil {
-		defer tty.Close()
-		defaultFlow.Input = tty.Input()
-		defaultFlow.Output = tty.Output()
+		fmt.Fprintf(out, "error getting cached creds: %v\n", err)
 	}
 
 	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
-	var authFlow oauthflow.TokenGetter = defaultFlow
+	var authFlow oauthflow.TokenGetter = &oauthflow.InteractiveIDTokenGetter{
+		HTMLPage: oauth.InteractiveSuccessHTML,
+		Input:    in,
+		Output:   out,
+	}
 	if providers.Enabled(ctx) {
 		idToken, err := providers.Provide(ctx, clientID)
 		if err != nil {
-			fmt.Fprintln(debug, "error getting id token:", err)
+			fmt.Fprintln(out, "error getting id token:", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
 	}
@@ -121,13 +111,13 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 
 	cert, err := client.GetCert(priv)
 	if err != nil {
-		fmt.Fprintln(debug, "error getting signer:", err)
+		fmt.Fprintln(out, "error getting signer:", err)
 		return nil, err
 	}
 
 	if cachePath != "" {
 		if err := cacheClient.StoreCert(ctx, priv, cert.CertPEM, cert.ChainPEM); err != nil {
-			fmt.Fprintf(debug, "error storing cert in cache: %v", err)
+			fmt.Fprintf(out, "error storing cert in cache: %v", err)
 		}
 	}
 
@@ -142,7 +132,6 @@ func NewIdentity(ctx context.Context, debug io.Writer) (*Identity, error) {
 			Cert:           cert.CertPEM,
 			Chain:          cert.ChainPEM,
 		},
-		stderr: debug,
 	}, nil
 }
 
