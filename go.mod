@@ -15,7 +15,7 @@ require (
 	github.com/pborman/getopt v0.0.0-20180811024354-2b5b3bfb099b
 	github.com/sigstore/cosign v1.8.1-0.20220601172726-ae90c7495df6
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7
-	github.com/sigstore/rekor v0.8.2
+	github.com/sigstore/rekor v0.9.0
 	github.com/sigstore/sigstore v1.3.1-0.20220624122732-132318ae8047
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
