@@ -26,7 +26,6 @@ import (
 
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
-	"github.com/sigstore/gitsign/pkg/version"
 )
 
 const (
@@ -122,10 +121,7 @@ func runCommand() error {
 	}
 
 	if *versionFlag {
-		v := version.GetVersionInfo()
-		fmt.Printf("gitsign version %s\n", v.GitVersion)
-
-		return nil
+		return commandVersion()
 	}
 
 	if *signFlag {

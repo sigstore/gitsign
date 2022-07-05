@@ -16,7 +16,9 @@
 package version
 
 import (
+	"os"
 	"runtime/debug"
+	"strings"
 )
 
 // Base version information.
@@ -30,7 +32,8 @@ var (
 )
 
 type Info struct {
-	GitVersion string `json:"gitVersion"`
+	GitVersion string   `json:"gitVersion"`
+	Env        []string `json:"env"`
 }
 
 func getBuildInfo() *debug.BuildInfo {
@@ -54,11 +57,32 @@ func getGitVersion(bi *debug.BuildInfo) string {
 	return bi.Main.Version
 }
 
+func getGitsignEnv() []string {
+	out := []string{}
+	for _, e := range os.Environ() {
+		// Prefixes to look for. err on the side of showing too much rather
+		// than too little. We'll only output things that have values set.
+		for _, prefix := range []string{
+			"GITSIGN_",
+			// Can modify Sigstore/TUF client behavior - https://github.com/sigstore/sigstore/blob/35d6a82c15183f7fe7a07eca45e17e378aa32126/pkg/tuf/client.go#L52
+			"SIGSTORE_",
+			"TUF_",
+		} {
+			if strings.HasPrefix(e, prefix) {
+				out = append(out, e)
+				continue
+			}
+		}
+	}
+	return out
+}
+
 // GetVersionInfo represents known information on how this binary was built.
 func GetVersionInfo() Info {
 	buildInfo := getBuildInfo()
 	gitVersion = getGitVersion(buildInfo)
 	return Info{
 		GitVersion: gitVersion,
+		Env:        getGitsignEnv(),
 	}
 }

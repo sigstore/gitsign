@@ -13,32 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package version
+package main
 
 import (
-	"os"
-	"testing"
+	"fmt"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/sigstore/gitsign/pkg/version"
 )
 
-func TestVersionText(t *testing.T) {
-	sut := GetVersionInfo()
-	if sut.GitVersion != gitVersion {
-		t.Errorf("GetVersionInfo: got %q, want %q", sut, gitVersion)
-	}
-}
-
-func TestEnv(t *testing.T) {
-	os.Setenv("GITSIGN_TEST", "foo")
-	os.Setenv("TUF_ROOT", "bar")
-	got := GetVersionInfo()
-	want := []string{
-		"GITSIGN_TEST=foo",
-		"TUF_ROOT=bar",
+func commandVersion() error {
+	v := version.GetVersionInfo()
+	fmt.Println("gitsign version", v.GitVersion)
+	if len(v.Env) > 0 {
+		fmt.Println("env:")
+		for _, e := range v.Env {
+			fmt.Println("\t", e)
+		}
 	}
 
-	if diff := cmp.Diff(got.Env, want); diff != "" {
-		t.Error(diff)
-	}
+	return nil
 }

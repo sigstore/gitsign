@@ -131,6 +131,8 @@ Validated Rekor entry: true
 
 ## Debugging
 
+### Signing
+
 If there is an error during signing, you may see an error like:
 
 ```
@@ -143,6 +145,16 @@ When Git invokes signing tools, both stdout and stderr are captured which means
 available, `gitsign` will output information to the TTY output directly. If a
 TTY is not available (e.g. in CI runners, etc.), you can use the `GITSIGN_LOG`
 environment variable to tee logs into a readable location for debugging.
+
+### Verification
+
+- `failed to verify detached signature: x509: certificate signed by unknown authority`
+
+  This usually means the TUF root used to verify the commit is not the same as
+  the root that was used to sign it. This can happen if you use multiple
+  sigstore instances frequently (e.g. if you're a sigstore developer - sigstore
+  staging). You can double check relevant environment variables by running
+  `gitsign --version`.
 
 ## Privacy
 
