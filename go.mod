@@ -7,7 +7,7 @@ require (
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-openapi/runtime v0.24.1
-	github.com/go-openapi/strfmt v0.21.2
+	github.com/go-openapi/strfmt v0.21.3
 	github.com/go-openapi/swag v0.21.1
 	github.com/google/go-cmp v0.5.8
 	github.com/mattn/go-tty v0.0.4
@@ -17,7 +17,7 @@ require (
 	github.com/sigstore/fulcio v0.1.2-0.20220114150912-86a2036f9bc7
 	github.com/sigstore/rekor v0.9.1
 	github.com/sigstore/sigstore v1.3.1-0.20220624122732-132318ae8047
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 )
 
@@ -71,7 +71,6 @@ require (
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.11.0 // indirect
-	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -165,7 +164,7 @@ require (
 	go.etcd.io/etcd/server/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/tests/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/v3 v3.5.4 // indirect
-	go.mongodb.org/mongo-driver v1.8.3 // indirect
+	go.mongodb.org/mongo-driver v1.10.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/contrib v1.6.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0 // indirect
