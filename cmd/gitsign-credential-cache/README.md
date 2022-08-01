@@ -24,15 +24,21 @@ If you understand the risks, read on!
 - Ephemeral Private Key
 - Fulcio Code Signing certificate + chain
 
-All data is stored in memory, keyed to your Git working directory (i.e. different repo paths
-will cache different keys)
+All data is stored in memory, keyed to your Git working directory (i.e.
+different repo paths will cache different keys)
 
-The data that is cached would allow any user with access to sign artifacts as you, until the signing certificate expires, typically in ten minutes.
+The data that is cached would allow any user with access to sign artifacts as
+you, until the signing certificate expires, typically in ten minutes.
 
 ## Usage
 
 ```
 $ gitsign-credential-cache &
-$ export GITSIGN_CREDENTIAL_CACHE="$HOME/.sigstore/gitsign/cache.sock"
+$ export GITSIGN_CREDENTIAL_CACHE="$HOME/.cache/.sigstore/gitsign/cache.sock"
 $ git commit ...
 ```
+
+Note: The cache directory will change depending on your OS - the socket file
+that is used is output by `gitsign-credential-cache` when it is spawned. See
+[os.UserCacheDir](https://pkg.go.dev/os#UserCacheDir) for details on how the
+cache directory is selected.
