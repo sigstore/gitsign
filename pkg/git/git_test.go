@@ -111,7 +111,7 @@ func TestObjectHash(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := objectHash([]byte(tc.body), []byte(tc.sig))
+			got, err := ObjectHash([]byte(tc.body), []byte(tc.sig))
 			if err != nil {
 				t.Fatal(err)
 			}

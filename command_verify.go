@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"github.com/sigstore/gitsign/internal"
-	"github.com/sigstore/gitsign/internal/git"
+	"github.com/sigstore/gitsign/pkg/git"
 )
 
 func commandVerify() error {
