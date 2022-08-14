@@ -31,6 +31,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
 )
 
+// VerificationSummary holds artifacts of the gitsign verification of a Git commit or tag.
 type VerificationSummary struct {
 	// Certificate used to sign the commit.
 	Cert *x509.Certificate
@@ -43,7 +44,7 @@ type VerificationSummary struct {
 	Claims []Claim
 }
 
-// Claim is a k/v pair representing the status of a given ClaimCondition.
+// Claim is a key value pair representing the status of a given ClaimCondition.
 type Claim struct {
 	Key   ClaimCondition
 	Value bool
@@ -63,6 +64,9 @@ func NewClaim(c ClaimCondition, ok bool) Claim {
 	}
 }
 
+// Verify takes a context, rekor verifier client, Git object data (everything but the signature), and a Git signature.
+// A VerificationSummary is returned with the signing certificate & Rekor transparency log index of the Git object, if found,
+// and whether each is valid for the given Git data.
 func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detached bool) (*VerificationSummary, error) {
 	claims := []Claim{}
 
@@ -153,6 +157,7 @@ type encoder interface {
 	Encode(o plumbing.EncodedObject) error
 }
 
+// ObjectHash is a string representation of an encoded Git object
 func ObjectHash(data, sig []byte) (string, error) {
 	// Precompute commit hash to store in tlog
 	obj := &plumbing.MemoryObject{}
