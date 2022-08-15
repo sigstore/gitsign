@@ -5,3 +5,4 @@ dist/*
 gitsign
 gitsign-credential-cache
 !/cmd/gitsign-credential-cache
+vendor
