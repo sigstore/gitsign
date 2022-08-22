@@ -31,6 +31,7 @@ import (
 
 	"github.com/sigstore/cosign/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/signerverifier"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"github.com/sigstore/sigstore/pkg/oauth"
@@ -42,7 +43,7 @@ type Identity struct {
 	sv *signerverifier.CertSignerVerifier
 }
 
-func NewIdentity(ctx context.Context, in io.Reader, out io.Writer) (*Identity, error) {
+func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.Writer) (*Identity, error) {
 	var cacheClient *cache.Client
 
 	cachePath := os.Getenv("GITSIGN_CREDENTIAL_CACHE")
@@ -79,7 +80,7 @@ func NewIdentity(ctx context.Context, in io.Reader, out io.Writer) (*Identity, e
 		fmt.Fprintf(out, "error getting cached creds: %v\n", err)
 	}
 
-	clientID := envOrValue("GITSIGN_OIDC_CLIENT_ID", "sigstore")
+	clientID := cfg.ClientID
 	var authFlow oauthflow.TokenGetter = &oauthflow.InteractiveIDTokenGetter{
 		HTMLPage: oauth.InteractiveSuccessHTML,
 		Input:    in,
@@ -98,11 +99,11 @@ func NewIdentity(ctx context.Context, in io.Reader, out io.Writer) (*Identity, e
 		return nil, fmt.Errorf("generating private key: %w", err)
 	}
 
-	client, err := NewClient(envOrValue("GITSIGN_FULCIO_URL", "https://fulcio.sigstore.dev"),
+	client, err := NewClient(cfg.Fulcio,
 		OIDCOptions{
-			Issuer:      envOrValue("GITSIGN_OIDC_ISSUER", "https://oauth2.sigstore.dev/auth"),
+			Issuer:      cfg.Issuer,
 			ClientID:    clientID,
-			RedirectURL: os.Getenv("GITSIGN_OIDC_REDIRECT_URL"),
+			RedirectURL: cfg.RedirectURL,
 			TokenGetter: authFlow,
 		})
 	if err != nil {
@@ -133,13 +134,6 @@ func NewIdentity(ctx context.Context, in io.Reader, out io.Writer) (*Identity, e
 			Chain:          cert.ChainPEM,
 		},
 	}, nil
-}
-
-func envOrValue(env, value string) string {
-	if v := os.Getenv(env); v != "" {
-		return v
-	}
-	return value
 }
 
 // Certificate gets the identity's certificate.

@@ -26,6 +26,7 @@ import (
 
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
+	"github.com/sigstore/gitsign/internal/config"
 )
 
 const (
@@ -63,14 +64,20 @@ var (
 )
 
 func main() {
-	if err := wrapIO(runCommand); err != nil {
+	cfg, err := config.Get()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
+	if err := wrapIO(cfg, runCommand); err != nil {
 		os.Exit(1)
 	}
 }
 
 // wrapIO initializes user input/output based on the environment.
-func wrapIO(fn func() error) error {
-	if logPath := os.Getenv("GITSIGN_LOG"); logPath != "" {
+func wrapIO(cfg *config.Config, fn func(*config.Config) error) error {
+	if logPath := cfg.LogPath; logPath != "" {
 		// Since Git eats both stdout and stderr, we don't have a good way of
 		// getting error information back from clients if things go wrong.
 		// As a janky way to preserve error message, tee stderr to
@@ -101,14 +108,14 @@ func wrapIO(fn func() error) error {
 		}
 	}()
 
-	if err := fn(); err != nil {
+	if err := fn(cfg); err != nil {
 		fmt.Fprintln(ttyout, err)
 		return err
 	}
 	return nil
 }
 
-func runCommand() error {
+func runCommand(cfg *config.Config) error {
 	// Parse CLI args
 	getopt.HelpColumn = 40
 	getopt.SetParameters("[files]")
@@ -121,7 +128,7 @@ func runCommand() error {
 	}
 
 	if *versionFlag {
-		return commandVersion()
+		return commandVersion(cfg)
 	}
 
 	if *signFlag {
@@ -132,7 +139,7 @@ func runCommand() error {
 			return errors.New("specify a USER-ID to sign with")
 		}
 
-		return commandSign()
+		return commandSign(cfg)
 	}
 
 	if *verifyFlag {
@@ -149,7 +156,7 @@ func runCommand() error {
 			return errors.New("armor cannot be specified for verification")
 		}
 
-		return commandVerify()
+		return commandVerify(cfg)
 	}
 
 	return errors.New("specify --help, --sign, --verify, or --list-keys")

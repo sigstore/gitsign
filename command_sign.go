@@ -23,14 +23,15 @@ import (
 	"io"
 	"os"
 
+	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/git"
 	"github.com/sigstore/gitsign/internal/signature"
 )
 
-func commandSign() error {
+func commandSign(cfg *config.Config) error {
 	ctx := context.Background()
-	userIdent, err := fulcio.NewIdentity(ctx, ttyin, ttyout)
+	userIdent, err := fulcio.NewIdentity(ctx, cfg, ttyin, ttyout)
 	if err != nil {
 		return fmt.Errorf("failed to get identity: %w", err)
 	}
@@ -55,7 +56,7 @@ func commandSign() error {
 		return fmt.Errorf("failed to read message from stdin: %w", err)
 	}
 
-	rekor, err := newRekorClient()
+	rekor, err := newRekorClient(cfg.Rekor)
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
