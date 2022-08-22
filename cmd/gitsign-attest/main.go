@@ -21,6 +21,7 @@ import (
 	"log"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/sigstore/cosign/cmd/cosign/cli/options"
 	"github.com/sigstore/gitsign/cmd/gitsign-attest/internal/attest"
 )
 
@@ -38,6 +39,11 @@ const (
 func main() {
 	flag.Parse()
 	ctx := context.Background()
+
+	at, err := options.ParsePredicateType(*attType)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	repo, err := git.PlainOpen(".")
 	if err != nil {
@@ -64,6 +70,6 @@ func main() {
 		refName = attTreeRef
 	}
 
-	out, err := attest.WriteFile(ctx, repo, refName, sha, *path, *attType)
+	out, err := attest.WriteFile(ctx, repo, refName, sha, *path, at)
 	fmt.Println(out, err)
 }
