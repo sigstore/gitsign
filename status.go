@@ -23,8 +23,12 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/openpgp/packet"
-	"golang.org/x/crypto/openpgp/s2k"
+	// TODO: this package is unmaintained except for security fixes.
+	// New applications should consider a more focused, modern alternative to OpenPGP for their specific task.
+	// If you are required to interoperate with OpenPGP systems and need a maintained package, consider a community fork.
+	// See https://golang.org/issue/44226
+	"golang.org/x/crypto/openpgp/packet" //nolint: staticcheck
+	"golang.org/x/crypto/openpgp/s2k"    //nolint: staticcheck
 
 	"github.com/sigstore/gitsign/internal"
 )
