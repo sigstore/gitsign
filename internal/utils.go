@@ -19,7 +19,6 @@ import (
 	"crypto/sha1" // #nosec G505
 	"crypto/x509"
 	"encoding/hex"
-	"os"
 )
 
 // certHexFingerprint calculated the hex SHA1 fingerprint of a certificate.
@@ -35,11 +34,4 @@ func certFingerprint(cert *x509.Certificate) []byte {
 
 	fpr := sha1.Sum(cert.Raw) // nolint:gosec
 	return fpr[:]
-}
-
-func EnvOrValue(env, value string) string {
-	if v := os.Getenv(env); v != "" {
-		return v
-	}
-	return value
 }

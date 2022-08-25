@@ -15,13 +15,11 @@
 package main
 
 import (
-	"github.com/sigstore/gitsign/internal"
 	gitrekor "github.com/sigstore/gitsign/pkg/rekor"
 	rekor "github.com/sigstore/rekor/pkg/client"
 )
 
-// newRekorClient returns a new Rekor client respecting gitsign environment
-// variables, or using the default if not set.
-func newRekorClient() (*gitrekor.Client, error) {
-	return gitrekor.New(internal.EnvOrValue("GITSIGN_REKOR_URL", "https://rekor.sigstore.dev"), rekor.WithUserAgent("gitsign"))
+// newRekorClient returns a new Rekor client with common client options set.
+func newRekorClient(url string) (*gitrekor.Client, error) {
+	return gitrekor.New(url, rekor.WithUserAgent("gitsign"))
 }

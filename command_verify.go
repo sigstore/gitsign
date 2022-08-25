@@ -23,10 +23,11 @@ import (
 	"os"
 
 	"github.com/sigstore/gitsign/internal"
+	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/pkg/git"
 )
 
-func commandVerify() error {
+func commandVerify(cfg *config.Config) error {
 	ctx := context.Background()
 	sNewSig.emit()
 
@@ -44,7 +45,7 @@ func commandVerify() error {
 		return fmt.Errorf("failed to read signature data (detached: %T): %w", detached, err)
 	}
 
-	rekor, err := newRekorClient()
+	rekor, err := newRekorClient(cfg.Rekor)
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}

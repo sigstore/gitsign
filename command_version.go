@@ -16,12 +16,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
+	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/pkg/version"
 )
 
-func commandVersion() error {
+func commandVersion(cfg *config.Config) error {
 	v := version.GetVersionInfo()
 	fmt.Println("gitsign version", v.GitVersion)
 	if len(v.Env) > 0 {
@@ -29,6 +32,12 @@ func commandVersion() error {
 		for _, e := range v.Env {
 			fmt.Println("\t", e)
 		}
+	}
+	fmt.Println("parsed config:")
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(cfg); err != nil {
+		return err
 	}
 
 	return nil

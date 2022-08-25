@@ -46,6 +46,27 @@ git config --global gpg.format x509  # gitsign expects x509 args
 To learn more about these options, see
 [`git-config`](https://git-scm.com/docs/git-config#Documentation/git-config.txt).
 
+### File config
+
+Gitsign can be configured with a standard
+[git-config](https://git-scm.com/docs/git-config) file. For example, to set the
+Fulcio option for a single repo:
+
+```sh
+$ git config --local gitsign.fulcio https://fulcio.example.com
+```
+
+The following config options are supported:
+
+| Option      | Default                          | Description                                                                                   |
+| ----------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| fulcio      | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                      |
+| logPath     |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment. |
+| clientID    | sigstore                         | OIDC client ID for application                                                                |
+| issuer      | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                    |
+| redirectURL |                                  | OIDC Redirect URL                                                                             |
+| rekor       | https://rekor.sigstore.dev       | Address of Rekor server                                                                       |
+
 ### Environment Variables
 
 | Environment Variable      | Default                          | Description                                                                                   |
@@ -130,6 +151,27 @@ Validated Rekor entry: true
   verified in the future!
 
 ## Debugging
+
+### Configuration
+
+If `gitsign` is running with unexpected configs, you can validate the config
+values that are being ran by running `gitsign -v`:
+
+```sh
+$ gitsign -v
+gitsign version devel
+env:
+         GITSIGN_LOG=/tmp/log.txt
+parsed config:
+{
+  "Fulcio": "https://fulcio.sigstore.dev",
+  "Rekor": "https://rekor.sigstore.dev",
+  "ClientID": "sigstore",
+  "RedirectURL": "",
+  "Issuer": "https://oauth2.sigstore.dev/auth",
+  "LogPath": "/tmp/log.txt"
+}
+```
 
 ### Signing
 
