@@ -65,6 +65,13 @@ func TestGet(t *testing.T) {
 	// This just overrides default value.
 	t.Setenv("GITSIGN_OIDC_ISSUER", "tacocat")
 
+	// Recognize SIGSTORE prefixes.
+	t.Setenv("SIGSTORE_OIDC_REDIRECT_URL", "example.com")
+
+	// GITSIGN prefix takes priority over SIGSTORE.
+	t.Setenv("SIGSTORE_CONNECTOR_ID", "foo")
+	t.Setenv("GITSIGN_CONNECTOR_ID", "bar")
+
 	want := &Config{
 		// Default overridden by config
 		Fulcio: "example.com",
@@ -73,7 +80,9 @@ func TestGet(t *testing.T) {
 		// Default value
 		ClientID: "sigstore",
 		// Overridden by env var
-		Issuer: "tacocat",
+		Issuer:      "tacocat",
+		RedirectURL: "example.com",
+		ConnectorID: "bar",
 	}
 
 	got, err := getWithRepo(repo)
