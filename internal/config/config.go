@@ -15,6 +15,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/go-git/go-git/v5"
@@ -77,13 +78,19 @@ func getWithRepo(repo *git.Repository) (*Config, error) {
 	}
 
 	// Get values from env vars
-	out.Fulcio = envOrValue("GITSIGN_FULCIO_URL", out.Fulcio)
-	out.Rekor = envOrValue("GITSIGN_REKOR_URL", out.Rekor)
-	out.ClientID = envOrValue("GITSIGN_OIDC_CLIENT_ID", out.ClientID)
-	out.RedirectURL = envOrValue("GITSIGN_OIDC_REDIRECT_URL", out.RedirectURL)
-	out.Issuer = envOrValue("GITSIGN_OIDC_ISSUER", out.Issuer)
+
+	// Check for common environment variables that could be shared with other
+	// Sigstore tools. Gitsign envs should take precedence.
+	for _, prefix := range []string{"SIGSTORE", "GITSIGN"} {
+		out.Fulcio = envOrValue(fmt.Sprintf("%s_FULCIO_URL", prefix), out.Fulcio)
+		out.Rekor = envOrValue(fmt.Sprintf("%s_REKOR_URL", prefix), out.Rekor)
+		out.ClientID = envOrValue(fmt.Sprintf("%s_OIDC_CLIENT_ID", prefix), out.ClientID)
+		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
+		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
+		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
+	}
+
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
-	out.ConnectorID = envOrValue("GITSIGN_CONNECTOR_ID", out.ConnectorID)
 
 	return out, nil
 }
