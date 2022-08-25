@@ -58,26 +58,28 @@ $ git config --local gitsign.fulcio https://fulcio.example.com
 
 The following config options are supported:
 
-| Option      | Default                          | Description                                                                                   |
-| ----------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| fulcio      | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                      |
-| logPath     |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment. |
-| clientID    | sigstore                         | OIDC client ID for application                                                                |
-| issuer      | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                    |
-| redirectURL |                                  | OIDC Redirect URL                                                                             |
-| rekor       | https://rekor.sigstore.dev       | Address of Rekor server                                                                       |
+| Option      | Default                          | Description                                                                                                                                                                                                                                |
+| ----------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| fulcio      | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                   |
+| logPath     |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                              |
+| clientID    | sigstore                         | OIDC client ID for application                                                                                                                                                                                                             |
+| issuer      | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                 |
+| redirectURL |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
+| rekor       | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
+| connectorID |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com`|
 
 ### Environment Variables
 
-| Environment Variable      | Default                          | Description                                                                                   |
-| ------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| GITSIGN_CREDENTIAL_CACHE  |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.   |
-| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                      |
-| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment. |
-| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                |
-| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                    |
-| GITSIGN_OIDC_REDIRECT_URL |                                  | OIDC Redirect URL                                                                             |
-| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                       |
+| Environment Variable      | Default                          | Description                                                                                                                                                                                                                                |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GITSIGN_CREDENTIAL_CACHE  |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                                                                                                                                                |
+| GITSIGN_CONNECTOR_ID      |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com`|
+| GITSIGN_FULCIO_URL        | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                   |
+| GITSIGN_LOG               |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                              |
+| GITSIGN_OIDC_CLIENT_ID    | sigstore                         | OIDC client ID for application                                                                                                                                                                                                             |
+| GITSIGN_OIDC_ISSUER       | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                 |
+| GITSIGN_OIDC_REDIRECT_URL |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
+| GITSIGN_REKOR_URL         | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
 
 ## Usage
 

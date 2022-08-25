@@ -35,6 +35,10 @@ type Config struct {
 	RedirectURL string
 	// OIDC provider to be used to issue ID token
 	Issuer string
+	// Optional Connector ID to use when fetching Dex OIDC token.
+	// See https://github.com/sigstore/sigstore/blob/c645ceb9d075499f3a4b3f183d3a6864640fa956/pkg/oauthflow/flow.go#L49-L53
+	// for more details.
+	ConnectorID string
 
 	// Path to log status output. Helpful for debugging when no TTY is available in the environment.
 	LogPath string
@@ -79,6 +83,7 @@ func getWithRepo(repo *git.Repository) (*Config, error) {
 	out.RedirectURL = envOrValue("GITSIGN_OIDC_REDIRECT_URL", out.RedirectURL)
 	out.Issuer = envOrValue("GITSIGN_OIDC_ISSUER", out.Issuer)
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
+	out.ConnectorID = envOrValue("GITSIGN_CONNECTOR_ID", out.ConnectorID)
 
 	return out, nil
 }
@@ -100,6 +105,8 @@ func applyGitOptions(out *Config, opts format.Options) {
 			out.Issuer = o.Value
 		case "logPath":
 			out.LogPath = o.Value
+		case "connectorID":
+			out.ConnectorID = o.Value
 		}
 	}
 }

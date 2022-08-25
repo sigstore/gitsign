@@ -37,6 +37,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/oauth"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
+	"golang.org/x/oauth2"
 )
 
 type Identity struct {
@@ -81,11 +82,16 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 	}
 
 	clientID := cfg.ClientID
-	var authFlow oauthflow.TokenGetter = &oauthflow.InteractiveIDTokenGetter{
+	defaultFlow := &oauthflow.InteractiveIDTokenGetter{
 		HTMLPage: oauth.InteractiveSuccessHTML,
 		Input:    in,
 		Output:   out,
 	}
+	if cfg.ConnectorID != "" {
+		defaultFlow.ExtraAuthURLParams = []oauth2.AuthCodeOption{oauthflow.ConnectorIDOpt(cfg.ConnectorID)}
+	}
+	var authFlow oauthflow.TokenGetter = defaultFlow
+
 	if providers.Enabled(ctx) {
 		idToken, err := providers.Provide(ctx, clientID)
 		if err != nil {
