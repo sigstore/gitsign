@@ -94,10 +94,7 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 
 	// Check current attestation ref to see if there is existing data.
 	// If so, make sure old data is preserved.
-	var (
-		parentHash plumbing.Hash
-		attCommit  *object.Commit
-	)
+	var attCommit *object.Commit
 	attRef, err := repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
@@ -138,8 +135,8 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 			When:  time.Now(),
 		},
 	}
-	if parentHash != plumbing.ZeroHash {
-		commit.ParentHashes = []plumbing.Hash{parentHash}
+	if attCommit != nil {
+		commit.ParentHashes = []plumbing.Hash{attCommit.Hash}
 	}
 	chash, err := encode(repo.Storer, commit)
 	if err != nil {
