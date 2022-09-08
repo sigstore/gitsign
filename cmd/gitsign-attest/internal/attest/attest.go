@@ -23,6 +23,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -284,6 +285,10 @@ func appendTree(repo *git.Repository, treeSHA plumbing.Hash, new []object.TreeEn
 	for _, e := range files {
 		entries = append(entries, e)
 	}
+	// Git expects trees to be sorted by name.
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name < entries[j].Name
+	})
 
 	return encode(repo.Storer, &object.Tree{
 		Entries: entries,
