@@ -68,7 +68,7 @@ func TestKeyAlgorithm(t *testing.T) {
 }
 
 type fakeFulcio struct {
-	api.Client
+	api.LegacyClient
 	signer *ecdsa.PrivateKey
 	email  string
 }
@@ -122,7 +122,7 @@ func TestGetCert(t *testing.T) {
 
 	client := &Client{
 		// fakeFulcio is what will be doing the validation.
-		Client: &fakeFulcio{
+		LegacyClient: &fakeFulcio{
 			signer: key,
 			email:  email,
 		},

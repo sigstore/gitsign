@@ -30,7 +30,7 @@ import (
 // Client provides a fulcio client with helpful options for configuring OIDC
 // flows.
 type Client struct {
-	api.Client
+	api.LegacyClient
 	oidc OIDCOptions
 }
 
@@ -50,8 +50,8 @@ func NewClient(fulcioURL string, opts OIDCOptions) (*Client, error) {
 	}
 	client := api.NewClient(u, api.WithUserAgent("gitsign"))
 	return &Client{
-		Client: client,
-		oidc:   opts,
+		LegacyClient: client,
+		oidc:         opts,
 	}, nil
 }
 
