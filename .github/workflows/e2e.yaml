@@ -52,7 +52,7 @@ jobs:
         go-version: 1.19
         check-latest: true
 
-    - name: Test Sign and Verify commit
+    - name: Install Gitsign
       run: |
         set -e
 
@@ -72,9 +72,27 @@ jobs:
 
         # Verify tool is on our path
         gitsign -h
+    - name: Test Sign and Verify commit
+      run: |
+        set -e
 
         # Sign commit
         git commit --allow-empty -S --message="Signed commit"
+
+        # Verify commit
+        git verify-commit HEAD
+
+        # Extra debug info
+        git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+    - name: Test Timestamped Commit
+      env:
+        # See https://knowledge.digicert.com/generalinformation/INFO4231.html
+        GITSIGN_TIMESTAMP_AUTHORITY: "http://timestamp.digicert.com"
+      run: |
+        set -e
+
+        # Sign commit
+        git commit --allow-empty -S --message="Signed timestamp commit"
 
         # Verify commit
         git verify-commit HEAD

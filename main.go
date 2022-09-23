@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 
 	"github.com/mattn/go-tty"
 	"github.com/pborman/getopt/v2"
@@ -27,11 +28,6 @@ import (
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
 	"github.com/sigstore/gitsign/internal/config"
-)
-
-const (
-	// TODO: Use fulcio as timestamp authority.
-	defaultTSA = ""
 )
 
 var (
@@ -46,7 +42,6 @@ var (
 	detachSignFlag  = getopt.BoolLong("detach-sign", 'b', "make a detached signature")
 	armorFlag       = getopt.BoolLong("armor", 'a', "create ascii armored output")
 	statusFdOpt     = getopt.IntLong("status-fd", 0, -1, "write special status strings to the file descriptor n.", "n")
-	tsaOpt          = getopt.StringLong("timestamp-authority", 't', defaultTSA, "URL of RFC3161 timestamp authority to use for timestamping", "url")
 	includeCertsOpt = getopt.IntLong("include-certs", 0, -2, "-3 is the same as -2, but ommits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2.", "n")
 
 	// Remaining arguments
@@ -104,7 +99,7 @@ func wrapIO(cfg *config.Config, fn func(*config.Config) error) error {
 	// Log any panics to ttyout, since otherwise they will be lost to os.Stderr.
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Fprintln(ttyout, r)
+			fmt.Fprintln(ttyout, string(debug.Stack()), r)
 		}
 	}()
 

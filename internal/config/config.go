@@ -48,6 +48,9 @@ type Config struct {
 	// for more details.
 	ConnectorID string
 
+	// Timestamp Authority address to use to get a trusted timestamp
+	TimestampAuthority string
+
 	// Path to log status output. Helpful for debugging when no TTY is available in the environment.
 	LogPath string
 }
@@ -83,6 +86,7 @@ func Get() (*Config, error) {
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
 		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
 		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
+		out.TimestampAuthority = envOrValue(fmt.Sprintf("%s_TIMESTAMP_AUTHORITY", prefix), out.TimestampAuthority)
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
