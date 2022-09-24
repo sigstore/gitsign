@@ -37,8 +37,8 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/sharding"
 	"github.com/sigstore/rekor/pkg/types"
-	hashedrekord "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
-	rekord "github.com/sigstore/rekor/pkg/types/rekord/v0.0.1"
+	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
+	rekord_v001 "github.com/sigstore/rekor/pkg/types/rekord/v0.0.1"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
@@ -158,19 +158,19 @@ func extractCerts(e *models.LogEntryAnon) ([]*x509.Certificate, error) {
 		return nil, err
 	}
 
-	eimpl, err := types.NewEntry(pe)
+	eimpl, err := types.CreateVersionedEntry(pe)
 	if err != nil {
 		return nil, err
 	}
 
 	var publicKeyB64 []byte
 	switch e := eimpl.(type) {
-	case *rekord.V001Entry:
+	case *rekord_v001.V001Entry:
 		publicKeyB64, err = e.RekordObj.Signature.PublicKey.Content.MarshalText()
 		if err != nil {
 			return nil, err
 		}
-	case *hashedrekord.V001Entry:
+	case *hashedrekord_v001.V001Entry:
 		publicKeyB64, err = e.HashedRekordObj.Signature.PublicKey.Content.MarshalText()
 		if err != nil {
 			return nil, err
