@@ -15,6 +15,8 @@
 package config
 
 import (
+	"io"
+	"os"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -85,7 +87,11 @@ func TestGet(t *testing.T) {
 		ConnectorID: "bar",
 	}
 
-	got, err := getWithRepo(repo)
+	execFn = func() (io.Reader, error) {
+		return os.Open("testdata/config.txt")
+	}
+
+	got, err := Get()
 	if err != nil {
 		t.Fatal(err)
 	}

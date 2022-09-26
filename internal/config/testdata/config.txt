@@ -1,0 +1,8 @@
+foo bar
+gitsign.foo bar
+gitsign.foo.bar baz
+gitsign
+
+gitsign.connectorid https://accounts.google.com
+gitsign.FULCIO example.com
+gitsign.Rekor example.com
