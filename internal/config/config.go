@@ -15,12 +15,19 @@
 package config
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"strings"
+)
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	format "github.com/go-git/go-git/v5/plumbing/format/config"
+var (
+	// execFn is a function to get the raw git config.
+	// Configurable to allow for overriding for testing.
+	execFn = realExec
 )
 
 // Config represents configuration options for gitsign.
@@ -48,21 +55,13 @@ type Config struct {
 // Get fetches the gitsign config options for the repo in the current working
 // directory.
 func Get() (*Config, error) {
-	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
+	r, err := execFn()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading config: %w", err)
 	}
-	return getWithRepo(repo)
-}
+	cfg := parseConfig(r)
 
-// getWithRepo fetches a config for a given repository. This is separated out
-// from Get so that we can create in-memory repos for testing.
-func getWithRepo(repo *git.Repository) (*Config, error) {
-	cfg, err := repo.ConfigScoped(config.GlobalScope)
-	if err != nil {
-		return nil, err
-	}
-
+	// Start with default config
 	out := &Config{
 		Fulcio:   "https://fulcio.sigstore.dev",
 		Rekor:    "https://rekor.sigstore.dev",
@@ -71,13 +70,9 @@ func getWithRepo(repo *git.Repository) (*Config, error) {
 	}
 
 	// Get values from config file.
-	for _, s := range cfg.Raw.Sections {
-		if s.IsName("gitsign") {
-			applyGitOptions(out, s.Options)
-		}
-	}
+	applyGitOptions(out, cfg)
 
-	// Get values from env vars
+	// Get values from env vars.
 
 	// Check for common environment variables that could be shared with other
 	// Sigstore tools. Gitsign envs should take precedence.
@@ -95,25 +90,61 @@ func getWithRepo(repo *git.Repository) (*Config, error) {
 	return out, nil
 }
 
-func applyGitOptions(out *Config, opts format.Options) {
-	// Iterate over options once instead of using Get (which itself iterates
-	// over options until a matching key is found).
-	for _, o := range opts {
-		switch o.Key {
-		case "fulcio":
-			out.Fulcio = o.Value
-		case "rekor":
-			out.Rekor = o.Value
-		case "clientID":
-			out.ClientID = o.Value
-		case "redirectURL":
-			out.RedirectURL = o.Value
-		case "issuer":
-			out.Issuer = o.Value
-		case "logPath":
-			out.LogPath = o.Value
-		case "connectorID":
-			out.ConnectorID = o.Value
+// realExec forks out to the git binary to read the git config.
+// We do this as a hack since go-git has issues parsing global configs
+// for custom fields (https://github.com/go-git/go-git/issues/508) and
+// doesn't support deprecated subsection syntaxes
+// (https://github.com/sigstore/gitsign/issues/142).
+func realExec() (io.Reader, error) {
+	cmd := exec.Command("git", "config", "--get-regexp", `^gitsign\.`)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		if cmd.ProcessState.ExitCode() == 1 && stderr.Len() == 0 {
+			// git config returning exit code 1 with no stderr message can
+			// happen if there are no gitsign related configs set. Treat this
+			// like an non-error / empty config.
+			return stdout, nil
+		}
+		return nil, fmt.Errorf("%w: %s", err, stderr)
+	}
+	return stdout, nil
+}
+
+func parseConfig(r io.Reader) map[string]string {
+	out := map[string]string{}
+
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		raw := s.Text()
+		data := strings.Split(raw, " ")
+		if len(data) < 2 {
+			continue
+		}
+		out[data[0]] = data[1]
+	}
+	return out
+}
+
+func applyGitOptions(out *Config, cfg map[string]string) {
+	for k, v := range cfg {
+		switch {
+		case strings.EqualFold(k, "gitsign.fulcio"):
+			out.Fulcio = v
+		case strings.EqualFold(k, "gitsign.rekor"):
+			out.Rekor = v
+		case strings.EqualFold(k, "gitsign.clientID"):
+			out.ClientID = v
+		case strings.EqualFold(k, "gitsign.redirectURL"):
+			out.RedirectURL = v
+		case strings.EqualFold(k, "gitsign.issuer"):
+			out.Issuer = v
+		case strings.EqualFold(k, "gitsign.logPath"):
+			out.LogPath = v
+		case strings.EqualFold(k, "gitsign.connectorID"):
+			out.ConnectorID = v
 		}
 	}
 }
