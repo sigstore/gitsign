@@ -22,6 +22,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/sigstore/cosign/cmd/cosign/cli/options"
+	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
+	"github.com/sigstore/cosign/pkg/cosign"
 	"github.com/sigstore/gitsign/cmd/gitsign-attest/internal/attest"
 )
 
@@ -62,14 +64,27 @@ func main() {
 	if *tree {
 		commit, err := repo.CommitObject(head.Hash())
 		if err != nil {
-			fmt.Println(err)
-			return
+			log.Fatal(err)
 		}
 		sha = commit.TreeHash
 
 		refName = attTreeRef
 	}
 
-	out, err := attest.WriteFile(ctx, repo, refName, sha, *path, at)
+	// TODO: read values from config.
+	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
+		FulcioURL:    "https://fulcio.sigstore.dev",
+		RekorURL:     "https://rekor.sigstore.dev",
+		OIDCIssuer:   "https://oauth2.sigstore.dev/auth",
+		OIDCClientID: "sigstore",
+	})
+	if err != nil {
+		log.Fatalf("getting signer: %v", err)
+	}
+	defer sv.Close()
+
+	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation)
+
+	out, err := attestor.WriteFile(ctx, refName, sha, *path, at)
 	fmt.Println(out, err)
 }
