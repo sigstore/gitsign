@@ -20,11 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -32,12 +31,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage"
-	"github.com/sigstore/cosign/cmd/cosign/cli/options"
+	"github.com/jonboulle/clockwork"
 	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
-	"github.com/sigstore/cosign/pkg/cosign"
 	"github.com/sigstore/cosign/pkg/cosign/attestation"
 	"github.com/sigstore/cosign/pkg/types"
 	rekorclient "github.com/sigstore/rekor/pkg/generated/client"
+	"github.com/sigstore/rekor/pkg/generated/models"
 	dssesig "github.com/sigstore/sigstore/pkg/signature/dsse"
 	signatureoptions "github.com/sigstore/sigstore/pkg/signature/options"
 )
@@ -47,17 +46,76 @@ const (
 	TreeRef   = "refs/attestations/trees"
 )
 
-// WriteFile writes the given file + a DSSE signed attestation to the corresponding attestation ref.
-// The SHA of the created commit is returned.
-func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha plumbing.Hash, path, attType string) (plumbing.Hash, error) {
-	b, err := os.ReadFile(path)
+var (
+	clock = clockwork.NewRealClock()
+)
+
+// rekorUpload stubs out cosign.TLogUploadInTotoAttestation for testing.
+type rekorUpload func(ctx context.Context, rekorClient *rekorclient.Rekor, signature []byte, pemBytes []byte) (*models.LogEntryAnon, error)
+
+type Attestor struct {
+	repo    *git.Repository
+	sv      *sign.SignerVerifier
+	rekorFn rekorUpload
+}
+
+func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload) *Attestor {
+	return &Attestor{
+		repo:    repo,
+		sv:      sv,
+		rekorFn: rekorFn,
+	}
+}
+
+// WriteFile is a convenience wrapper around WriteAttestation that takes in a filepath rather than an io.Reader.
+func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string) (plumbing.Hash, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		log.Fatal(err)
+		return plumbing.ZeroHash, err
+	}
+	defer f.Close()
+
+	return a.WriteAttestation(ctx, refName, sha, f, attType)
+}
+
+type Reader interface {
+	io.Reader
+	Name() string
+}
+
+type NamedReader struct {
+	io.Reader
+	name string
+}
+
+func (r NamedReader) Name() string {
+	return r.name
+}
+
+func NewNamedReader(r io.Reader, name string) Reader {
+	return NamedReader{
+		Reader: r,
+		name:   name,
+	}
+}
+
+// WriteAttestion writes the given content + a DSSE signed attestation to the corresponding attestation ref.
+// The SHA of the created commit is returned.
+//
+// repo: What repository to write to.
+// refName: What ref to write to (e.g. refs/attestations/commits)
+// sha: Commit SHA you are attesting to.
+// input: Attestation file input.
+// attType: Attestation type. See [attestation.GenerateStatement] for allowed values.
+func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string) (plumbing.Hash, error) {
+	b, err := io.ReadAll(input)
+	if err != nil {
+		return plumbing.ZeroHash, err
 	}
 
 	// Write the blob we received verbatim.
 	// TODO: is this necessary? should we just extract this data from DSSE?
-	blobHash, err := writeBlob(repo.Storer, b)
+	blobHash, err := writeBlob(a.repo.Storer, b)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -65,11 +123,11 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 	// Step 1: Write the files
 
 	// Create the DSSE, sign it, store it.
-	sig, err := signPayload(ctx, sha, b, attType)
+	sig, err := a.signPayload(ctx, sha, b, attType)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
-	sigHash, err := writeBlob(repo.Storer, sig)
+	sigHash, err := writeBlob(a.repo.Storer, sig)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -77,7 +135,7 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 	// Create 2 files: 1 mirroring the original file basename,
 	// another using <basename>.sig for the DSSE.
 	// TODO: prevent accidental file overwrites.
-	filename := filepath.Base(path)
+	filename := filepath.Base(input.Name())
 	entries := []object.TreeEntry{
 		{
 			Name: filename,
@@ -96,20 +154,20 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 	// Check current attestation ref to see if there is existing data.
 	// If so, make sure old data is preserved.
 	var attCommit *object.Commit
-	attRef, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	attRef, err := a.repo.Reference(plumbing.ReferenceName(refName), true)
 	if err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return plumbing.ZeroHash, err
 		}
 	}
 	if attRef != nil {
-		attCommit, err = repo.CommitObject(attRef.Hash())
+		attCommit, err = a.repo.CommitObject(attRef.Hash())
 		if err != nil {
 			return plumbing.ZeroHash, err
 		}
 	}
 
-	tree, err := buildTree(repo, attCommit, sha, entries)
+	tree, err := buildTree(a.repo, attCommit, sha, entries)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -117,7 +175,7 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 	// Step 3: Make the commit
 
 	// Grab the user from the repository config so we know who to attribute the commit to.
-	cfg, err := repo.ConfigScoped(config.GlobalScope)
+	cfg, err := a.repo.ConfigScoped(config.GlobalScope)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -128,23 +186,23 @@ func WriteFile(ctx context.Context, repo *git.Repository, refName string, sha pl
 		Author: object.Signature{
 			Name:  cfg.User.Name,
 			Email: cfg.User.Email,
-			When:  time.Now(),
+			When:  clock.Now(),
 		},
 		Committer: object.Signature{
 			Name:  cfg.User.Name,
 			Email: cfg.User.Email,
-			When:  time.Now(),
+			When:  clock.Now(),
 		},
 	}
 	if attCommit != nil {
 		commit.ParentHashes = []plumbing.Hash{attCommit.Hash}
 	}
-	chash, err := encode(repo.Storer, commit)
+	chash, err := encode(a.repo.Storer, commit)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
-	if err := repo.Storer.CheckAndSetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), chash), attRef); err != nil {
+	if err := a.repo.Storer.CheckAndSetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), chash), attRef); err != nil {
 		return plumbing.ZeroHash, err
 	}
 
@@ -163,25 +221,13 @@ func encode(store storage.Storer, enc Encoder) (plumbing.Hash, error) {
 	return store.SetEncodedObject(obj)
 }
 
-func signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
-	// Get ephemeral key
-	sv, err := sign.SignerFromKeyOpts(ctx, "", "", options.KeyOpts{
-		FulcioURL:    "https://fulcio.sigstore.dev",
-		RekorURL:     "https://rekor.sigstore.dev",
-		OIDCIssuer:   "https://oauth2.sigstore.dev/auth",
-		OIDCClientID: "sigstore",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("getting signer: %w", err)
-	}
-	defer sv.Close()
-
+func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
 	// Generate attestation
 	sh, err := attestation.GenerateStatement(attestation.GenerateOpts{
 		Predicate: bytes.NewBuffer(b),
 		Type:      attType,
 		Digest:    sha.String(),
-		//Repo:      digest.Repository.String(),
+		Time:      clock.Now,
 	})
 	if err != nil {
 		return nil, err
@@ -190,14 +236,14 @@ func signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType strin
 	if err != nil {
 		return nil, err
 	}
-	wrapped := dssesig.WrapSigner(sv, types.IntotoPayloadType)
+	wrapped := dssesig.WrapSigner(a.sv, types.IntotoPayloadType)
 	envelope, err := wrapped.SignMessage(bytes.NewReader(payload), signatureoptions.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
 
 	// Upload to rekor
-	entry, err := cosign.TLogUploadInTotoAttestation(ctx, rekorclient.Default, envelope, sv.Cert)
+	entry, err := a.rekorFn(ctx, rekorclient.Default, envelope, a.sv.Cert)
 	if err != nil {
 		return nil, err
 	}
