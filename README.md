@@ -139,23 +139,38 @@ Validated Git signature: true
 Validated Rekor entry: true
 ```
 
-## Limitations
+## FAQ
 
-- [GitHub Verified Badge](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
+### Is there any way to bypass the browser flow?
 
-  <img src="./images/unverified.png" width="400" />
+A browser window is needed to get an OAuth token, since gitsign aims to not
+store refresh tokens or other cryptographic material on disk, but there are some
+things you can do to make this process a bit easier!
 
-  GitHub doesn't recognize Gitsign signatures as verified at the moment:
+1. Set the `connectorID` config option - This preselects the identity provider
+   to use. Assuming you're already signed in, in most cases you'll bounce
+   directly to the auth success screen! (and you can clean up the browser tabs
+   later)
+2. Use the [Credential Cache](cmd/gitsign-credential-cache/README.md). This uses
+   an in-memory credential cache over a file socket that allows you to persist
+   keys and certificates for their full lifetime (meaning you only need to auth
+   once every 10 minutes).
 
-  1. The sigstore CA root is not a part of
-     [GitHub's trust root](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#smime-commit-signature-verification).
-  2. Because Gitsign's ephemeral keys are only valid for a short time, using
-     standard x509 verification would consider the certificate invalid after
-     expiration. Verification needs to include validation via Rekor to verify
-     the cert was valid at the time it was used.
+### Why doesn't GitHub show commits as [verified](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)?
 
-  We hope to work with GitHub to get these types of signatures recognized as
-  verified in the future!
+<img src="./images/unverified.png" width="400" />
+
+GitHub doesn't recognize Gitsign signatures as verified at the moment:
+
+1. The sigstore CA root is not a part of
+   [GitHub's trust root](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#smime-commit-signature-verification).
+2. Because Gitsign's ephemeral keys are only valid for a short time, using
+   standard x509 verification would consider the certificate invalid after
+   expiration. Verification needs to include validation via Rekor to verify the
+   cert was valid at the time it was used.
+
+We hope to work with GitHub to get these types of signatures recognized as
+verified in the future!
 
 ## Debugging
 
@@ -243,8 +258,8 @@ Gitsign stores data in 2 places:
 
 ## Security
 
-Should you discover any security issues, please refer to sigstores
-[security process](https://github.com/sigstore/community/blob/main/SECURITY.md)
+Should you discover any security issues, please refer to the
+[security process](https://github.com/sigstore/gitsign/security/policy)
 
 ## Advanced
 
