@@ -19,7 +19,7 @@ require (
 	github.com/sigstore/cosign v1.13.0
 	github.com/sigstore/fulcio v0.6.0
 	github.com/sigstore/rekor v0.12.2
-	github.com/sigstore/sigstore v1.4.3
+	github.com/sigstore/sigstore v1.4.4
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 )
