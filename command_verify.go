@@ -45,12 +45,17 @@ func commandVerify(cfg *config.Config) error {
 		return fmt.Errorf("failed to read signature data (detached: %T): %w", detached, err)
 	}
 
+	cv, err := git.NewCertVerifier()
+	if err != nil {
+		return fmt.Errorf("error creating git cert verifier: %w", err)
+	}
+
 	rekor, err := newRekorClient(cfg.Rekor)
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
 
-	summary, err := git.Verify(ctx, rekor, data, sig, detached)
+	summary, err := git.Verify(ctx, cv, rekor, data, sig, detached)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			emitBadSig(summary.Cert)

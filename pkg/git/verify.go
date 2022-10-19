@@ -19,16 +19,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 
-	cms "github.com/github/smimesign/ietf-cms"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
 )
 
 // VerificationSummary holds artifacts of the gitsign verification of a Git commit or tag.
@@ -67,19 +64,10 @@ func NewClaim(c ClaimCondition, ok bool) Claim {
 // Verify takes a context, rekor verifier client, Git object data (everything but the signature), and a Git signature.
 // A VerificationSummary is returned with the signing certificate & Rekor transparency log index of the Git object, if found,
 // and whether each is valid for the given Git data.
-func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detached bool) (*VerificationSummary, error) {
+func Verify(ctx context.Context, git Verifier, rekor rekor.Verifier, data, sig []byte, detached bool) (*VerificationSummary, error) {
 	claims := []Claim{}
 
-	root, err := fulcioroots.Get()
-	if err != nil {
-		return nil, fmt.Errorf("getting fulcio root certificate: %w", err)
-	}
-	intermediates, err := fulcioroots.GetIntermediates()
-	if err != nil {
-		return nil, fmt.Errorf("getting fulcio intermediate certificates: %w", err)
-	}
-
-	cert, err := VerifySignature(data, sig, detached, root, intermediates)
+	cert, err := git.Verify(ctx, data, sig, detached)
 	if err != nil {
 		return nil, err
 	}
@@ -110,47 +98,15 @@ func Verify(ctx context.Context, rekor rekor.Verifier, data, sig []byte, detache
 // work.
 //
 // Signatures should be CMS/PKCS7 formatted.
+//
+// Deprecated: Use CertVerifier.Verify instead.
 func VerifySignature(data, sig []byte, detached bool, rootCerts, intermediates *x509.CertPool) (*x509.Certificate, error) {
-	// Try decoding as PEM
-	var der []byte
-	if blk, _ := pem.Decode(sig); blk != nil {
-		der = blk.Bytes
-	} else {
-		der = sig
-	}
-	// Parse signature
-	sd, err := cms.ParseSignedData(der)
+	v, err := NewCertVerifier(WithRootPool(rootCerts), WithIntermediatePool(intermediates))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature: %w", err)
+		return nil, err
 	}
 
-	// Generate verification options.
-	certs, err := sd.GetCertificates()
-	if err != nil {
-		return nil, fmt.Errorf("error getting signature certs: %w", err)
-	}
-	cert := certs[0]
-
-	opts := x509.VerifyOptions{
-		Roots:         rootCerts,
-		Intermediates: intermediates,
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-		// cosign hack: ignore the current time for now - we'll use the tlog to
-		// verify whether the commit was signed at a valid time.
-		CurrentTime: cert.NotBefore,
-	}
-
-	if detached {
-		if _, err := sd.VerifyDetached(data, opts); err != nil {
-			return nil, fmt.Errorf("failed to verify detached signature: %w", err)
-		}
-	} else {
-		if _, err := sd.Verify(opts); err != nil {
-			return nil, fmt.Errorf("failed to verify attached signature: %w", err)
-		}
-	}
-
-	return cert, nil
+	return v.Verify(context.Background(), data, sig, detached)
 }
 
 type encoder interface {

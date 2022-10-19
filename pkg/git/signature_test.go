@@ -16,6 +16,7 @@
 package git
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"fmt"
@@ -67,9 +68,24 @@ func TestSignVerify(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Sign() = %v", err)
 			}
-			if _, err := VerifySignature(data, sig, detached, roots, ca.ChainPool()); err != nil {
-				t.Fatalf("Verify() = %v", err)
-			}
+
+			// Deprecated, included for completeness
+			t.Run("VerifySignature", func(t *testing.T) {
+				if _, err := VerifySignature(data, sig, detached, roots, ca.ChainPool()); err != nil {
+					t.Fatalf("Verify() = %v", err)
+				}
+			})
+
+			t.Run("CertVerifier.Verify", func(t *testing.T) {
+				cv, err := NewCertVerifier(WithRootPool(roots))
+				if err != nil {
+					t.Fatal(err)
+				}
+				ctx := context.Background()
+				if _, err := cv.Verify(ctx, data, sig, detached); err != nil {
+					t.Fatalf("Verify() = %v", err)
+				}
+			})
 		})
 	}
 }
