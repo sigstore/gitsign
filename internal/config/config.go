@@ -34,6 +34,9 @@ var (
 type Config struct {
 	// Address of Fulcio server
 	Fulcio string
+	// Path to PEM encoded certificate root for Fulcio.
+	FulcioRoot string
+
 	// Address of Rekor server
 	Rekor string
 
@@ -77,10 +80,16 @@ func Get() (*Config, error) {
 
 	// Get values from env vars.
 
+	// Same as GITSIGN_FULCIO_ROOT, but using legacy cosign value for compatibility.
+	// Long term we're likely going to be moving away from this.
+	// See https://github.com/sigstore/sigstore/pull/759 for more discussion.
+	out.FulcioRoot = envOrValue("SIGSTORE_ROOT_FILE", out.FulcioRoot)
+
 	// Check for common environment variables that could be shared with other
 	// Sigstore tools. Gitsign envs should take precedence.
 	for _, prefix := range []string{"SIGSTORE", "GITSIGN"} {
 		out.Fulcio = envOrValue(fmt.Sprintf("%s_FULCIO_URL", prefix), out.Fulcio)
+		out.FulcioRoot = envOrValue(fmt.Sprintf("%s_FULCIO_ROOT", prefix), out.FulcioRoot)
 		out.Rekor = envOrValue(fmt.Sprintf("%s_REKOR_URL", prefix), out.Rekor)
 		out.ClientID = envOrValue(fmt.Sprintf("%s_OIDC_CLIENT_ID", prefix), out.ClientID)
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
@@ -137,6 +146,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 		switch {
 		case strings.EqualFold(k, "gitsign.fulcio"):
 			out.Fulcio = v
+		case strings.EqualFold(k, "gitsign.fulcioRoot"):
+			out.FulcioRoot = v
 		case strings.EqualFold(k, "gitsign.rekor"):
 			out.Rekor = v
 		case strings.EqualFold(k, "gitsign.clientID"):

@@ -82,11 +82,18 @@ The following config options are supported:
 | GITSIGN_OIDC_REDIRECT_URL   | ✅                 |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
 | GITSIGN_REKOR_URL           | ✅                 | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
 | GITSIGN_TIMESTAMP_AUTHORITY | ✅                 |                                  | Optional address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                 |
+| GITSIGN_FULCIO_ROOT         | ✅                 |                                  | Path to PEM encoded certificate for Fulcio CA                                                                                                                                                                                              |
 
 For environment variables that support `Sigstore Prefix`, the values may be
 provided with either a `GITSIGN_` or `SIGSTORE_` prefix - e.g.
 `GITSIGN_CONNECTOR_ID` or `SIGSTORE_CONNECTOR_ID`. If both environment variables
 are set, `GITSIGN_` prefix takes priority.
+
+#### Other environment variables
+
+| Environment Variable      | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| SIGSTORE_REKOR_PUBLIC_KEY | This specifies an out of band PEM-encoded public key to use for a custom Rekor. |
 
 ## Usage
 
@@ -140,6 +147,33 @@ gitsign: Good signature from [billy@chainguard.dev]
 Validated Git signature: true
 Validated Rekor entry: true
 ```
+
+### Private Sigstore
+
+[Similar to cosign](https://docs.sigstore.dev/cosign/custom_components/),
+Gitsign can also run against other Sigstore instances besides the default public
+instance.
+
+There are three options to configure Gitsign to verify against custom
+components:
+
+1. Use [scaffolding](https://github.com/sigstore/scaffolding) to create a custom
+   Sigstore stack. This provides a TUF root distributing verification material
+   for the custom components, and pre-configured Cosign with the trust root.
+
+2. Create a TUF repository yourself, using
+   [go-tuf](https://github.com/theupdateframework/go-tuf) or
+   [python-tuf](https://github.com/theupdateframework/python-tuf)'s repository
+   writers. Instructions for how to configure this root is in this
+   [blog post](https://blog.sigstore.dev/sigstore-bring-your-own-stuf-with-tuf-40febfd2badd).
+
+3. As a last resort, you may also use the following environment variables to
+   configure custom keys out of band.
+
+| Env Variable              | Description                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| SIGSTORE_REKOR_PUBLIC_KEY | This specifies an out of band PEM-encoded public key to use for a custom Rekor.                   |
+| SIGSTORE_FULCIO_ROOT      | This specifies an out of band PEM-encoded X.509 certificate for a custom Fulcio root certificate. |
 
 ## FAQ
 
