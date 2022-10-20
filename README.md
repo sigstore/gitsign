@@ -82,11 +82,18 @@ The following config options are supported:
 | GITSIGN_OIDC_REDIRECT_URL   | ✅                 |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
 | GITSIGN_REKOR_URL           | ✅                 | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
 | GITSIGN_TIMESTAMP_AUTHORITY | ✅                 |                                  | Optional address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                 |
+| GITSIGN_FULCIO_ROOT         | ✅                 |                                  | Path to PEM encoded certificate for Fulcio CA (additional alias: SIGSTORE_ROOT_FILE)                                                                                                                                                                                             |
 
 For environment variables that support `Sigstore Prefix`, the values may be
 provided with either a `GITSIGN_` or `SIGSTORE_` prefix - e.g.
 `GITSIGN_CONNECTOR_ID` or `SIGSTORE_CONNECTOR_ID`. If both environment variables
 are set, `GITSIGN_` prefix takes priority.
+
+#### Other environment variables
+
+| Environment Variable      | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| SIGSTORE_REKOR_PUBLIC_KEY | This specifies an out of band PEM-encoded public key to use for a custom Rekor. |
 
 ## Usage
 
@@ -140,6 +147,13 @@ gitsign: Good signature from [billy@chainguard.dev]
 Validated Git signature: true
 Validated Rekor entry: true
 ```
+
+### Private Sigstore
+
+Gitsign is compatible with other Sigstore tools cosign for running against other
+Sigstore instances besides the default public instace. See
+[cosign documentation](https://docs.sigstore.dev/cosign/custom_components/) for
+how to configure and use another instance.
 
 ## FAQ
 

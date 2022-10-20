@@ -84,6 +84,30 @@ jobs:
 
         # Extra debug info
         git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+    - name: Test Sign and Verify commit - staging
+      env:
+        GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
+        GITSIGN_FULCIO_URL: "https://fulcio.sigstage.dev"
+        GITSIGN_FULCIO_ROOT: "fulcio.pem"
+        GITSIGN_REKOR_URL: "https://rekor.sigstage.dev"
+        # This needs to be SIGSTORE_ since we currently rely on the cosign library impl.
+        SIGSTORE_REKOR_PUBLIC_KEY: "rekor.pem"
+      run: |
+        set -e
+
+        # Download Fulcio certs
+        curl https://fulcio.sigstage.dev/api/v2/trustBundle | jq -r '.chains[0].certificates | flatten[]' > ${GITSIGN_FULCIO_ROOT}
+        # Download Rekor public key
+        curl https://rekor.sigstage.dev/api/v1/log/publicKey > ${SIGSTORE_REKOR_PUBLIC_KEY}
+
+        # Sign commit
+        git commit --allow-empty -S --message="Signed commit"
+
+        # Verify commit
+        git verify-commit HEAD
+
+        # Extra debug info
+        git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
     - name: Debug log
       if: failure()
       run: cat ${GITSIGN_LOG}

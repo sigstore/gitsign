@@ -20,10 +20,13 @@ import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
 	"github.com/sigstore/gitsign/internal/signature"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type identity struct {
@@ -47,6 +50,7 @@ func (i *identity) Signer() (crypto.Signer, error) {
 // used with each other. We're assuming that the actual signature format has
 // been more thoroghly vetted in other packages (i.e. ietf-cms).
 func TestSignVerify(t *testing.T) {
+	ctx := context.Background()
 	ca := fakeca.New()
 	id := &identity{
 		base: ca,
@@ -54,6 +58,15 @@ func TestSignVerify(t *testing.T) {
 	roots := x509.NewCertPool()
 	roots.AddCert(ca.Certificate)
 	data := []byte("tacocat")
+
+	certpath := filepath.Join(t.TempDir(), "cert.pem")
+	b, err := cryptoutils.MarshalCertificateToPEM(ca.Certificate)
+	if err != nil {
+		t.Fatalf("error marshalling cert: %v", err)
+	}
+	if err := os.WriteFile(certpath, b, 0600); err != nil {
+		t.Fatalf("error writing cert: %v", err)
+	}
 
 	for _, detached := range []bool{true, false} {
 		t.Run(fmt.Sprintf("detached(%t)", detached), func(t *testing.T) {
@@ -81,7 +94,6 @@ func TestSignVerify(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				ctx := context.Background()
 				if _, err := cv.Verify(ctx, data, sig, detached); err != nil {
 					t.Fatalf("Verify() = %v", err)
 				}

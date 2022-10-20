@@ -24,6 +24,7 @@ import (
 
 	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/config"
+	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/pkg/git"
 )
 
@@ -45,7 +46,11 @@ func commandVerify(cfg *config.Config) error {
 		return fmt.Errorf("failed to read signature data (detached: %T): %w", detached, err)
 	}
 
-	cv, err := git.NewCertVerifier()
+	root, intermediate, err := fulcioroots.NewFromConfig(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("error getting certificate root: %w", err)
+	}
+	cv, err := git.NewCertVerifier(git.WithRootPool(root), git.WithIntermediatePool(intermediate))
 	if err != nil {
 		return fmt.Errorf("error creating git cert verifier: %w", err)
 	}

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	cms "github.com/github/smimesign/ietf-cms"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
 )
 
 // Verifier verifies git commit signature data.
@@ -42,26 +41,7 @@ type CertVerifier struct {
 type CertVerifierOption func(*CertVerifier) error
 
 func NewCertVerifier(opts ...CertVerifierOption) (*CertVerifier, error) {
-	// Setup default cert pool - system pool + fulcio roots.
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, fmt.Errorf("error getting system cert pool: %w", err)
-	}
-
-	roots := pool.Clone()
-	if err := fulcioroots.GetWithCertPool(roots); err != nil {
-		return nil, fmt.Errorf("getting fulcio root certificate: %w", err)
-	}
-
-	intermediates := pool.Clone()
-	if err := fulcioroots.GetIntermediatesWithCertPool(intermediates); err != nil {
-		return nil, fmt.Errorf("getting fulcio intermediate certificates: %w", err)
-	}
-
-	v := &CertVerifier{
-		roots:         roots,
-		intermediates: intermediates,
-	}
+	v := &CertVerifier{}
 
 	for _, o := range opts {
 		if err := o(v); err != nil {
@@ -69,12 +49,16 @@ func NewCertVerifier(opts ...CertVerifierOption) (*CertVerifier, error) {
 		}
 	}
 
-	return v, err
+	// Use empty pool if not set - this makes it so that we don't fallback
+	// to the system pool.
+	if v.roots == nil {
+		v.roots = x509.NewCertPool()
+	}
+
+	return v, nil
 }
 
 // WithRootPool sets the base CertPool for the verifier.
-// NOTE: this option is order sensitive - setting this will
-// wipe out any previous cert pool configuration.
 func WithRootPool(pool *x509.CertPool) CertVerifierOption {
 	return func(v *CertVerifier) error {
 		v.roots = pool
@@ -82,32 +66,10 @@ func WithRootPool(pool *x509.CertPool) CertVerifierOption {
 	}
 }
 
-// WithRootPool sets the base CertPool for the verifier.
-// NOTE: this option is order sensitive - setting this will
-// wipe out any previous cert pool configuration.
+// WithIntermediatePool sets the base intermediate CertPool for the verifier.
 func WithIntermediatePool(pool *x509.CertPool) CertVerifierOption {
 	return func(v *CertVerifier) error {
 		v.intermediates = pool
-		return nil
-	}
-}
-
-// AddIntermediateCert adds the given cert to the root pool.
-func AddRootCert(certs ...*x509.Certificate) CertVerifierOption {
-	return func(v *CertVerifier) error {
-		for _, c := range certs {
-			v.roots.AddCert(c)
-		}
-		return nil
-	}
-}
-
-// AddIntermediateCert adds the given cert to the intermediate pool.
-func AddIntermediateCert(certs ...*x509.Certificate) CertVerifierOption {
-	return func(v *CertVerifier) error {
-		for _, c := range certs {
-			v.intermediates.AddCert(c)
-		}
 		return nil
 	}
 }
