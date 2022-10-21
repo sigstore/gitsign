@@ -42,8 +42,9 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 
-	at, err := options.ParsePredicateType(*attType)
-	if err != nil {
+	// Don't try to take the value - this will try to convert the short-form attestation type to it's
+	// full predicate URI.
+	if _, err := options.ParsePredicateType(*attType); err != nil {
 		log.Fatal(err)
 	}
 
@@ -85,6 +86,6 @@ func main() {
 
 	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation)
 
-	out, err := attestor.WriteFile(ctx, refName, sha, *path, at)
+	out, err := attestor.WriteFile(ctx, refName, sha, *path, *attType)
 	fmt.Println(out, err)
 }
