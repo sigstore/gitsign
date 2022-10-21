@@ -42,12 +42,6 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 
-	// Don't try to take the value - this will try to convert the short-form attestation type to it's
-	// full predicate URI.
-	if _, err := options.ParsePredicateType(*attType); err != nil {
-		log.Fatal(err)
-	}
-
 	repo, err := git.PlainOpen(".")
 	if err != nil {
 		log.Fatal(err)
