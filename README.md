@@ -155,7 +155,7 @@ Validated Rekor entry: true
 ### Private Sigstore
 
 Gitsign is compatible with other Sigstore tools cosign for running against other
-Sigstore instances besides the default public instace. See
+Sigstore instances besides the default public instance. See
 [cosign documentation](https://docs.sigstore.dev/cosign/custom_components/) for
 how to configure and use another instance.
 
@@ -269,7 +269,7 @@ Gitsign stores data in 2 places:
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
    particular, users and organizations may be sensitive to the data contained
-   within code signing certificatesm returned by Fulcio, which may include user
+   within code signing certificates returned by Fulcio, which may include user
    emails or repo identifiers. See
    [OIDC usage in Fulcio](https://github.com/sigstore/fulcio/blob/6ac6b8c94c3ec6106d68c0f92225016a3a6eef79/docs/oidc.md)
    for more details for what data is contained in the code signing certs, and
