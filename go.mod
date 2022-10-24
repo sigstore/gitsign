@@ -16,7 +16,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pborman/getopt v0.0.0-20180811024354-2b5b3bfb099b
 	github.com/secure-systems-lab/go-securesystemslib v0.4.0
-	github.com/sigstore/cosign v1.13.0
+	github.com/sigstore/cosign v1.13.1
 	github.com/sigstore/fulcio v1.0.0
 	github.com/sigstore/rekor v1.0.0
 	github.com/sigstore/sigstore v1.4.5-0.20221018191222-7d467ad58b13
