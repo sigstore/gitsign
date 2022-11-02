@@ -25,12 +25,13 @@ import (
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
+	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
-func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, error) {
+func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, *models.LogEntryAnon, error) {
 	sig, cert, err := signature.Sign(ident, data, opts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign message: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	// This uploads the commit SHA + sig(commit SHA) to the tlog using the same
@@ -41,17 +42,18 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 
 	commit, err := git.ObjectHash(data, sig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error generating commit hash: %w", err)
+		return nil, nil, nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
 
 	sv := ident.SignerVerifier()
 	commitSig, err := sv.SignMessage(bytes.NewBufferString(commit))
 	if err != nil {
-		return nil, nil, fmt.Errorf("error signing commit hash: %w", err)
+		return nil, nil, nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
-	if _, err := rekor.Write(ctx, commit, commitSig, cert); err != nil {
-		return nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
+	tlog, err := rekor.Write(ctx, commit, commitSig, cert)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 
-	return sig, cert, nil
+	return sig, cert, tlog, nil
 }

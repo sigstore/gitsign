@@ -61,7 +61,7 @@ func commandSign(cfg *config.Config) error {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
 
-	sig, cert, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
+	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
 		Detached:           *detachSignFlag,
 		TimestampAuthority: cfg.TimestampAuthority,
 		Armor:              *armorFlag,
@@ -69,6 +69,10 @@ func commandSign(cfg *config.Config) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to sign message: %w", err)
+	}
+
+	if tlog != nil && tlog.LogIndex != nil {
+		fmt.Fprintf(ttyout, "tlog entry created with index: %d\n", *tlog.LogIndex)
 	}
 
 	emitSigCreated(cert, *detachSignFlag)
