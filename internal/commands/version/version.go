@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package version
 
 import (
 	"encoding/json"
@@ -22,23 +22,31 @@ import (
 
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/pkg/version"
+	"github.com/spf13/cobra"
 )
 
-func commandVersion(cfg *config.Config) error {
-	v := version.GetVersionInfo()
-	fmt.Println("gitsign version", v.GitVersion)
-	if len(v.Env) > 0 {
-		fmt.Println("env:")
-		for _, e := range v.Env {
-			fmt.Println("\t", e)
-		}
-	}
-	fmt.Println("parsed config:")
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(cfg); err != nil {
-		return err
-	}
+func New(cfg *config.Config) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "print Gitsign version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			v := version.GetVersionInfo()
+			fmt.Println("gitsign version", v.GitVersion)
+			if len(v.Env) > 0 {
+				fmt.Println("env:")
+				for _, e := range v.Env {
+					fmt.Println("\t", e)
+				}
+			}
+			fmt.Println("parsed config:")
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(cfg); err != nil {
+				return err
+			}
 
-	return nil
+			return nil
+		},
+	}
+	return cmd
 }

@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package gpg
 
 import (
 	"crypto"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"os"
-	"sync"
 	"time"
 
 	// TODO: this package is unmaintained except for security fixes.
@@ -37,13 +37,13 @@ import (
 // is passed, gpg will output machine-readable status updates to that fd.
 // Details on the "protocol" can be found at https://git.io/vFFKC
 
-type status string
+type Status string
 
 const (
 	// BEGIN_SIGNING
 	//   Mark the start of the actual signing process. This may be used as an
 	//   indication that all requested secret keys are ready for use.
-	sBeginSigning status = "BEGIN_SIGNING"
+	StatusBeginSigning Status = "BEGIN_SIGNING"
 
 	// SIG_CREATED <type> <pk_algo> <hash_algo> <class> <timestamp> <keyfpr>
 	//   A signature has been created using these parameters.
@@ -58,7 +58,7 @@ const (
 	//   Note, that TIMESTAMP may either be a number of seconds since Epoch
 	//   or an ISO 8601 string which can be detected by the presence of the
 	//   letter 'T'.
-	sSigCreated status = "SIG_CREATED"
+	StatusSigCreated Status = "SIG_CREATED"
 
 	// NEWSIG [<signers_uid>]
 	//   Is issued right before a signature verification starts.  This is
@@ -66,7 +66,7 @@ const (
 	//   arguments are currently defined.  If SIGNERS_UID is given and is
 	//   not "-" this is the percent escape value of the OpenPGP Signer's
 	//   User ID signature sub-packet.
-	sNewSig status = "NEWSIG"
+	StatusNewSig Status = "NEWSIG"
 
 	// GOODSIG  <long_keyid_or_fpr>  <username>
 	//   The signature with the keyid is good.  For each signature only one
@@ -77,14 +77,14 @@ const (
 	//   escaped. The fingerprint may be used instead of the long keyid if
 	//   it is available.  This is the case with CMS and might eventually
 	//   also be available for OpenPGP.
-	sGoodSig status = "GOODSIG"
+	StatusGoodSig Status = "GOODSIG"
 
 	// BADSIG <long_keyid_or_fpr> <username>
 	//   The signature with the keyid has not been verified okay. The username is
 	//   the primary one encoded in UTF-8 and %XX escaped. The fingerprint may be
 	//   used instead of the long keyid if it is available. This is the case with
 	//   CMS and might eventually also be available for OpenPGP.
-	sBadSig status = "BADSIG"
+	StatusBadSig Status = "BADSIG"
 
 	// ERRSIG <keyid> <pkalgo> <hashalgo> <sig_class> <time> <rc>
 	//
@@ -99,7 +99,7 @@ const (
 	//   Note, that TIME may either be the number of seconds since Epoch or an ISO
 	//   8601 string. The latter can be detected by the presence of the letter
 	//   ‘T’.
-	sErrSig status = "ERRSIG"
+	StatusErrSig Status = "ERRSIG"
 
 	// TRUST_
 	//   These are several similar status codes:
@@ -127,64 +127,54 @@ const (
 	//
 	//   Note that the term =TRUST_= in the status names is used for
 	//   historic reasons; we now speak of validity.
-	sTrustFully status = "TRUST_FULLY"
+	StatusTrustFully Status = "TRUST_FULLY"
+
+	prefix = "[GNUPG:] "
 )
 
-var (
-	_setupStatus sync.Once
-	statusFile   *os.File
-)
-
-func setupStatus() {
-	_setupStatus.Do(func() {
-		if *statusFdOpt <= 0 {
-			return
-		}
-
-		const (
-			unixStdout = 1
-			unixStderr = 2
-		)
-
-		// Even though Windows uses different numbers, we always equate 1/2 with
-		// stdout/stderr because Git always passes `--status-fd=1`.
-		switch *statusFdOpt {
-		case unixStdout:
-			statusFile = os.Stdout
-		case unixStderr:
-			statusFile = os.Stderr
-		default:
-			// TODO: debugging output if this fails
-			statusFile = os.NewFile(uintptr(*statusFdOpt), "status")
-		}
-	})
+type StatusWriter struct {
+	w io.Writer
 }
 
-func (s status) emitf(format string, args ...interface{}) {
-	setupStatus()
+func NewStatusWriter(w io.Writer) *StatusWriter {
+	return &StatusWriter{
+		w: w,
+	}
+}
 
-	if statusFile == nil {
-		return
+func NewStatusWriterFromFD(fd uintptr) *StatusWriter {
+	const (
+		unixStdout = 1
+		unixStderr = 2
+	)
+
+	var statusFile io.Writer
+	// Even though Windows uses different numbers, we always equate 1/2 with
+	// stdout/stderr because Git always passes `--status-fd=1`.
+	switch fd {
+	case unixStdout:
+		statusFile = os.Stdout
+	case unixStderr:
+		statusFile = os.Stderr
+	default:
+		// TODO: debugging output if this fails
+		statusFile = os.NewFile(fd, "status")
 	}
 
-	const prefix = "[GNUPG:] "
-	_, _ = statusFile.WriteString(prefix)
-	_, _ = statusFile.WriteString(string(s))
-	fmt.Fprintf(statusFile, " "+format+"\n", args...)
+	return NewStatusWriter(statusFile)
 }
 
-func (s status) emit() {
-	setupStatus()
-
-	if statusFile == nil {
-		return
-	}
-
-	const prefix = "[GNUPG:] "
-	_, _ = statusFile.WriteString(prefix + string(s) + "\n")
+func (w *StatusWriter) Emit(s Status) {
+	fmt.Fprintln(w.w, prefix+string(s))
 }
 
-func emitSigCreated(cert *x509.Certificate, isDetached bool) {
+func (w *StatusWriter) Emitf(s Status, format string, args ...interface{}) {
+	fmt.Fprint(w.w, prefix)
+	fmt.Fprint(w.w, string(s))
+	fmt.Fprintf(w.w, " "+format+"\n", args...)
+}
+
+func (w *StatusWriter) EmitSigCreated(cert *x509.Certificate, isDetached bool) {
 	// SIG_CREATED arguments
 	var (
 		sigType                    string
@@ -222,23 +212,23 @@ func emitSigCreated(cert *x509.Certificate, isDetached bool) {
 	now = time.Now().Unix()
 	fpr = internal.CertHexFingerprint(cert)
 
-	sSigCreated.emitf("%s %d %d %02x %d %s", sigType, pkAlgo, hashAlgo, sigClass, now, fpr)
+	w.Emitf(StatusSigCreated, "%s %d %d %02x %d %s", sigType, pkAlgo, hashAlgo, sigClass, now, fpr)
 }
 
-func emitGoodSig(cert *x509.Certificate) {
+func (w *StatusWriter) EmitGoodSig(cert *x509.Certificate) {
 	subj := cert.Subject.String()
 	fpr := internal.CertHexFingerprint(cert)
 
-	sGoodSig.emitf("%s %s", fpr, subj)
+	w.Emitf(StatusGoodSig, "%s %s", fpr, subj)
 }
 
-func emitBadSig(cert *x509.Certificate) {
+func (w *StatusWriter) EmitBadSig(cert *x509.Certificate) {
 	subj := cert.Subject.String()
 	fpr := internal.CertHexFingerprint(cert)
 
-	sBadSig.emitf("%s %s", fpr, subj)
+	w.Emitf(StatusBadSig, "%s %s", fpr, subj)
 }
 
-func emitTrustFully() {
-	sTrustFully.emitf("0 shell")
+func (w *StatusWriter) EmitTrustFully() {
+	w.Emitf(StatusTrustFully, "0 shell")
 }

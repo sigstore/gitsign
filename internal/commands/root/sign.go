@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package root
 
 import (
 	"bytes"
@@ -23,15 +23,29 @@ import (
 	"io"
 	"os"
 
-	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/git"
+	"github.com/sigstore/gitsign/internal/gpg"
+	gsio "github.com/sigstore/gitsign/internal/io"
+	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/internal/signature"
 )
 
-func commandSign(cfg *config.Config) error {
+// commandSign implements gitsign commit signing.
+// This is implemented as a root command so that user can specify the
+// gitsign binary directly in their gitconfigs.
+func commandSign(o *options, s *gsio.Streams, args ...string) error {
 	ctx := context.Background()
-	userIdent, err := fulcio.NewIdentity(ctx, cfg, ttyin, ttyout)
+
+	// Flag validation
+	if o.FlagVerify {
+		return errors.New("specify --help, --sign, or --verify")
+	}
+	if len(o.FlagLocalUser) == 0 {
+		return errors.New("specify a USER-ID to sign with")
+	}
+
+	userIdent, err := fulcio.NewIdentity(ctx, o.Config, s.TTYIn, s.TTYOut)
 	if err != nil {
 		return fmt.Errorf("failed to get identity: %w", err)
 	}
@@ -39,16 +53,19 @@ func commandSign(cfg *config.Config) error {
 	// Git is looking for "\n[GNUPG:] SIG_CREATED ", meaning we need to print a
 	// line before SIG_CREATED. BEGIN_SIGNING seems appropriate. GPG emits this,
 	// though GPGSM does not.
-	sBeginSigning.emit()
+	gpgout := gpg.NewStatusWriterFromFD(uintptr(o.FlagStatusFD))
+	gpgout.Emit(gpg.StatusBeginSigning)
 
-	var f io.ReadCloser
-	if len(fileArgs) == 1 {
-		if f, err = os.Open(fileArgs[0]); err != nil {
-			return fmt.Errorf("failed to open message file (%s): %w", fileArgs[0], err)
+	var f io.Reader
+	if len(args) == 1 {
+		f2, err := os.Open(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to open message file (%s): %w", args[0], err)
 		}
-		defer f.Close()
+		defer f2.Close()
+		f = f2
 	} else {
-		f = stdin
+		f = s.In
 	}
 
 	dataBuf := new(bytes.Buffer)
@@ -56,28 +73,28 @@ func commandSign(cfg *config.Config) error {
 		return fmt.Errorf("failed to read message from stdin: %w", err)
 	}
 
-	rekor, err := newRekorClient(cfg.Rekor)
+	rekor, err := rekor.NewClient(o.Config.Rekor)
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
 
 	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
-		Detached:           *detachSignFlag,
-		TimestampAuthority: cfg.TimestampAuthority,
-		Armor:              *armorFlag,
-		IncludeCerts:       *includeCertsOpt,
+		Detached:           o.FlagDetachedSignature,
+		TimestampAuthority: o.Config.TimestampAuthority,
+		Armor:              o.FlagArmor,
+		IncludeCerts:       o.FlagIncludeCerts,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	if tlog != nil && tlog.LogIndex != nil {
-		fmt.Fprintf(ttyout, "tlog entry created with index: %d\n", *tlog.LogIndex)
+		fmt.Fprintf(s.TTYOut, "tlog entry created with index: %d\n", *tlog.LogIndex)
 	}
 
-	emitSigCreated(cert, *detachSignFlag)
+	gpgout.EmitSigCreated(cert, o.FlagDetachedSignature)
 
-	if _, err := stdout.Write(sig); err != nil {
+	if _, err := s.Out.Write(sig); err != nil {
 		return errors.New("failed to write signature")
 	}
 
