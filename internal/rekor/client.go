@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package rekor
 
 import (
 	gitrekor "github.com/sigstore/gitsign/pkg/rekor"
 	rekor "github.com/sigstore/rekor/pkg/client"
 )
 
-// newRekorClient returns a new Rekor client with common client options set.
-func newRekorClient(url string) (*gitrekor.Client, error) {
+// NewClient returns a new Rekor client with common client options set.
+func NewClient(url string) (*gitrekor.Client, error) {
 	return gitrekor.New(url, rekor.WithUserAgent("gitsign"))
 }
