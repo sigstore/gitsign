@@ -1,0 +1,38 @@
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "predicateType": "gitsign.sigstore.dev/attestation/git/v0.1",
+  "subject": [
+    {
+      "name": "git@github.com:wlynch/gitsign.git",
+      "digest": {
+        "sha1": "2eaf8fc6d66505baa90640d018e1131cd8e99334"
+      }
+    }
+  ],
+  "predicate": {
+    "source": {
+      "tree": "05f2acbfffb79109c3a03eb5eae50fdb1509acf1",
+      "parents": [
+        "6cee2138cff86230615c45bd676b236e95ac9018"
+      ],
+      "author": {
+        "name": "Billy Lynch",
+        "email": "billy@chainguard.dev",
+        "date": "2022-11-14T16:10:37-05:00"
+      },
+      "committer": {
+        "name": "Billy Lynch",
+        "email": "billy@chainguard.dev",
+        "date": "2022-11-14T16:10:37-05:00"
+      },
+      "message": "Add `gitsign show` subcommand.\n\nAdds a new subcommand that outputs an in-toto Statement containing the\nsource provenance of the given commit.\n"
+    },
+    "signature": "-----BEGIN SIGNED MESSAGE-----\nMIIEBAYJKoZIhvcNAQcCoIID9TCCA/ECAQExDTALBglghkgBZQMEAgEwCwYJKoZI\nhvcNAQcBoIICpDCCAqAwggIloAMCAQICFCY+RzOaY5V8/DCjwiULVfrhLionMAoG\nCCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln\nc3RvcmUtaW50ZXJtZWRpYXRlMB4XDTIyMTExNDIxMTEzNVoXDTIyMTExNDIxMjEz\nNVowADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABFQ4Oz/g13eNAPSdoLjY41Ba\n9mhD+NBgLPERoPXb1/lsfET8bhbUvme5MfkJtIsTOTMwCHe3hXyIz4+T/NZCMlaj\nggFEMIIBQDAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYD\nVR0OBBYEFLgQqE1pLo8wIVVuf3q74LZWMIoPMB8GA1UdIwQYMBaAFN/T6c9WJBGW\n+ajY6ShVosYuGGQ/MCIGA1UdEQEB/wQYMBaBFGJpbGx5QGNoYWluZ3VhcmQuZGV2\nMCkGCisGAQQBg78wAQEEG2h0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbTCBiQYK\nKwYBBAHWeQIEAgR7BHkAdwB1AN09MGrGxxEyYxkeHJlnNwKiSl643jyt/4eKcoAv\nKe6OAAABhHf7s6oAAAQDAEYwRAIgZ5NBib2jk89IhYPciTKADJSF9zsqJd4eeDTa\nwBrStR8CIBkfCd0Q+BjciP02kFU/kXPTpgQEqcPn/HqT9Wm2rdsVMAoGCCqGSM49\nBAMDA2kAMGYCMQCx//GzKGNWx5HNPfD7nXziBcGmJqTBtOuPwOLX9YqEXQbSw4Jq\nKyyzlhz306OtDlgCMQCcE834asgw5oBIofJpYBWuSEbQIQCT324ZI9AEQEM3inH/\nfqPBJugmNxWP/JuZeugxggEmMIIBIgIBATBPMDcxFTATBgNVBAoTDHNpZ3N0b3Jl\nLmRldjEeMBwGA1UEAxMVc2lnc3RvcmUtaW50ZXJtZWRpYXRlAhQmPkczmmOVfPww\no8IlC1X64S4qJzALBglghkgBZQMEAgGgaTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcN\nAQcBMBwGCSqGSIb3DQEJBTEPFw0yMjExMTQyMTExMzVaMC8GCSqGSIb3DQEJBDEi\nBCDSJHtL2A3sKtpmK9TDnYZ5/mfDQWLlh4kBd7OPc4gdbzAKBggqhkjOPQQDAgRI\nMEYCIQDj+4L14rBwLMEW9KMh2x88Jy5G8QPnKe3CL6A16j/7IgIhALjACsHmFQNl\n/TQDEp9V+9XoWa/k0PmrSp5ZaUdN7zYp\n-----END SIGNED MESSAGE-----\n",
+    "signer_info": [
+      {
+        "attributes": "MWkwGAYJKoZIhvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjIxMTE0MjExMTM1WjAvBgkqhkiG9w0BCQQxIgQg0iR7S9gN7CraZivUw52Gef5nw0Fi5YeJAXezj3OIHW8=",
+        "certificate": "-----BEGIN CERTIFICATE-----\nMIICoDCCAiWgAwIBAgIUJj5HM5pjlXz8MKPCJQtV+uEuKicwCgYIKoZIzj0EAwMw\nNzEVMBMGA1UEChMMc2lnc3RvcmUuZGV2MR4wHAYDVQQDExVzaWdzdG9yZS1pbnRl\ncm1lZGlhdGUwHhcNMjIxMTE0MjExMTM1WhcNMjIxMTE0MjEyMTM1WjAAMFkwEwYH\nKoZIzj0CAQYIKoZIzj0DAQcDQgAEVDg7P+DXd40A9J2guNjjUFr2aEP40GAs8RGg\n9dvX+Wx8RPxuFtS+Z7kx+Qm0ixM5MzAId7eFfIjPj5P81kIyVqOCAUQwggFAMA4G\nA1UdDwEB/wQEAwIHgDATBgNVHSUEDDAKBggrBgEFBQcDAzAdBgNVHQ4EFgQUuBCo\nTWkujzAhVW5/ervgtlYwig8wHwYDVR0jBBgwFoAU39Ppz1YkEZb5qNjpKFWixi4Y\nZD8wIgYDVR0RAQH/BBgwFoEUYmlsbHlAY2hhaW5ndWFyZC5kZXYwKQYKKwYBBAGD\nvzABAQQbaHR0cHM6Ly9hY2NvdW50cy5nb29nbGUuY29tMIGJBgorBgEEAdZ5AgQC\nBHsEeQB3AHUA3T0wasbHETJjGR4cmWc3AqJKXrjePK3/h4pygC8p7o4AAAGEd/uz\nqgAABAMARjBEAiBnk0GJvaOTz0iFg9yJMoAMlIX3Oyol3h54NNrAGtK1HwIgGR8J\n3RD4GNyI/TaQVT+Rc9OmBASpw+f8epP1abat2xUwCgYIKoZIzj0EAwMDaQAwZgIx\nALH/8bMoY1bHkc098PudfOIFwaYmpMG064/A4tf1ioRdBtLDgmorLLOWHPfTo60O\nWAIxAJwTzfhqyDDmgEih8mlgFa5IRtAhAJPfbhkj0ARAQzeKcf9+o8Em6CY3FY/8\nm5l66A==\n-----END CERTIFICATE-----\n"
+      }
+    ]
+  }
+}

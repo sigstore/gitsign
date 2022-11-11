@@ -1,0 +1,32 @@
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "predicateType": "gitsign.sigstore.dev/predicate/git/v0.1",
+  "subject": [
+    {
+      "name": "git@github.com:wlynch/gitsign.git",
+      "digest": {
+        "sha1": "262c05491554c57ee641461f315bf4023d0e93c7"
+      }
+    }
+  ],
+  "predicate": {
+    "source": {
+      "tree": "6cd5cc5fbf2bac0aac027e411ec3072699e7028c",
+      "parents": [
+        "7bac7137354d99bd876d453e6dc98c6961975d93"
+      ],
+      "author": {
+        "name": "Billy Lynch",
+        "email": "billy@chainguard.dev",
+        "date": "2022-11-09T08:35:29-05:00"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2022-11-09T08:35:29-05:00"
+      },
+      "message": "Refactor commands with Cobra. (#185)\n\nThis PR rewrites the commands using Cobra so that it can be easier to\r\nadd additional subcommands (i.e. gitsign cache, gitsign attest, etc.)\r\n\r\nThis change doesn't add any new functionality, though it does refactor a\r\ngood chunk of the config, flags, status printing, and other global state\r\nto make it more easily consumable by packages.\r\n\r\nCo-authored-by: Eddie Zaneski \u003ceddiezane@chainguard.dev\u003e\r\nSigned-off-by: Billy Lynch \u003cbilly@chainguard.dev\u003e\r\n\r\nSigned-off-by: Billy Lynch \u003cbilly@chainguard.dev\u003e\r\nCo-authored-by: Eddie Zaneski \u003ceddiezane@chainguard.dev\u003e"
+    },
+    "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsBcBAABCAAQBQJja6yhCRBK7hj4Ov3rIwAAYakIAEvzgwrtNu/GLTIgMXOPylQy\nBo4FBGRnBshaA/nOVfgjinw8Cixrb9N9/YvkQU+ub/I24MEc+R6YsjbGDXqre/Ny\nYSakMBYLJeiPAP0y9GMBXoD8HEk3nl1Ae1BXpRMS9dzHzGOwESuv9BEo5D+RhpXw\nGeeoUFjK8/ISB7Qad5n61brQtinFYwP+3qu+14hwFMJPkQcIqtdHeXd0uFkO0/Th\n1vellvL9yTSOspaWD9qG7s4x2ZRPwf9MjgRp1NTkGDfH9xpqcXWqJl5AorHZdSTk\nbzg98srLKvqcCTBj09WJbWDIu4e/pZc4lFEd3APCSU6kEIJigizXf2uEIfuPZpE=\n=/vdg\n-----END PGP SIGNATURE-----\n\n"
+  }
+}
