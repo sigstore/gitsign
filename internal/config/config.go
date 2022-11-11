@@ -52,7 +52,9 @@ type Config struct {
 	ConnectorID string
 
 	// Timestamp Authority address to use to get a trusted timestamp
-	TimestampAuthority string
+	TimestampURL string
+	// Timestamp Authority PEM encoded cert(s) to use for verification.
+	TimestampCert string
 
 	// Path to log status output. Helpful for debugging when no TTY is available in the environment.
 	LogPath string
@@ -95,7 +97,8 @@ func Get() (*Config, error) {
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
 		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
 		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
-		out.TimestampAuthority = envOrValue(fmt.Sprintf("%s_TIMESTAMP_AUTHORITY", prefix), out.TimestampAuthority)
+		out.TimestampURL = envOrValue(fmt.Sprintf("%s_TIMESTAMP_URL", prefix), out.TimestampURL)
+		out.TimestampCert = envOrValue(fmt.Sprintf("%s_TIMESTAMP_CERT", prefix), out.TimestampCert)
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
@@ -160,6 +163,10 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.LogPath = v
 		case strings.EqualFold(k, "gitsign.connectorID"):
 			out.ConnectorID = v
+		case strings.EqualFold(k, "gitsign.timestampURL"):
+			out.TimestampURL = v
+		case strings.EqualFold(k, "gitsign.timestampCert"):
+			out.TimestampCert = v
 		}
 	}
 }

@@ -80,7 +80,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 
 	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
 		Detached:           o.FlagDetachedSignature,
-		TimestampAuthority: o.Config.TimestampAuthority,
+		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
 	})
