@@ -122,9 +122,6 @@ func statement(repo *git.Repository, remote, revision string) (*in_toto.Statemen
 	// Try and resolve the remote name to use as the subject name.
 	// If the repo does not have a remote configured then this will be left
 	// blank.
-	if remote == "" {
-		remote = "origin"
-	}
 	resolvedRemote, err := repo.Remote(remote)
 	if err != nil && !errors.Is(err, git.ErrRemoteNotFound) {
 		return nil, err
