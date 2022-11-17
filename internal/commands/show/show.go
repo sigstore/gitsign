@@ -42,7 +42,7 @@ type options struct {
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&o.FlagRemote, "remote", "r", "origin", "make a signature")
+	cmd.Flags().StringVarP(&o.FlagRemote, "remote", "r", "origin", "git remote (used to populate subject)")
 }
 
 func (o *options) Run(w io.Writer, args []string) error {
@@ -109,7 +109,7 @@ func statement(repo *git.Repository, remote, revision string) (*in_toto.Statemen
 		Signature: commit.PGPSignature,
 	}
 
-	// If we can a PEM encoded signature, try and extract certificate details.
+	// We have a PEM encoded signature, try and extract certificate details.
 	pem, _ := pem.Decode([]byte(commit.PGPSignature))
 	if pem != nil {
 		sigs, err := parseSignature(pem.Bytes)
@@ -127,7 +127,7 @@ func statement(repo *git.Repository, remote, revision string) (*in_toto.Statemen
 		return nil, err
 	}
 	remoteName := ""
-	if resolvedRemote != nil && len(resolvedRemote.Config().URLs) > 0 {
+	if resolvedRemote != nil && resolvedRemote.Config() != nil && len(resolvedRemote.Config().URLs) > 0 {
 		remoteName = resolvedRemote.Config().URLs[0]
 	}
 
@@ -203,7 +203,6 @@ Prints an in-toto style predicate for the specified revision.
 If no revision is specified, HEAD is used.
 
 This command is experimental, and its CLI surface may change.`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return o.Run(os.Stdout, args)
 		},
