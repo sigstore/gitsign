@@ -22,6 +22,7 @@ import (
 	// Enable OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
 	"github.com/sigstore/gitsign/internal/commands/root"
+	"github.com/sigstore/gitsign/internal/commands/show"
 	"github.com/sigstore/gitsign/internal/commands/version"
 	"github.com/sigstore/gitsign/internal/config"
 )
@@ -35,6 +36,7 @@ func main() {
 
 	rootCmd := root.New(cfg)
 	rootCmd.AddCommand(version.New(cfg))
+	rootCmd.AddCommand(show.New(cfg))
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

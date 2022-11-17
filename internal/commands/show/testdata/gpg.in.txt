@@ -1,0 +1,30 @@
+tree 6cd5cc5fbf2bac0aac027e411ec3072699e7028c
+parent 7bac7137354d99bd876d453e6dc98c6961975d93
+author Billy Lynch <billy@chainguard.dev> 1668000929 -0500
+committer GitHub <noreply@github.com> 1668000929 -0500
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ wsBcBAABCAAQBQJja6yhCRBK7hj4Ov3rIwAAYakIAEvzgwrtNu/GLTIgMXOPylQy
+ Bo4FBGRnBshaA/nOVfgjinw8Cixrb9N9/YvkQU+ub/I24MEc+R6YsjbGDXqre/Ny
+ YSakMBYLJeiPAP0y9GMBXoD8HEk3nl1Ae1BXpRMS9dzHzGOwESuv9BEo5D+RhpXw
+ GeeoUFjK8/ISB7Qad5n61brQtinFYwP+3qu+14hwFMJPkQcIqtdHeXd0uFkO0/Th
+ 1vellvL9yTSOspaWD9qG7s4x2ZRPwf9MjgRp1NTkGDfH9xpqcXWqJl5AorHZdSTk
+ bzg98srLKvqcCTBj09WJbWDIu4e/pZc4lFEd3APCSU6kEIJigizXf2uEIfuPZpE=
+ =/vdg
+ -----END PGP SIGNATURE-----
+ 
+
+Refactor commands with Cobra. (#185)
+
+This PR rewrites the commands using Cobra so that it can be easier to
+add additional subcommands (i.e. gitsign cache, gitsign attest, etc.)
+
+This change doesn't add any new functionality, though it does refactor a
+good chunk of the config, flags, status printing, and other global state
+to make it more easily consumable by packages.
+
+Co-authored-by: Eddie Zaneski <eddiezane@chainguard.dev>
+Signed-off-by: Billy Lynch <billy@chainguard.dev>
+
+Signed-off-by: Billy Lynch <billy@chainguard.dev>
+Co-authored-by: Eddie Zaneski <eddiezane@chainguard.dev>
