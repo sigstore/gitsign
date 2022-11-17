@@ -1,11 +1,10 @@
-//
-// Copyright 2022 The Sigstore Authors.
+// Copyright 2022 The Sigstore Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,28 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:generate go run .
 package main
 
 import (
-	"fmt"
-	"os"
+	"log"
 
-	// Enable OIDC providers
-	_ "github.com/sigstore/cosign/pkg/providers/all"
 	"github.com/sigstore/gitsign/internal/commands/root"
-	"github.com/sigstore/gitsign/internal/config"
+	"github.com/spf13/cobra/doc"
 )
 
 func main() {
-	cfg, err := config.Get()
+	err := doc.GenMarkdownTree(root.New(nil), ".")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-
-	rootCmd := root.New(cfg)
-
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }

@@ -18,6 +18,8 @@ package root
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/sigstore/gitsign/internal/commands/show"
+	"github.com/sigstore/gitsign/internal/commands/version"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/io"
 )
@@ -78,6 +80,8 @@ func New(cfg *config.Config) *cobra.Command {
 		},
 	}
 
+	rootCmd.AddCommand(version.New(cfg))
+	rootCmd.AddCommand(show.New(cfg))
 	o.AddFlags(rootCmd)
 
 	return rootCmd
