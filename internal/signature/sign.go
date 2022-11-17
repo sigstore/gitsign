@@ -33,7 +33,7 @@ type SignOptions struct {
 	// Create ascii armored output
 	Armor bool
 	// IncludeCerts specifies what certs to include in the resulting signature.
-	// -3 is the same as -2, but ommits issuer when cert has Authority Information Access extension.
+	// -3 is the same as -2, but omits issuer when cert has Authority Information Access extension.
 	// -2 includes all certs except root.
 	// -1 includes all certs.
 	// 0 includes no certs.
