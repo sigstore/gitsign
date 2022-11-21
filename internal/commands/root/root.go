@@ -45,7 +45,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.FlagDetachedSignature, "detached-sign", "b", false, "make a detached signature")
 	cmd.Flags().BoolVarP(&o.FlagArmor, "armor", "a", false, "create ascii armored output")
 	cmd.Flags().IntVar(&o.FlagStatusFD, "status-fd", -1, "write special status strings to the file descriptor n.")
-	cmd.Flags().IntVar(&o.FlagIncludeCerts, "include-certs", -2, "-3 is the same as -2, but ommits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2.")
+	cmd.Flags().IntVar(&o.FlagIncludeCerts, "include-certs", -2, "-3 is the same as -2, but omits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2.")
 }
 
 func New(cfg *config.Config) *cobra.Command {
