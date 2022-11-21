@@ -39,3 +39,15 @@ jobs:
         timeout-minutes: 5
         with:
           version: v1.50.1
+
+  generate-docs:
+    name: generate-docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.0.2
+      - uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f # v3.3.0
+        with:
+          go-version: 1.19
+          check-latest: true
+      - name: Check CLI docs are up to date
+        run: ./hack/presubmit.sh
