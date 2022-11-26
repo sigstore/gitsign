@@ -30,7 +30,7 @@ f44de7a (HEAD -> main) commit
 2b0ff1e commit 1
 760568f initial commit
 $ gitsign-attest -f test.json
-$ gitsign-attest -f spdx.sbom -type spdx
+$ gitsign-attest -f spdx.sbom --type spdx
 $ git checkout refs/attestations/commits
 $ tree
 .
@@ -51,7 +51,7 @@ preserve attestations for squash commits, or between sub-directories.
 ```sh
 $ git log --oneline --format="Commit: %h  Tree: %t" -1
 Commit: edd19d9  Tree: 853a6ca
-$ gitsign-attest -f test.json -t
+$ gitsign-attest -f test.json --objtype tree
 $ git checkout refs/attestations/trees
 $ tree .
 .
