@@ -34,3 +34,5 @@ issues:
 run:
   issues-exit-code: 1
   timeout: 10m
+  skip-dirs:
+    - internal/fork

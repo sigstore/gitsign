@@ -18,6 +18,7 @@ package root
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	gsio "github.com/sigstore/gitsign/internal/io"
 	"github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/pkg/git"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 // commandSign implements gitsign commit verification.
@@ -72,7 +74,30 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 	if err != nil {
 		return fmt.Errorf("error getting certificate root: %w", err)
 	}
-	cv, err := git.NewCertVerifier(git.WithRootPool(root), git.WithIntermediatePool(intermediate))
+
+	tsa, err := x509.SystemCertPool()
+	if err != nil {
+		return fmt.Errorf("error getting system root pool: %w", err)
+	}
+	if path := o.Config.TimestampCert; path != "" {
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		cert, err := cryptoutils.LoadCertificatesFromPEM(f)
+		if err != nil {
+			return fmt.Errorf("error loading certs from %s: %w", path, err)
+		}
+		for _, c := range cert {
+			tsa.AddCert(c)
+		}
+	}
+
+	cv, err := git.NewCertVerifier(
+		git.WithRootPool(root),
+		git.WithIntermediatePool(intermediate),
+		git.WithTimestampCertPool(tsa),
+	)
 	if err != nil {
 		return fmt.Errorf("error creating git cert verifier: %w", err)
 	}

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	cms "github.com/github/smimesign/ietf-cms"
+	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 )
 
 // Verifier verifies git commit signature data.
@@ -36,6 +36,7 @@ type Verifier interface {
 type CertVerifier struct {
 	roots         *x509.CertPool
 	intermediates *x509.CertPool
+	tsa           *x509.CertPool
 }
 
 type CertVerifierOption func(*CertVerifier) error
@@ -70,6 +71,14 @@ func WithRootPool(pool *x509.CertPool) CertVerifierOption {
 func WithIntermediatePool(pool *x509.CertPool) CertVerifierOption {
 	return func(v *CertVerifier) error {
 		v.intermediates = pool
+		return nil
+	}
+}
+
+// WithIntermediatePool sets the base intermediate CertPool for the verifier.
+func WithTimestampCertPool(pool *x509.CertPool) CertVerifierOption {
+	return func(v *CertVerifier) error {
+		v.tsa = pool
 		return nil
 	}
 }
@@ -111,12 +120,19 @@ func (v *CertVerifier) Verify(ctx context.Context, data, sig []byte, detached bo
 		CurrentTime: cert.NotBefore.Add(1 * time.Minute),
 	}
 
+	tsaOpts := x509.VerifyOptions{
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping},
+	}
+	if v.tsa != nil {
+		tsaOpts.Roots = v.tsa
+	}
+
 	if detached {
-		if _, err := sd.VerifyDetached(data, opts); err != nil {
+		if _, err := sd.VerifyDetached(data, opts, tsaOpts); err != nil {
 			return nil, fmt.Errorf("failed to verify detached signature: %w", err)
 		}
 	} else {
-		if _, err := sd.Verify(opts); err != nil {
+		if _, err := sd.Verify(opts, tsaOpts); err != nil {
 			return nil, fmt.Errorf("failed to verify attached signature: %w", err)
 		}
 	}
