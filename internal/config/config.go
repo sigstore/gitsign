@@ -97,8 +97,8 @@ func Get() (*Config, error) {
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
 		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
 		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
-		out.TimestampURL = envOrValue(fmt.Sprintf("%s_TIMESTAMP_URL", prefix), out.TimestampURL)
-		out.TimestampCert = envOrValue(fmt.Sprintf("%s_TIMESTAMP_CERT", prefix), out.TimestampCert)
+		out.TimestampURL = envOrValue(fmt.Sprintf("%s_TIMESTAMP_SERVER_URL", prefix), out.TimestampURL)
+		out.TimestampCert = envOrValue(fmt.Sprintf("%s_TIMESTAMP_CERT_CHAIN", prefix), out.TimestampCert)
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
@@ -163,9 +163,9 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.LogPath = v
 		case strings.EqualFold(k, "gitsign.connectorID"):
 			out.ConnectorID = v
-		case strings.EqualFold(k, "gitsign.timestampURL"):
+		case strings.EqualFold(k, "gitsign.timestampServerURL"):
 			out.TimestampURL = v
-		case strings.EqualFold(k, "gitsign.timestampCert"):
+		case strings.EqualFold(k, "gitsign.timestampCertChain"):
 			out.TimestampCert = v
 		}
 	}
