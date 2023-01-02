@@ -93,6 +93,28 @@ jobs:
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+      - name: Test Sign and Verify commit - offline verification
+        env:
+          GITSIGN_REKOR_MODE: "offline"
+        run: |
+          set -e
+
+          # Sign commit
+          git commit --allow-empty -S --message="Signed commit"
+
+          # Verify commit
+          echo "========== git verify-commit =========="
+          git verify-commit HEAD
+
+          echo "========== gitsign verify =========="
+          gitsign verify \
+            --certificate-github-workflow-repository=${{ github.repository }} \
+            --certificate-github-workflow-sha=${{ github.sha }} \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
+
+          # Extra debug info
+          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
       - name: Test Sign and Verify commit - staging
         env:
           GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"

@@ -677,6 +677,8 @@ github.com/sigstore/cosign/v2 v2.0.2 h1:Ttaj/OkJAy+ummhnHG2F+JSFeZQj8i0P6o8j2RY9
 github.com/sigstore/cosign/v2 v2.0.2/go.mod h1:yJXtRmWrumyQA/XPjTTjOufnNckI87mmmVxv9rtEqgE=
 github.com/sigstore/fulcio v1.3.1 h1:0ntW9VbQbt2JytoSs8BOGB84A65eeyvGSavWteYp29Y=
 github.com/sigstore/fulcio v1.3.1/go.mod h1:/XfqazOec45ulJZpyL9sq+OsVQ8g2UOVoNVi7abFgqU=
+github.com/sigstore/protobuf-specs v0.1.0 h1:X0l/E2C2c79t/rI/lmSu8WAoKWsQtMqDzAMiDdEMGr8=
+github.com/sigstore/protobuf-specs v0.1.0/go.mod h1:5shUCxf82hGnjUEFVWiktcxwzdtn6EfeeJssxZ5Q5HE=
 github.com/sigstore/rekor v1.1.1 h1:JCeSss+qUHnCATmwAZh4zT9k0Frdyq0BjmRwewSfEy4=
 github.com/sigstore/rekor v1.1.1/go.mod h1:x/xK+HK08MiuJv+v4OxY/Oo3bhuz1DtJXNJrV7hrzvs=
 github.com/sigstore/sigstore v1.6.4 h1:jH4AzR7qlEH/EWzm+opSpxCfuUcjHL+LJPuQE7h40WE=

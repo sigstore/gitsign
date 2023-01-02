@@ -110,6 +110,7 @@ func generateCert(t *testing.T, tmpl *x509.Certificate) (*x509.Certificate, *ecd
 
 func generateData(t *testing.T, cert *x509.Certificate, priv crypto.Signer) ([]byte, []byte) {
 	t.Helper()
+	ctx := context.Background()
 
 	// Generate commit data
 	commit := object.Commit{
@@ -132,7 +133,7 @@ func generateData(t *testing.T, cert *x509.Certificate, priv crypto.Signer) ([]b
 		cert: cert,
 		priv: priv,
 	}
-	sig, _, err := signature.Sign(id, data, signature.SignOptions{
+	resp, err := signature.Sign(ctx, id, data, signature.SignOptions{
 		Detached: true,
 		Armor:    true,
 		// Fake CA outputs self-signed certs, so we need to use -1 to make sure
@@ -144,12 +145,16 @@ func generateData(t *testing.T, cert *x509.Certificate, priv crypto.Signer) ([]b
 		t.Fatalf("Sign() = %v", err)
 	}
 
-	return data, sig
+	return data, resp.Signature
 }
 
 type fakeRekor struct{}
 
 func (fakeRekor) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	return nil, nil
+}
+
+func (fakeRekor) VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error) {
 	return nil, nil
 }
 

@@ -81,3 +81,8 @@ func (sd *SignedData) IsDetached() bool {
 func (sd *SignedData) ToDER() ([]byte, error) {
 	return sd.psd.ContentInfoDER()
 }
+
+// Raw returns the underlying CMS SignedData struct.
+func (sd *SignedData) Raw() *protocol.SignedData {
+	return sd.psd
+}

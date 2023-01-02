@@ -17,13 +17,17 @@ package signature
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"strings"
 
-	cms "github.com/github/smimesign/ietf-cms"
+	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
+	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
+	"github.com/sigstore/gitsign/pkg/rekor"
+	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
 type SignOptions struct {
@@ -49,6 +53,10 @@ type SignOptions struct {
 	// UserEmail specifies the email to match against. If present, signing
 	// will fail if the Fulcio identity SAN email does not match the git committer email.
 	UserEmail string
+
+	// Rekor address - if specified, Rekor details are embedded directly in the
+	// signature output.
+	RekorAddr string
 }
 
 // Identity is a copy of smimesign.Identity to allow for compatibility without
@@ -67,12 +75,21 @@ type Identity interface {
 	Close()
 }
 
+// SignResponse is the response from Sign containing the signature and other related metadata.
+type SignResponse struct {
+	Signature []byte
+	Cert      *x509.Certificate
+	// LogEntry is the Rekor tlog entry from the signing operation.
+	// This is only populated if offline signing mode was used.
+	LogEntry *models.LogEntryAnon
+}
+
 // Sign signs a given payload for the given identity.
 // The resulting signature and cert used is returned.
-func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certificate, error) {
+func Sign(ctx context.Context, ident Identity, body []byte, opts SignOptions) (*SignResponse, error) {
 	cert, err := ident.Certificate()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get identity certificate: %w", err)
+		return nil, fmt.Errorf("failed to get idenity certificate: %w", err)
 	}
 
 	// If specified, check if retrieved identity matches the expected identity.
@@ -85,22 +102,22 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 			if len(cert.URIs) > 0 {
 				san = append(san, fmt.Sprintf("uri: %v", cert.URIs))
 			}
-			return nil, nil, fmt.Errorf("gitsign.matchCommitter: certificate identity does not match config - want %s <%s>, got %s", opts.UserName, opts.UserEmail, strings.Join(san, ","))
+			return nil, fmt.Errorf("gitsign.matchCommitter: certificate identity does not match config - want %s <%s>, got %s", opts.UserName, opts.UserEmail, strings.Join(san, ","))
 		}
 	}
 
 	signer, err := ident.Signer()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get idenity signer: %w", err)
+		return nil, fmt.Errorf("failed to get idenity signer: %w", err)
 	}
 
 	sd, err := cms.NewSignedData(body)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create signed data: %w", err)
+		return nil, fmt.Errorf("failed to create signed data: %w", err)
 	}
 
 	if err := sd.Sign([]*x509.Certificate{cert}, signer); err != nil {
-		return nil, nil, fmt.Errorf("failed to sign message: %w", err)
+		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 	if opts.Detached {
 		sd.Detached()
@@ -108,37 +125,53 @@ func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certific
 
 	if len(opts.TimestampAuthority) > 0 {
 		if err = sd.AddTimestamps(opts.TimestampAuthority); err != nil {
-			return nil, nil, fmt.Errorf("failed to add timestamp: %w", err)
+			return nil, fmt.Errorf("failed to add timestamp: %w", err)
 		}
 	}
 
 	chain, err := ident.CertificateChain()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get identity certificate chain: %w", err)
+		return nil, fmt.Errorf("failed to get identity certificate chain: %w", err)
 	}
 	// TODO: look into adding back support for opts.IncludeCerts here.
 	// This was removed due to unstable ordering in the cert chain when
 	// intermediates were included.
 	if chain, err = certsForSignature(chain, 1); err != nil {
-		return nil, nil, fmt.Errorf("failed to extract certificates from chain: %w", err)
+		return nil, fmt.Errorf("failed to extract certificates from chain: %w", err)
 	}
 	if err := sd.SetCertificates(chain); err != nil {
-		return nil, nil, fmt.Errorf("failed to set certificates: %w", err)
+		return nil, fmt.Errorf("failed to set certificates: %w", err)
+	}
+
+	var lea *models.LogEntryAnon
+	if opts.RekorAddr != "" {
+		var err error
+		lea, err = attachRekorLogEntry(ctx, sd, cert, opts.RekorAddr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	der, err := sd.ToDER()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to serialize signature: %w", err)
+		return nil, fmt.Errorf("failed to serialize signature: %w", err)
 	}
 
 	if opts.Armor {
-		return pem.EncodeToMemory(&pem.Block{
-			Type:  "SIGNED MESSAGE",
-			Bytes: der,
-		}), cert, nil
+		return &SignResponse{
+			Signature: pem.EncodeToMemory(&pem.Block{
+				Type:  "SIGNED MESSAGE",
+				Bytes: der,
+			}),
+			Cert:     cert,
+			LogEntry: lea,
+		}, nil
 	}
-
-	return der, cert, nil
+	return &SignResponse{
+		Signature: der,
+		Cert:      cert,
+		LogEntry:  lea,
+	}, nil
 }
 
 // certsForSignature determines which certificates to include in the signature
@@ -208,4 +241,40 @@ func matchSAN(cert *x509.Certificate, name, email string) bool {
 	}
 
 	return false
+}
+
+func attachRekorLogEntry(ctx context.Context, sd *cms.SignedData, cert *x509.Certificate, addr string) (*models.LogEntryAnon, error) {
+	rekor, err := rekor.New(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal commit attributes as it was signed.
+	raw := sd.Raw()
+	// We're creating a new signature, so this should generally always be len 1.
+	if len(raw.SignerInfos) < 1 {
+		return nil, fmt.Errorf("no SignerInfo found")
+	}
+	si := raw.SignerInfos[0]
+	message, err := si.SignedAttrs.MarshaledForVerification()
+	if err != nil {
+		return nil, err
+	}
+
+	// Store HashedRekord of the commit content that was signed.
+	lea, err := rekor.WriteMessage(ctx, message, si.Signature, cert)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert LogEntry into attributes.
+	attrs, err := rekoroid.ToAttributes(lea)
+	if err != nil {
+		return nil, err
+	}
+	si.UnsignedAttrs = append(si.UnsignedAttrs, attrs...)
+	// SignerInfo isn't a pointer so we need to reassign it in the SignerInfo list.
+	raw.SignerInfos[0] = si
+
+	return lea, nil
 }

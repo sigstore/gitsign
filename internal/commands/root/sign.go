@@ -88,18 +88,21 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		opts.UserName = o.Config.CommitterName
 		opts.UserEmail = o.Config.CommitterEmail
 	}
-	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), opts)
+	if o.Config.RekorMode == "offline" {
+		opts.RekorAddr = o.Config.Rekor
+	}
+	resp, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), opts)
 	if err != nil {
 		return fmt.Errorf("failed to sign message: %w", err)
 	}
 
-	if tlog != nil && tlog.LogIndex != nil {
+	if tlog := resp.LogEntry; tlog != nil && tlog.LogIndex != nil {
 		fmt.Fprintf(s.TTYOut, "tlog entry created with index: %d\n", *tlog.LogIndex)
 	}
 
-	gpgout.EmitSigCreated(cert, o.FlagDetachedSignature)
+	gpgout.EmitSigCreated(resp.Cert, o.FlagDetachedSignature)
 
-	if _, err := s.Out.Write(sig); err != nil {
+	if _, err := s.Out.Write(resp.Signature); err != nil {
 		return errors.New("failed to write signature")
 	}
 

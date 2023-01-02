@@ -24,6 +24,13 @@ import (
 	"strings"
 )
 
+type RekorVerificationMode int
+
+const (
+	RekorVerificationOnline RekorVerificationMode = iota
+	RekorVerificationOffline
+)
+
 var (
 	// execFn is a function to get the raw git config.
 	// Configurable to allow for overriding for testing.
@@ -39,6 +46,12 @@ type Config struct {
 
 	// Address of Rekor server
 	Rekor string
+	// Rekor storage mode to operate in. One of [online, offline] (default: online)
+	// online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.
+	// offline - Hashed commit content is stored in Rekor, with Rekor attributes
+	// necessary for offline verification being stored in the commit itself.
+	// Note: online verification will be deprecated in favor of offline in the future.
+	RekorMode string
 
 	// OIDC client ID for application
 	ClientID string
@@ -80,6 +93,8 @@ func Get() (*Config, error) {
 		Rekor:    "https://rekor.sigstore.dev",
 		ClientID: "sigstore",
 		Issuer:   "https://oauth2.sigstore.dev/auth",
+		// TODO: default to offline
+		RekorMode: "online",
 	}
 
 	// Get values from config file.
@@ -107,6 +122,7 @@ func Get() (*Config, error) {
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
+	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
 
 	return out, nil
 }
@@ -162,6 +178,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.FulcioRoot = v
 		case strings.EqualFold(k, "gitsign.rekor"):
 			out.Rekor = v
+		case strings.EqualFold(k, "gitsign.rekorMode"):
+			out.RekorMode = v
 		case strings.EqualFold(k, "gitsign.clientID"):
 			out.ClientID = v
 		case strings.EqualFold(k, "gitsign.redirectURL"):

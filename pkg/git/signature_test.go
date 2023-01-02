@@ -70,7 +70,7 @@ func TestSignVerify(t *testing.T) {
 
 	for _, detached := range []bool{true, false} {
 		t.Run(fmt.Sprintf("detached(%t)", detached), func(t *testing.T) {
-			sig, _, err := signature.Sign(id, data, signature.SignOptions{
+			resp, err := signature.Sign(ctx, id, data, signature.SignOptions{
 				Detached: detached,
 				Armor:    true,
 				// Fake CA outputs self-signed certs, so we need to use -1 to make sure
@@ -84,7 +84,7 @@ func TestSignVerify(t *testing.T) {
 
 			// Deprecated, included for completeness
 			t.Run("VerifySignature", func(t *testing.T) {
-				if _, err := VerifySignature(data, sig, detached, roots, ca.ChainPool()); err != nil {
+				if _, err := VerifySignature(data, resp.Signature, detached, roots, ca.ChainPool()); err != nil {
 					t.Fatalf("Verify() = %v", err)
 				}
 			})
@@ -94,7 +94,7 @@ func TestSignVerify(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if _, err := cv.Verify(ctx, data, sig, detached); err != nil {
+				if _, err := cv.Verify(ctx, data, resp.Signature, detached); err != nil {
 					t.Fatalf("Verify() = %v", err)
 				}
 			})

@@ -74,11 +74,19 @@ func Verify(ctx context.Context, git Verifier, rekor rekor.Verifier, data, sig [
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
+	if tlog, err := rekor.VerifyOffline(ctx, sig); err == nil {
+		return &VerificationSummary{
+			Cert:     cert,
+			LogEntry: tlog,
+			Claims:   claims,
+		}, nil
+	}
+
+	// Legacy commit based lookup.
 	commit, err := ObjectHash(data, sig)
 	if err != nil {
 		return nil, err
 	}
-
 	tlog, err := rekor.Verify(ctx, commit, cert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate rekor entry: %w", err)
