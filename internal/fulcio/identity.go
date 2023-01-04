@@ -40,8 +40,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// PrivateKey defines the [crypto.PrivateKey] interface. This should be true for all PrivateKeys.
+type PrivateKey interface {
+	crypto.PrivateKey
+	Public() crypto.PublicKey
+}
+
 type Identity struct {
-	sv *signerverifier.CertSignerVerifier
+	PrivateKey crypto.PrivateKey
+	CertPEM    []byte
+	ChainPEM   []byte
 }
 
 func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.Writer) (*Identity, error) {
@@ -66,10 +74,12 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 			Roots:         roots,
 			Intermediates: intermediates,
 		}
-		sv, err := cacheClient.GetSignerVerifier(ctx)
-		if err == nil && sv != nil {
+		priv, cert, chain, err := cacheClient.GetCredentials(ctx, cfg)
+		if err == nil {
 			return &Identity{
-				sv: sv,
+				PrivateKey: priv,
+				CertPEM:    cert,
+				ChainPEM:   chain,
 			}, nil
 		}
 		// Only print error on failure - if there's a problem fetching
@@ -77,11 +87,116 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 		fmt.Fprintf(out, "error getting cached creds: %v\n", err)
 	}
 
+	idf := &IdentityFactory{
+		in:  in,
+		out: out,
+	}
+	id, err := idf.NewIdentity(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if cacheClient != nil {
+		if err := id.CacheCert(ctx, cacheClient); err != nil {
+			fmt.Fprintf(out, "error storing identity in cache: %v", err)
+		}
+	}
+
+	return id, nil
+}
+
+// Certificate gets the identity's certificate.
+func (i *Identity) Certificate() (*x509.Certificate, error) {
+	p, _ := pem.Decode(i.CertPEM)
+	cert, err := x509.ParseCertificate(p.Bytes)
+	return cert, err
+}
+
+// CertificateChain attempts to get the identity's full certificate chain.
+func (i *Identity) CertificateChain() ([]*x509.Certificate, error) {
+	p, _ := pem.Decode(i.ChainPEM)
+	chain, err := x509.ParseCertificates(p.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	// the cert itself needs to be appended to the chain
+	cert, err := i.Certificate()
+	if err != nil {
+		return nil, err
+	}
+
+	return append([]*x509.Certificate{cert}, chain...), nil
+}
+
+// Signer gets a crypto.Signer that uses the identity's private key.
+func (i *Identity) Signer() (crypto.Signer, error) {
+	sv, err := i.SignerVerifier()
+	if err != nil {
+		return nil, err
+	}
+	s, ok := sv.SignerVerifier.(crypto.Signer)
+	if !ok {
+		return nil, fmt.Errorf("could not use signer %T as crypto.Signer", sv)
+	}
+	return s, nil
+}
+
+// Delete deletes this identity from the system.
+func (i *Identity) Delete() error {
+	// Does nothing - keys are ephemeral
+	return nil
+}
+
+// Close any manually managed memory held by the Identity.
+func (i *Identity) Close() {
+	// noop
+}
+
+func (i *Identity) PublicKey() (crypto.PublicKey, error) {
+	pk, ok := i.PrivateKey.(PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("private key does not implement public key method")
+	}
+	return pk.Public(), nil
+}
+
+func (i *Identity) SignerVerifier() (*signerverifier.CertSignerVerifier, error) {
+	sv, err := signature.LoadSignerVerifier(i.PrivateKey, crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("error creating SignerVerifier: %w", err)
+	}
+
+	return &signerverifier.CertSignerVerifier{
+		SignerVerifier: sv,
+		Cert:           i.CertPEM,
+		Chain:          i.ChainPEM,
+	}, nil
+}
+
+func (i *Identity) CacheCert(ctx context.Context, cacheClient *cache.Client) error {
+	return cacheClient.StoreCert(ctx, i.PrivateKey, i.CertPEM, i.ChainPEM)
+}
+
+// IdentityFactory holds reusable values for configuring how identities are created.
+// Values set here are not expected to change per-request.
+type IdentityFactory struct {
+	in  io.Reader
+	out io.Writer
+}
+
+func NewIdentityFactory(in io.Reader, out io.Writer) *IdentityFactory {
+	return &IdentityFactory{
+		in:  in,
+		out: out,
+	}
+}
+
+func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (*Identity, error) {
 	clientID := cfg.ClientID
 	defaultFlow := &oauthflow.InteractiveIDTokenGetter{
 		HTMLPage: oauth.InteractiveSuccessHTML,
-		Input:    in,
-		Output:   out,
+		Input:    f.in,
+		Output:   f.out,
 	}
 	if cfg.ConnectorID != "" {
 		defaultFlow.ExtraAuthURLParams = []oauth2.AuthCodeOption{oauthflow.ConnectorIDOpt(cfg.ConnectorID)}
@@ -91,7 +206,7 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 	if providers.Enabled(ctx) {
 		idToken, err := providers.Provide(ctx, clientID)
 		if err != nil {
-			fmt.Fprintln(out, "error getting id token:", err)
+			fmt.Fprintln(f.out, "error getting id token:", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
 	}
@@ -114,78 +229,13 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 
 	cert, err := client.GetCert(priv)
 	if err != nil {
-		fmt.Fprintln(out, "error getting signer:", err)
-		return nil, err
-	}
-
-	if cachePath != "" {
-		if err := cacheClient.StoreCert(ctx, priv, cert.CertPEM, cert.ChainPEM); err != nil {
-			fmt.Fprintf(out, "error storing cert in cache: %v", err)
-		}
-	}
-
-	sv, err := signature.LoadECDSASignerVerifier(priv, crypto.SHA256)
-	if err != nil {
+		fmt.Fprintln(f.out, "error getting signer:", err)
 		return nil, err
 	}
 
 	return &Identity{
-		sv: &signerverifier.CertSignerVerifier{
-			SignerVerifier: sv,
-			Cert:           cert.CertPEM,
-			Chain:          cert.ChainPEM,
-		},
+		PrivateKey: priv,
+		CertPEM:    cert.CertPEM,
+		ChainPEM:   cert.ChainPEM,
 	}, nil
-}
-
-// Certificate gets the identity's certificate.
-func (i *Identity) Certificate() (*x509.Certificate, error) {
-	p, _ := pem.Decode(i.sv.Cert)
-	cert, err := x509.ParseCertificate(p.Bytes)
-	return cert, err
-}
-
-// CertificateChain attempts to get the identity's full certificate chain.
-func (i *Identity) CertificateChain() ([]*x509.Certificate, error) {
-	p, _ := pem.Decode(i.sv.Chain)
-	chain, err := x509.ParseCertificates(p.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	// the cert itself needs to be appended to the chain
-	cert, err := i.Certificate()
-	if err != nil {
-		return nil, err
-	}
-
-	return append([]*x509.Certificate{cert}, chain...), nil
-}
-
-// Signer gets a crypto.Signer that uses the identity's private key.
-func (i *Identity) Signer() (crypto.Signer, error) {
-	s, ok := i.sv.SignerVerifier.(crypto.Signer)
-	if !ok {
-		return nil, fmt.Errorf("could not use signer %T as crypto.Signer", i.sv.SignerVerifier)
-	}
-
-	return s, nil
-}
-
-// Delete deletes this identity from the system.
-func (i *Identity) Delete() error {
-	// Does nothing - keys are ephemeral
-	return nil
-}
-
-// Close any manually managed memory held by the Identity.
-func (i *Identity) Close() {
-	// noop
-}
-
-func (i *Identity) PublicKey() (crypto.PublicKey, error) {
-	return i.sv.SignerVerifier.PublicKey()
-}
-
-func (i *Identity) SignerVerifier() *signerverifier.CertSignerVerifier {
-	return i.sv
 }

@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cache
+package cache_test
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"net"
 	"net/rpc"
 	"os"
@@ -27,6 +28,9 @@ import (
 
 	"github.com/github/smimesign/fakeca"
 	"github.com/google/go-cmp/cmp"
+	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/cache/api"
+	"github.com/sigstore/gitsign/internal/cache/service"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
@@ -39,7 +43,7 @@ func TestCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := rpc.NewServer()
-	srv.Register(NewService())
+	srv.Register(service.NewService())
 	go func() {
 		for {
 			srv.Accept(l)
@@ -49,12 +53,12 @@ func TestCache(t *testing.T) {
 	rpcClient, _ := rpc.Dial("unix", path)
 	defer rpcClient.Close()
 	ca := fakeca.New()
-	client := &Client{
+	client := &cache.Client{
 		Client: rpcClient,
 		Roots:  ca.ChainPool(),
 	}
 
-	if _, err := client.GetSignerVerifier(ctx); err == nil {
+	if _, _, _, err := client.GetCredentials(ctx, nil); err == nil {
 		t.Fatal("GetSignerVerifier: expected err, got not")
 	}
 
@@ -65,14 +69,16 @@ func TestCache(t *testing.T) {
 		t.Fatalf("StoreCert: %v", err)
 	}
 
-	id, _ := os.Getwd()
-	cred := new(Credential)
-	if err := client.Client.Call("Service.GetCredential", &GetCredentialRequest{ID: id}, cred); err != nil {
+	host, _ := os.Hostname()
+	wd, _ := os.Getwd()
+	id := fmt.Sprintf("%s@%s", host, wd)
+	cred := new(api.Credential)
+	if err := client.Client.Call("Service.GetCredential", &api.GetCredentialRequest{ID: id}, cred); err != nil {
 		t.Fatal(err)
 	}
 
 	privPEM, _ := cryptoutils.MarshalPrivateKeyToPEM(priv)
-	want := &Credential{
+	want := &api.Credential{
 		PrivateKey: privPEM,
 		Cert:       certPEM,
 	}
@@ -81,14 +87,14 @@ func TestCache(t *testing.T) {
 		t.Error(diff)
 	}
 
-	got, err := client.GetSignerVerifier(ctx)
+	gotPriv, gotCert, _, err := client.GetCredentials(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil {
-		t.Fatal("SignerVerifier was nil")
+	if !priv.Equal(gotPriv) {
+		t.Fatal("private key did not match")
 	}
-	if ok := cmp.Equal(certPEM, got.Cert); !ok {
+	if ok := cmp.Equal(certPEM, gotCert); !ok {
 		t.Error("stored cert does not match")
 	}
 }

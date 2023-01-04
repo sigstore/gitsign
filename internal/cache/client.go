@@ -23,9 +23,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/sigstore/gitsign/internal/signerverifier"
+	"github.com/sigstore/gitsign/internal/cache/api"
+	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 type Client struct {
@@ -34,33 +34,28 @@ type Client struct {
 	Intermediates *x509.CertPool
 }
 
-func (c *Client) GetSignerVerifier(ctx context.Context) (*signerverifier.CertSignerVerifier, error) {
-	id, err := os.Getwd()
+func (c *Client) GetCredentials(ctx context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
+	id, err := id()
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, fmt.Errorf("error getting credential ID: %w", err)
 	}
-
-	resp := new(Credential)
-	if err := c.Client.Call("Service.GetCredential", GetCredentialRequest{
-		ID: id,
+	resp := new(api.Credential)
+	if err := c.Client.Call("Service.GetCredential", api.GetCredentialRequest{
+		ID:     id,
+		Config: cfg,
 	}, resp); err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	privateKey, err := cryptoutils.UnmarshalPEMToPrivateKey(resp.PrivateKey, cryptoutils.SkipPassword)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling private key: %w", err)
-	}
-
-	sv, err := signature.LoadSignerVerifier(privateKey, crypto.SHA256)
-	if err != nil {
-		return nil, fmt.Errorf("error creating SignerVerifier: %w", err)
+		return nil, nil, nil, fmt.Errorf("error unmarshalling private key: %w", err)
 	}
 
 	// Check that the cert is in fact still valid.
 	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(resp.Cert)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling cert: %w", err)
+		return nil, nil, nil, fmt.Errorf("error unmarshalling cert: %w", err)
 	}
 	// There should really only be 1 cert, but check them all anyway.
 	for _, cert := range certs {
@@ -72,42 +67,46 @@ func (c *Client) GetSignerVerifier(ctx context.Context) (*signerverifier.CertSig
 			// Just make sure it's not about to expire.
 			CurrentTime: time.Now().Add(30 * time.Second),
 		}); err != nil {
-			return nil, fmt.Errorf("stored cert no longer valid: %w", err)
+			return nil, nil, nil, fmt.Errorf("stored cert no longer valid: %w", err)
 		}
 	}
 
-	return &signerverifier.CertSignerVerifier{
-		SignerVerifier: sv,
-		Cert:           resp.Cert,
-		Chain:          resp.Chain,
-	}, nil
+	return privateKey, resp.Cert, resp.Chain, nil
 }
 
-type PrivateKey interface {
-	crypto.PrivateKey
-	Public() crypto.PublicKey
-}
-
-func (c *Client) StoreCert(ctx context.Context, priv PrivateKey, cert, chain []byte) error {
-	id, err := os.Getwd()
+func (c *Client) StoreCert(ctx context.Context, priv crypto.PrivateKey, cert, chain []byte) error {
+	id, err := id()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting credential ID: %w", err)
 	}
 	privPEM, err := cryptoutils.MarshalPrivateKeyToPEM(priv)
 	if err != nil {
 		return err
 	}
 
-	if err := c.Client.Call("Service.StoreCredential", StoreCredentialRequest{
+	if err := c.Client.Call("Service.StoreCredential", api.StoreCredentialRequest{
 		ID: id,
-		Credential: &Credential{
+		Credential: &api.Credential{
 			PrivateKey: privPEM,
 			Cert:       cert,
 			Chain:      chain,
 		},
-	}, new(Credential)); err != nil {
+	}, new(api.Credential)); err != nil {
 		return err
 	}
 
 	return err
+}
+
+func id() (string, error) {
+	// Prefix host name in case cache socket is being shared over a SSH session.
+	host, err := os.Hostname()
+	if err != nil {
+		return "", fmt.Errorf("error getting hostname: %w", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("error getting working directory: %w", err)
+	}
+	return fmt.Sprintf("%s@%s", host, wd), nil
 }
