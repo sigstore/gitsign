@@ -3,7 +3,7 @@ module github.com/sigstore/gitsign
 go 1.19
 
 require (
-	github.com/coreos/go-oidc/v3 v3.4.0
+	github.com/coreos/go-oidc/v3 v3.5.0
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-billy/v5 v5.4.0
 	github.com/go-git/go-git/v5 v5.5.1
@@ -23,7 +23,7 @@ require (
 	github.com/sigstore/sigstore v1.4.5-0.20221018191222-7d467ad58b13
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/crypto v0.4.0
-	golang.org/x/oauth2 v0.0.0-20221006150949-b44042a4b9c1
+	golang.org/x/oauth2 v0.3.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 )
 
@@ -104,6 +104,7 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect
@@ -239,7 +240,7 @@ require (
 	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.3.0 // indirect
+	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/term v0.3.0 // indirect
