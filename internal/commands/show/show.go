@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	predicateType = "gitsign.sigstore.dev/predicate/git/v0.1"
+	predicateType = "https://gitsign.sigstore.dev/predicate/git/v0.1"
 )
 
 type options struct {

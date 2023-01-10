@@ -1,6 +1,6 @@
 {
   "_type": "https://in-toto.io/Statement/v0.1",
-  "predicateType": "gitsign.sigstore.dev/predicate/git/v0.1",
+  "predicateType": "https://gitsign.sigstore.dev/predicate/git/v0.1",
   "subject": [
     {
       "name": "git@github.com:wlynch/gitsign.git",
