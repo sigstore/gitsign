@@ -45,7 +45,10 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 		return nil, nil, nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
 
-	sv := ident.SignerVerifier()
+	sv, err := ident.SignerVerifier()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error getting signer: %w", err)
+	}
 	commitSig, err := sv.SignMessage(bytes.NewBufferString(commit))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error signing commit hash: %w", err)

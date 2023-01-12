@@ -25,7 +25,7 @@ import (
 
 	"github.com/pborman/getopt/v2"
 
-	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/cache/service"
 	"github.com/sigstore/gitsign/pkg/version"
 )
 
@@ -68,7 +68,7 @@ func main() {
 		log.Fatalf("error opening socket: %v", err)
 	}
 	srv := rpc.NewServer()
-	if err := srv.Register(cache.NewService()); err != nil {
+	if err := srv.Register(service.NewService()); err != nil {
 		log.Fatalf("error registering RPC service: %v", err)
 	}
 	for {
