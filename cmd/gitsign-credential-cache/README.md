@@ -34,7 +34,7 @@ you, until the signing certificate expires, typically in ten minutes.
 
 ```sh
 $ gitsign-credential-cache &
-$ export GITSIGN_CREDENTIAL_CACHE="$HOME/.cache/.sigstore/gitsign/cache.sock"
+$ export GITSIGN_CREDENTIAL_CACHE="$HOME/.cache/sigstore/gitsign/cache.sock"
 $ git commit ...
 ```
 
@@ -61,10 +61,10 @@ or in `~/.ssh/config`:
 
 ```
 Host amazon
-    RemoteForward /home/wlynch/.sigstore/cache.sock /Users/wlynch/Library/Caches/.sigstore/gitsign/cache.sock
+    RemoteForward /home/wlynch/.cache/sigstore/cache.sock /Users/wlynch/Library/Caches/sigstore/gitsign/cache.sock
 ```
 
-where `/home/wlynch/.sigstore/cache.sock` is the location of the socket path on
+where `/home/wlynch/.cache/sigstore/cache.sock` is the location of the socket path on
 the remote host (this can be changed, so long as the environment variable is
 also updated to match).
 
