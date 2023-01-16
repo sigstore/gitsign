@@ -23,7 +23,7 @@ require (
 	github.com/sigstore/sigstore v1.4.5-0.20221018191222-7d467ad58b13
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/crypto v0.5.0
-	golang.org/x/oauth2 v0.3.0
+	golang.org/x/oauth2 v0.4.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 )
 
