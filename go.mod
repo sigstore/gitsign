@@ -86,6 +86,7 @@ require (
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.12.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20210823021906-dc406ceaf94b // indirect
