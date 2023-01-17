@@ -43,6 +43,36 @@ that is used is output by `gitsign-credential-cache` when it is spawned. See
 [os.UserCacheDir](https://pkg.go.dev/os#UserCacheDir) for details on how the
 cache directory is selected.
 
+### Systemd service
+
+There are systemd user units in contrib
+
+Change path to gitsign-credential-cache in service unit
+
+```sh
+${EDITOR:-vi} ./contrib/gitsign-credential-cache.service
+```
+
+Install units in home directory for specific user
+
+```sh
+install -m 0660 -D -t $HOME/.config/systemd/user/ ./contrib/gitsign-credential-cache.{socket,service}
+systemctl --user daemon-reload
+```
+
+OR install them for all users
+
+```sh
+sudo install -m 0660 -D -t /etc/systemd/user/ ./contrib/gitsign-credential-cache.{socket,service}
+sudo systemctl daemon-reload
+```
+
+After that you can enable and start socket service
+
+```sh
+systemctl --user enable --now gitsign-credential-cache.socket
+```
+
 ### Forwarding cache over SSH
 
 (Requires gitsign >= v0.5)
