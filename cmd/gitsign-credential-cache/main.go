@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/coreos/go-systemd/activation"
+	"github.com/coreos/go-systemd/v22/activation"
 	"github.com/pborman/getopt/v2"
 
 	"github.com/sigstore/gitsign/internal/cache/service"
@@ -33,7 +33,7 @@ import (
 var (
 	// Action flags
 	versionFlag = getopt.BoolLong("version", 'v', "print the version number")
-	systemdFlag = getopt.BoolLong("socket-activation", 's', "use systemd socket activation")
+	systemdFlag = getopt.BoolLong("systemd-socket-activation", 's', "use systemd socket activation")
 )
 
 func main() {
@@ -51,11 +51,23 @@ func main() {
 
 	var connChan = make(chan net.Conn)
 	if *systemdFlag {
+		// Stop if we're not running under systemd.
+		if os.Getenv("LISTEN_PID") == "" {
+			log.Fatalf("systemd socket activation requested but not running under systemd")
+		}
+
 		listeners, err := activation.Listeners()
 		if err != nil {
 			log.Fatalf("error getting systemd listeners: %v", err)
 		}
+		if len(listeners) == 0 {
+			log.Fatalf("no systemd listeners found")
+		}
 		for _, l := range listeners {
+			if l == nil {
+				continue
+			}
+			fmt.Println(l.Addr().String())
 			go connToChan(l, connChan)
 		}
 	} else {
