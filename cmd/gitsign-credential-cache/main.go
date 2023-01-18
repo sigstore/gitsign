@@ -60,15 +60,17 @@ func main() {
 		if err != nil {
 			log.Fatalf("error getting systemd listeners: %v", err)
 		}
-		if len(listeners) == 0 {
-			log.Fatalf("no systemd listeners found")
-		}
+		var validCount int
 		for _, l := range listeners {
 			if l == nil {
 				continue
 			}
 			fmt.Println(l.Addr().String())
 			go connToChan(l, connChan)
+			validCount++
+		}
+		if validCount == 0 {
+			log.Fatalf("no valid systemd listeners found")
 		}
 	} else {
 		user, err := os.UserCacheDir()
