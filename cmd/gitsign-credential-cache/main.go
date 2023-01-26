@@ -24,7 +24,7 @@ import (
 	"syscall"
 
 	"github.com/coreos/go-systemd/v22/activation"
-	"github.com/pborman/getopt/v2"
+	"github.com/spf13/pflag"
 
 	"github.com/sigstore/gitsign/internal/cache/service"
 	"github.com/sigstore/gitsign/pkg/version"
@@ -32,12 +32,12 @@ import (
 
 var (
 	// Action flags
-	versionFlag = getopt.BoolLong("version", 'v', "print the version number")
-	systemdFlag = getopt.BoolLong("systemd-socket-activation", 's', "use systemd socket activation")
+	versionFlag = pflag.BoolP("version", "v", false, "print the version number")
+	systemdFlag = pflag.Bool("systemd-socket-activation", false, "use systemd socket activation")
 )
 
 func main() {
-	getopt.Parse()
+	pflag.Parse()
 	// Override default umask so created files are always scoped to the
 	// current user.
 	syscall.Umask(0077)
