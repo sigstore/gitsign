@@ -26,7 +26,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/in-toto/in-toto-golang/in_toto"
-	v02 "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
+	"github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/pkg/predicate"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
@@ -137,7 +137,7 @@ func statement(repo *git.Repository, remote, revision string) (*in_toto.Statemen
 			Type: in_toto.StatementInTotoV01,
 			Subject: []in_toto.Subject{{
 				Name: remoteName,
-				Digest: v02.DigestSet{
+				Digest: common.DigestSet{
 					// TODO?: Figure out if/how to support git sha256 - this
 					// will likely depend on upstream support in go-git.
 					// See https://github.com/go-git/go-git/issues/229.
