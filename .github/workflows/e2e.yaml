@@ -34,80 +34,81 @@ jobs:
       GITSIGN_LOG: "/tmp/gitsign.log"
 
     steps:
-    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      with:
-        # Use the merge commit if type is pull_request/pull_request_target,
-        # else use the default ref.
-        # By default pull_request_target will use the base branch as the
-        # target since it was originally intended for trusted workloads.
-        # However, we need to use this to have access to the OIDC creds
-        # for the e2e tests, so insert our own logic here.
-        # This is effectively a ternary of the form ${{ <condition> && <true> || <false> }}.
-        # See https://docs.github.com/en/actions/learn-github-actions/expressions for more details.
-        ref: ${{ startsWith(github.event_name, 'pull_request') && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          # Use the merge commit if type is pull_request/pull_request_target,
+          # else use the default ref.
+          # By default pull_request_target will use the base branch as the
+          # target since it was originally intended for trusted workloads.
+          # However, we need to use this to have access to the OIDC creds
+          # for the e2e tests, so insert our own logic here.
+          # This is effectively a ternary of the form ${{ <condition> && <true> || <false> }}.
+          # See https://docs.github.com/en/actions/learn-github-actions/expressions for more details.
+          ref: ${{ startsWith(github.event_name, 'pull_request') && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
 
-    - name: Set up Go
-      uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
-      with:
-        go-version: 1.19
-        check-latest: true
+      - name: Set up Go
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
+        with:
+          go-version: '1.20'
+          check-latest: true
 
-    - name: Install Gitsign
-      run: |
-        set -e
+      - name: Install Gitsign
+        run: |
+          set -e
 
-        # Setup repo + tool
-        make install-gitsign
-        export PATH="$PATH:$GOPATH/bin"
-        echo "PATH=${PATH}"
-        whereis gitsign
-        mkdir /tmp/git
-        cd /tmp/git
-        git init -b main .
-        git config --global user.email "test@example.com"
-        git config --global user.name "gitsign"
-        git config --global gpg.x509.program gitsign
-        git config --global gpg.format x509
-        git config --global commit.gpgsign true
+          # Setup repo + tool
+          make install-gitsign
+          export PATH="$PATH:$GOPATH/bin"
+          echo "PATH=${PATH}"
+          whereis gitsign
+          mkdir /tmp/git
+          cd /tmp/git
+          git init -b main .
+          git config --global user.email "test@example.com"
+          git config --global user.name "gitsign"
+          git config --global gpg.x509.program gitsign
+          git config --global gpg.format x509
+          git config --global commit.gpgsign true
 
-        # Verify tool is on our path
-        gitsign -h
-    - name: Test Sign and Verify commit
-      run: |
-        set -e
+          # Verify tool is on our path
+          gitsign -h
+      - name: Test Sign and Verify commit
+        run: |
+          set -e
 
-        # Sign commit
-        git commit --allow-empty -S --message="Signed commit"
+          # Sign commit
+          git commit --allow-empty -S --message="Signed commit"
 
-        # Verify commit
-        git verify-commit HEAD
+          # Verify commit
+          git verify-commit HEAD
 
-        # Extra debug info
-        git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
-    - name: Test Sign and Verify commit - staging
-      env:
-        GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
-        GITSIGN_FULCIO_URL: "https://fulcio.sigstage.dev"
-        GITSIGN_FULCIO_ROOT: "fulcio.pem"
-        GITSIGN_REKOR_URL: "https://rekor.sigstage.dev"
-        # This needs to be SIGSTORE_ since we currently rely on the cosign library impl.
-        SIGSTORE_REKOR_PUBLIC_KEY: "rekor.pem"
-      run: |
-        set -e
+          # Extra debug info
+          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+      - name: Test Sign and Verify commit - staging
+        env:
+          GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
+          GITSIGN_FULCIO_URL: "https://fulcio.sigstage.dev"
+          GITSIGN_FULCIO_ROOT: "fulcio.pem"
+          GITSIGN_REKOR_URL: "https://rekor.sigstage.dev"
+          # This needs to be SIGSTORE_ since we currently rely on the cosign library impl.
+          SIGSTORE_REKOR_PUBLIC_KEY: "rekor.pem"
+        run: |
+          set -e
 
-        # Download Fulcio certs
-        curl https://fulcio.sigstage.dev/api/v2/trustBundle | jq -r '.chains[0].certificates | flatten[]' > ${GITSIGN_FULCIO_ROOT}
-        # Download Rekor public key
-        curl https://rekor.sigstage.dev/api/v1/log/publicKey > ${SIGSTORE_REKOR_PUBLIC_KEY}
+          # Download Fulcio certs
+          curl https://fulcio.sigstage.dev/api/v2/trustBundle | jq -r '.chains[0].certificates | flatten[]' > "${GITSIGN_FULCIO_ROOT}"
+          # Download Rekor public key
+          curl https://rekor.sigstage.dev/api/v1/log/publicKey > "${SIGSTORE_REKOR_PUBLIC_KEY}"
 
-        # Sign commit
-        git commit --allow-empty -S --message="Signed commit"
+          # Sign commit
+          git commit --allow-empty -S --message="Signed commit"
 
-        # Verify commit
-        git verify-commit HEAD
+          # Verify commit
+          git verify-commit HEAD
 
-        # Extra debug info
-        git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
-    - name: Debug log
-      if: failure()
-      run: cat ${GITSIGN_LOG}
+          # Extra debug info
+          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+
+      - name: Debug log
+        if: failure()
+        run: cat "${GITSIGN_LOG}"
