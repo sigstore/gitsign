@@ -199,21 +199,23 @@ verified in the future!
 ### Configuration
 
 If `gitsign` is running with unexpected configs, you can validate the config
-values that are being ran by running `gitsign -v`:
+values that are being ran by running `gitsign --version`:
 
 ```sh
-$ gitsign -v
-gitsign version devel
-env:
-         GITSIGN_LOG=/tmp/log.txt
+$ gitsign --version
+gitsign version v0.5.2
 parsed config:
 {
   "Fulcio": "https://fulcio.sigstore.dev",
+  "FulcioRoot": "",
   "Rekor": "https://rekor.sigstore.dev",
   "ClientID": "sigstore",
   "RedirectURL": "",
   "Issuer": "https://oauth2.sigstore.dev/auth",
-  "LogPath": "/tmp/log.txt"
+  "ConnectorID": "",
+  "TimestampURL": "",
+  "TimestampCert": "",
+  "LogPath": ""
 }
 ```
 
