@@ -139,7 +139,7 @@ func parseConfig(r io.Reader) map[string]string {
 		if len(data) < 2 {
 			continue
 		}
-		out[data[0]] = data[1]
+		out[data[0]] = strings.Join(data[1:], " ")
 	}
 	return out
 }
