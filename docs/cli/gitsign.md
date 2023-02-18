@@ -10,7 +10,7 @@ gitsign [flags]
 
 ```
   -a, --armor               create ascii armored output
-  -b, --detached-sign       make a detached signature
+  -b, --detach-sign         make a detached signature
   -h, --help                help for gitsign
       --include-certs int   -3 is the same as -2, but omits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2. (default -2)
   -u, --local-user string   use USER-ID to sign
