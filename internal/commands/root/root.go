@@ -55,9 +55,10 @@ func New(cfg *config.Config) *cobra.Command {
 	o := &options{Config: cfg}
 
 	rootCmd := &cobra.Command{
-		Use:   "gitsign",
-		Short: "Keyless Git signing with Sigstore!",
-		Args:  cobra.ArbitraryArgs,
+		Use:               "gitsign",
+		Short:             "Keyless Git signing with Sigstore!",
+		Args:              cobra.ArbitraryArgs,
+		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s := io.New(o.Config.LogPath)
 			return s.Wrap(func() error {
