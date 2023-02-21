@@ -78,12 +78,17 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}
 
-	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), signature.SignOptions{
+	opts := signature.SignOptions{
 		Detached:           o.FlagDetachedSignature,
 		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
-	})
+	}
+	if o.Config.MatchCommitter {
+		opts.UserName = o.Config.CommitterName
+		opts.UserEmail = o.Config.CommitterEmail
+	}
+	sig, cert, tlog, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), opts)
 	if err != nil {
 		return fmt.Errorf("failed to sign message: %w", err)
 	}
