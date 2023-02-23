@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strings"
 
 	cms "github.com/github/smimesign/ietf-cms"
 )
@@ -40,6 +41,14 @@ type SignOptions struct {
 	// 1 includes leaf cert.
 	// >1 includes n from the leaf.
 	IncludeCerts int
+
+	// UserName specifies the email to match against. If present, signing
+	// will fail if the Fulcio identity SAN URI does not match the git committer name.
+	UserName string
+
+	// UserEmail specifies the email to match against. If present, signing
+	// will fail if the Fulcio identity SAN email does not match the git committer email.
+	UserEmail string
 }
 
 // Identity is a copy of smimesign.Identity to allow for compatibility without
@@ -63,8 +72,23 @@ type Identity interface {
 func Sign(ident Identity, body []byte, opts SignOptions) ([]byte, *x509.Certificate, error) {
 	cert, err := ident.Certificate()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get idenity certificate: %w", err)
+		return nil, nil, fmt.Errorf("failed to get identity certificate: %w", err)
 	}
+
+	// If specified, check if retrieved identity matches the expected identity.
+	if opts.UserName != "" || opts.UserEmail != "" {
+		if !matchSAN(cert, opts.UserName, opts.UserEmail) {
+			san := []string{}
+			if len(cert.EmailAddresses) > 0 {
+				san = append(san, fmt.Sprintf("email: %v", cert.EmailAddresses))
+			}
+			if len(cert.URIs) > 0 {
+				san = append(san, fmt.Sprintf("uri: %v", cert.URIs))
+			}
+			return nil, nil, fmt.Errorf("gitsign.matchCommitter: certificate identity does not match config - want %s <%s>, got %s", opts.UserName, opts.UserEmail, strings.Join(san, ","))
+		}
+	}
+
 	signer, err := ident.Signer()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get idenity signer: %w", err)
@@ -163,4 +187,25 @@ func chainWithoutRoot(chain []*x509.Certificate) []*x509.Certificate {
 	}
 
 	return chain
+}
+
+// matchSAN checks whether a given cert SAN matches the given user name/email.
+// At least 1 of the following needs to match to be considered successful:
+//
+// 1. SAN email == user email (typical for most human users)
+// 2. SAN URI == user name (for non-email based identities like CI)
+func matchSAN(cert *x509.Certificate, name, email string) bool {
+	for _, e := range cert.EmailAddresses {
+		if e == email {
+			return true
+		}
+	}
+
+	for _, u := range cert.URIs {
+		if u.String() == name {
+			return true
+		}
+	}
+
+	return false
 }

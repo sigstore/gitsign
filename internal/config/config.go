@@ -58,6 +58,11 @@ type Config struct {
 
 	// Path to log status output. Helpful for debugging when no TTY is available in the environment.
 	LogPath string
+
+	// Committer details
+	CommitterName  string
+	CommitterEmail string
+	MatchCommitter bool
 }
 
 // Get fetches the gitsign config options for the repo in the current working
@@ -112,7 +117,7 @@ func Get() (*Config, error) {
 // doesn't support deprecated subsection syntaxes
 // (https://github.com/sigstore/gitsign/issues/142).
 func realExec() (io.Reader, error) {
-	cmd := exec.Command("git", "config", "--get-regexp", `^gitsign\.`)
+	cmd := exec.Command("git", "config", "--get-regexp", `.*`)
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
 	cmd.Stdout = stdout
@@ -147,6 +152,10 @@ func parseConfig(r io.Reader) map[string]string {
 func applyGitOptions(out *Config, cfg map[string]string) {
 	for k, v := range cfg {
 		switch {
+		case strings.EqualFold(k, "user.name"):
+			out.CommitterName = v
+		case strings.EqualFold(k, "user.email"):
+			out.CommitterEmail = v
 		case strings.EqualFold(k, "gitsign.fulcio"):
 			out.Fulcio = v
 		case strings.EqualFold(k, "gitsign.fulcioRoot"):
@@ -167,6 +176,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.TimestampURL = v
 		case strings.EqualFold(k, "gitsign.timestampCertChain"):
 			out.TimestampCert = v
+		case strings.EqualFold(k, "gitsign.matchCommitter"):
+			out.MatchCommitter = strings.EqualFold(v, "true")
 		}
 	}
 }
