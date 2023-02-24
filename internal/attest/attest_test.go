@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"text/template"
 
@@ -313,13 +312,13 @@ func generateAttestation(t *testing.T, h plumbing.Hash) string {
 	t.Helper()
 
 	b := new(bytes.Buffer)
-	if err := tmpl.Execute(b, h.String()); err != nil {
+	if err := tmpl.Execute(b, h); err != nil {
 		t.Fatal(err)
 	}
 
 	att := dsse.Envelope{
 		PayloadType: "application/vnd.in-toto+json",
-		Payload:     base64.StdEncoding.EncodeToString([]byte(strings.TrimSpace(b.String()))),
+		Payload:     base64.StdEncoding.EncodeToString(bytes.TrimSpace(b.Bytes())),
 		Signatures:  []dsse.Signature{{Sig: "dGFjb2NhdA=="}},
 	}
 
