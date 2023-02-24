@@ -30,10 +30,12 @@ func TestVersionText(t *testing.T) {
 }
 
 func TestEnv(t *testing.T) {
+	os.Setenv("GITSIGN_CONNECTOR_ID", "foobar")
 	os.Setenv("GITSIGN_TEST", "foo")
 	os.Setenv("TUF_ROOT", "bar")
 	got := GetVersionInfo()
 	want := []string{
+		"GITSIGN_CONNECTOR_ID=foobar",
 		"GITSIGN_TEST=foo",
 		"TUF_ROOT=bar",
 	}

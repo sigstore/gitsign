@@ -20,7 +20,7 @@ import (
 	"os"
 
 	// Enable OIDC providers
-	_ "github.com/sigstore/cosign/pkg/providers/all"
+	_ "github.com/sigstore/cosign/v2/pkg/providers/all"
 	"github.com/sigstore/gitsign/internal/commands/root"
 	"github.com/sigstore/gitsign/internal/config"
 )

@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
-	cosignopts "github.com/sigstore/cosign/cmd/cosign/cli/options"
-	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
-	"github.com/sigstore/cosign/pkg/cosign"
+	cosignopts "github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
+	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
 	"github.com/sigstore/gitsign/internal/attest"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/spf13/cobra"

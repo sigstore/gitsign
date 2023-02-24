@@ -30,7 +30,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 
-	"github.com/sigstore/cosign/pkg/cosign"
+	"github.com/sigstore/cosign/v2/pkg/cosign"
 	rekor "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/index"
@@ -40,6 +40,7 @@ import (
 	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	rekord_v001 "github.com/sigstore/rekor/pkg/types/rekord/v0.0.1"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 // Verifier represents a mechanism to get and verify Rekor entries for the given Git commit.
@@ -72,7 +73,11 @@ func (c *Client) Write(ctx context.Context, commitSHA string, sig []byte, cert *
 	if err != nil {
 		return nil, err
 	}
-	return cosign.TLogUpload(ctx, c.Rekor, sig, []byte(commitSHA), pem)
+	checkSum := sha256.New()
+	if _, err := checkSum.Write([]byte(commitSHA)); err != nil {
+		return nil, err
+	}
+	return cosign.TLogUpload(ctx, c.Rekor, sig, checkSum, pem)
 }
 
 func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
@@ -137,12 +142,31 @@ func (c *Client) findTLogEntriesByPayloadAndPK(ctx context.Context, payload, pub
 	return searchIndex.GetPayload(), nil
 }
 
+// rekorPubsFromClient returns a RekorPubKey keyed by the log ID from the Rekor client.
+// NOTE: This **must not** be used in the verification path, but may be used in the
+// sign path to validate return responses are consistent from Rekor.
+func rekorPubsFromClient(rekorClient *client.Rekor) (*cosign.TrustedTransparencyLogPubKeys, error) {
+	publicKeys := cosign.NewTrustedTransparencyLogPubKeys()
+	pubOK, err := rekorClient.Pubkey.GetPublicKey(nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch rekor public key from rekor: %w", err)
+	}
+	if err := publicKeys.AddTransparencyLogPubKey([]byte(pubOK.Payload), tuf.Active); err != nil {
+		return nil, fmt.Errorf("constructRekorPubKey: %w", err)
+	}
+	return &publicKeys, nil
+}
+
 func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	e, err := c.get(ctx, []byte(commitSHA), cert)
 	if err != nil {
 		return nil, err
 	}
-	return e, cosign.VerifyTLogEntry(ctx, c.Rekor, e)
+	rekorPubsFromAPI, err := rekorPubsFromClient(c.Rekor)
+	if err != nil {
+		return nil, err
+	}
+	return e, cosign.VerifyTLogEntryOffline(ctx, e, rekorPubsFromAPI)
 }
 
 // extractCerts is taken from cosign's cmd/cosign/cli/verify/verify_blob.go.

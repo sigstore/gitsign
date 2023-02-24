@@ -35,7 +35,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jonboulle/clockwork"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"github.com/sigstore/cosign/cmd/cosign/cli/sign"
+	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -318,7 +318,7 @@ func generateAttestation(t *testing.T, h plumbing.Hash) string {
 
 	att := dsse.Envelope{
 		PayloadType: "application/vnd.in-toto+json",
-		Payload:     base64.StdEncoding.EncodeToString(b.Bytes()),
+		Payload:     base64.StdEncoding.EncodeToString(bytes.TrimSpace(b.Bytes())),
 		Signatures:  []dsse.Signature{{Sig: "dGFjb2NhdA=="}},
 	}
 
