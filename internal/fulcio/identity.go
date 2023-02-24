@@ -29,7 +29,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sigstore/cosign/pkg/providers"
+	"github.com/sigstore/cosign/v2/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
