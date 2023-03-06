@@ -25,7 +25,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - uses: sigstore/cosign-installer@9becc617647dfa20ae7b1151972e9b3a2c338a2b # v2.8.1
+      - uses: sigstore/cosign-installer@c3667d99424e7e6047999fb6246c0da843953c65 # v3.0.1
         with:
           cosign-release: 'v2.0.0' # optional
       - uses: anchore/sbom-action/download-syft@07978da4bdb4faa726e52dfc6b1bed63d4b56479 # v0.13.3

@@ -81,7 +81,7 @@ sboms:
 signs:
 - cmd: cosign
   env:
-  - COSIGN_EXPERIMENTAL=1
+  - COSIGN_YES=true
   certificate: '${artifact}.pem'
   signature: '${artifact}.sig'
   args:
