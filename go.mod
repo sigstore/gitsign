@@ -9,7 +9,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.4.1
 	github.com/go-git/go-git/v5 v5.6.0
 	github.com/go-openapi/runtime v0.25.0
-	github.com/go-openapi/strfmt v0.21.3
+	github.com/go-openapi/strfmt v0.21.5
 	github.com/go-openapi/swag v0.22.3
 	github.com/google/go-cmp v0.5.9
 	github.com/in-toto/in-toto-golang v0.7.0
