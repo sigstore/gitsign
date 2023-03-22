@@ -24,5 +24,6 @@ gitsign [flags]
 
 * [gitsign attest](gitsign_attest.md)	 - add attestations to Git objects
 * [gitsign show](gitsign_show.md)	 - Show source predicate information
+* [gitsign verify](gitsign_verify.md)	 - Verify a commit
 * [gitsign version](gitsign_version.md)	 - print Gitsign version
 

@@ -2,7 +2,7 @@
 *.swp
 dist/*
 .vscode/*
-gitsign
-gitsign-credential-cache
+/gitsign
+/gitsign-credential-cache
 !/cmd/gitsign-credential-cache
 vendor
