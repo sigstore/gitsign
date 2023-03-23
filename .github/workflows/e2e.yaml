@@ -80,8 +80,15 @@ jobs:
           git commit --allow-empty -S --message="Signed commit"
 
           # Verify commit
+          echo "========== git verify-commit =========="
           git verify-commit HEAD
-          gitsign verify --certificate-github-workflow-repository=${{ github.repository }} --certificate-github-workflow-sha=${{ github.sha }} --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+
+          echo "========== gitsign verify =========="
+          gitsign verify \
+            --certificate-github-workflow-repository=${{ github.repository }} \
+            --certificate-github-workflow-sha=${{ github.sha }} \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            --certificate-identity="https://github.com/sigstore/gitsign/.github/workflows/e2e.yaml@refs/heads/main"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
@@ -105,8 +112,15 @@ jobs:
           git commit --allow-empty -S --message="Signed commit"
 
           # Verify commit
+          echo "========== git verify-commit =========="
           git verify-commit HEAD
-          gitsign verify --certificate-github-workflow-repository=${{ github.repository }} --certificate-github-workflow-sha=${{ github.sha }} --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+          
+          echo "========== gitsign verify =========="
+          gitsign verify \
+            --certificate-github-workflow-repository=${{ github.repository }} \
+            --certificate-github-workflow-sha=${{ github.sha }} \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            --certificate-identity="https://github.com/sigstore/gitsign/.github/workflows/e2e.yaml@refs/heads/main"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
