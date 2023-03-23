@@ -81,6 +81,7 @@ jobs:
 
           # Verify commit
           git verify-commit HEAD
+          gitsign verify --certificate-github-workflow-repository=${{ github.repository }} --certificate-github-workflow-sha=${{ github.sha }} --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
@@ -105,6 +106,7 @@ jobs:
 
           # Verify commit
           git verify-commit HEAD
+          gitsign verify --certificate-github-workflow-repository=${{ github.repository }} --certificate-github-workflow-sha=${{ github.sha }} --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text

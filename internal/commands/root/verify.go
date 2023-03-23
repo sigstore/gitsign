@@ -18,19 +18,15 @@ package root
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/sigstore/gitsign/internal"
-	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
+	"github.com/sigstore/gitsign/internal/commands/verify"
+	"github.com/sigstore/gitsign/internal/gitsign"
 	"github.com/sigstore/gitsign/internal/gpg"
 	gsio "github.com/sigstore/gitsign/internal/io"
-	"github.com/sigstore/gitsign/internal/rekor"
-	"github.com/sigstore/gitsign/pkg/git"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 // commandSign implements gitsign commit verification.
@@ -70,44 +66,15 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 		return fmt.Errorf("failed to read signature data (detached: %T): %w", detached, err)
 	}
 
-	root, intermediate, err := fulcioroots.NewFromConfig(ctx, o.Config)
+	v, err := gitsign.NewVerifierWithCosignOpts(ctx, o.Config, nil)
 	if err != nil {
-		return fmt.Errorf("error getting certificate root: %w", err)
+		return err
+	}
+	summary, err := v.Verify(ctx, data, sig, true)
+	if err != nil {
+		return err
 	}
 
-	tsa, err := x509.SystemCertPool()
-	if err != nil {
-		return fmt.Errorf("error getting system root pool: %w", err)
-	}
-	if path := o.Config.TimestampCert; path != "" {
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		cert, err := cryptoutils.LoadCertificatesFromPEM(f)
-		if err != nil {
-			return fmt.Errorf("error loading certs from %s: %w", path, err)
-		}
-		for _, c := range cert {
-			tsa.AddCert(c)
-		}
-	}
-
-	cv, err := git.NewCertVerifier(
-		git.WithRootPool(root),
-		git.WithIntermediatePool(intermediate),
-		git.WithTimestampCertPool(tsa),
-	)
-	if err != nil {
-		return fmt.Errorf("error creating git cert verifier: %w", err)
-	}
-
-	rekor, err := rekor.NewClient(o.Config.Rekor)
-	if err != nil {
-		return fmt.Errorf("failed to create rekor client: %w", err)
-	}
-
-	summary, err := git.Verify(ctx, cv, rekor, data, sig, detached)
 	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			gpgout.EmitBadSig(summary.Cert)
@@ -118,20 +85,10 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}
 
-	fpr := internal.CertHexFingerprint(summary.Cert)
+	verify.PrintSummary(s.Err, summary)
+	fmt.Fprintln(s.Err, "WARNING: git verify-commit does not verify cert claims. Prefer using `gitsign verify` instead.")
 
-	fmt.Fprintln(s.Err, "tlog index:", *summary.LogEntry.LogIndex)
-	fmt.Fprintf(s.Err, "gitsign: Signature made using certificate ID 0x%s | %v\n", fpr, summary.Cert.Issuer)
 	gpgout.EmitGoodSig(summary.Cert)
-
-	// TODO: Maybe split up signature checking and certificate checking so we can
-	// output something more meaningful.
-	fmt.Fprintf(s.Err, "gitsign: Good signature from %v\n", summary.Cert.EmailAddresses)
-
-	for _, c := range summary.Claims {
-		fmt.Fprintf(s.Err, "%s: %t\n", string(c.Key), c.Value)
-	}
-
 	gpgout.EmitTrustFully()
 
 	return nil

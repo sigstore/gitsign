@@ -119,17 +119,6 @@ https://oauth2.sigstore.dev/auth/auth?access_type=online&client_id=sigstore&...
 This will redirect you through the Sigstore Keyless flow to authenticate and
 sign the commit.
 
-Commits can then be verified using `git verify-commit`:
-
-```sh
-$ git verify-commit HEAD
-tlog index: 2801760
-gitsign: Signature made using certificate ID 0xf805288664f2e851dcb34e6a03b1a5232eb574ae | CN=sigstore-intermediate,O=sigstore.dev
-gitsign: Good signature from [billy@chainguard.dev]
-Validated Git signature: true
-Validated Rekor entry: true
-```
-
 ### Signing Tags
 
 Once configured, you can sign commits as usual with `git tag -s` (or
@@ -144,15 +133,41 @@ https://oauth2.sigstore.dev/auth/auth?access_type=online&client_id=sigstore&...
 This will redirect you through the Sigstore Keyless flow to authenticate and
 sign the tag.
 
-Tags can then be verified using `git verify-tag`:
+### Verifying commits
+
+Commits can be verified using `gitsign verify`:
 
 ```sh
-$ git verify-tag v0.0.1
-tlog index: 2802961
-gitsign: Signature made using certificate ID 0xe56a5a962ed59f9e3730d6696137eceb8b4ee8ea | CN=sigstore-intermediate,O=sigstore.dev
-gitsign: Good signature from [billy@chainguard.dev]
+$ gitsign verify HEAD
+tlog index: 16072348
+gitsign: Signature made using certificate ID 0xa6c178d9292f70eb5c4ad9e274ead0158e75e484 | CN=sigstore-intermediate,O=sigstore.dev
+gitsign: Good signature from [billy@chainguard.dev](https://accounts.google.com)
 Validated Git signature: true
 Validated Rekor entry: true
+Validated Certificate claims: true
+```
+
+`HEAD` may be replaced with any
+[Git revision](https://git-scm.com/docs/gitrevisions) (e.g. branch, tag, etc.).
+
+**NOTE**: `gitsign verify` is preferred over
+[`git verify-commit`](https://git-scm.com/docs/git-verify-commit) and
+[`git verify-tag`](https://git-scm.com/docs/git-verify-tag). The git commands
+do not pass through any expected identity information to the signing tools, so
+they only verify cryptographic integrity and that the data exists on Rekor, but
+not **who** put the data there.
+
+Using these commands will still work, but a warning being displayed.
+
+```sh
+$ git verify-commit HEAD
+tlog index: 16072349
+gitsign: Signature made using certificate ID 0xa6c178d9292f70eb5c4ad9e274ead0158e75e484 | CN=sigstore-intermediate,O=sigstore.dev
+gitsign: Good signature from [billy@chainguard.dev](https://accounts.google.com)
+Validated Git signature: true
+Validated Rekor entry: true
+Validated Certificate claims: false
+WARNING: git verify-commit does not verify cert claims. Prefer using `gitsign verify` instead.
 ```
 
 ### Private Sigstore

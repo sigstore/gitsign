@@ -56,6 +56,7 @@ type Writer interface {
 // Client implements a basic rekor implementation for writing and verifying Rekor data.
 type Client struct {
 	*client.Rekor
+	publicKeys *cosign.TrustedTransparencyLogPubKeys
 }
 
 func New(url string, opts ...rekor.Option) (*Client, error) {
@@ -63,8 +64,13 @@ func New(url string, opts ...rekor.Option) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	pubs, err := rekorPubsFromClient(c)
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
-		Rekor: c,
+		Rekor:      c,
+		publicKeys: pubs,
 	}, nil
 }
 
@@ -162,11 +168,7 @@ func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certif
 	if err != nil {
 		return nil, err
 	}
-	rekorPubsFromAPI, err := rekorPubsFromClient(c.Rekor)
-	if err != nil {
-		return nil, err
-	}
-	return e, cosign.VerifyTLogEntryOffline(ctx, e, rekorPubsFromAPI)
+	return e, cosign.VerifyTLogEntryOffline(ctx, e, c.publicKeys)
 }
 
 // extractCerts is taken from cosign's cmd/cosign/cli/verify/verify_blob.go.
@@ -218,4 +220,8 @@ func extractCerts(e *models.LogEntryAnon) ([]*x509.Certificate, error) {
 	}
 
 	return certs, err
+}
+
+func (c *Client) PublicKeys() *cosign.TrustedTransparencyLogPubKeys {
+	return c.publicKeys
 }

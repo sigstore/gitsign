@@ -52,6 +52,7 @@ type ClaimCondition string
 const (
 	ClaimValidatedSignature  ClaimCondition = "Validated Git signature"
 	ClaimValidatedRekorEntry ClaimCondition = "Validated Rekor entry"
+	ClaimValidatedCerificate ClaimCondition = "Validated Certificate claims"
 )
 
 func NewClaim(c ClaimCondition, ok bool) Claim {
