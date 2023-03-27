@@ -96,17 +96,14 @@ jobs:
         env:
           GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
           GITSIGN_FULCIO_URL: "https://fulcio.sigstage.dev"
-          GITSIGN_FULCIO_ROOT: "fulcio.pem"
           GITSIGN_REKOR_URL: "https://rekor.sigstage.dev"
-          # This needs to be SIGSTORE_ since we currently rely on the cosign library impl.
-          SIGSTORE_REKOR_PUBLIC_KEY: "rekor.pem"
         run: |
           set -e
 
-          # Download Fulcio certs
-          curl https://fulcio.sigstage.dev/api/v2/trustBundle | jq -r '.chains[0].certificates | flatten[]' > "${GITSIGN_FULCIO_ROOT}"
-          # Download Rekor public key
-          curl https://rekor.sigstage.dev/api/v1/log/publicKey > "${SIGSTORE_REKOR_PUBLIC_KEY}"
+          # Setup staging TUF root - https://github.com/sigstore/public-good-instance/blob/1023ed05b7a8cf28e6a7de73bf98dd5075d97858/playbooks/tuf.md#updating-tuf-metadata-for-staging
+          rm -rf ~/.sigstore
+          wget http://storage.googleapis.com/tuf-root-staging/root.json
+          cosign initialize --mirror=tuf-root-staging --root=root.json
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"
