@@ -2,7 +2,6 @@ name: E2E
 
 on:
   push:
-    branches: ['main']
   pull_request_target:
     branches: ['main']
   workflow_dispatch:
@@ -51,6 +50,8 @@ jobs:
         with:
           go-version: '1.20'
           check-latest: true
+      - name: Install cosign
+        uses: sigstore/cosign-installer@main
 
       - name: Install Gitsign
         run: |
@@ -88,7 +89,7 @@ jobs:
             --certificate-github-workflow-repository=${{ github.repository }} \
             --certificate-github-workflow-sha=${{ github.sha }} \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            --certificate-identity="https://github.com/sigstore/gitsign/.github/workflows/e2e.yaml@refs/heads/main"
+            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
@@ -117,7 +118,7 @@ jobs:
             --certificate-github-workflow-repository=${{ github.repository }} \
             --certificate-github-workflow-sha=${{ github.sha }} \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            --certificate-identity="https://github.com/sigstore/gitsign/.github/workflows/e2e.yaml@refs/heads/main"
+            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
