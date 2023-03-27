@@ -138,7 +138,7 @@ sign the tag.
 Commits can be verified using `gitsign verify`:
 
 ```sh
-$ gitsign verify HEAD
+$ gitsign verify --certificate-identity=billy@chainguard.dev --certificate-oidc-issuer=https://accounts.google.com HEAD
 tlog index: 16072348
 gitsign: Signature made using certificate ID 0xa6c178d9292f70eb5c4ad9e274ead0158e75e484 | CN=sigstore-intermediate,O=sigstore.dev
 gitsign: Good signature from [billy@chainguard.dev](https://accounts.google.com)
