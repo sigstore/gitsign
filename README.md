@@ -4,7 +4,7 @@
 [![E2E](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml/badge.svg)](https://github.com/sigstore/gitsign/actions/workflows/e2e.yaml)
 
 <p align="center">
-  <img style="max-width: 100%;width: 300px;" src="https://raw.githubusercontent.com/sigstore/community/main/artwork/gitsign/horizontal/color/sigstore_gitsign-horizontal-color.svg" alt="Gitsign logo"/>
+  <img style="max-width: 100%;width: 300px;" src="https://raw.githubusercontent.com/sigstore/community/main/artwork/Gitsign/Horizontal/Color/sigstore_gitsign-horizontal-color.svg" alt="Gitsign logo"/>
 </p>
 
 Keyless Git signing with Sigstore!
