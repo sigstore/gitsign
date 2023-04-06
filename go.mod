@@ -12,12 +12,12 @@ require (
 	github.com/go-openapi/strfmt v0.21.7
 	github.com/go-openapi/swag v0.22.3
 	github.com/google/go-cmp v0.5.9
-	github.com/in-toto/in-toto-golang v0.7.0
+	github.com/in-toto/in-toto-golang v0.7.1
 	github.com/jonboulle/clockwork v0.3.0
 	github.com/mattn/go-tty v0.0.4
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/secure-systems-lab/go-securesystemslib v0.5.0
-	github.com/sigstore/cosign/v2 v2.0.1-0.20230404223517-fdeea9fd1574
+	github.com/sigstore/cosign/v2 v2.0.1
 	github.com/sigstore/fulcio v1.2.0
 	github.com/sigstore/rekor v1.1.0
 	github.com/sigstore/sigstore v1.6.1
@@ -180,7 +180,7 @@ require (
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/transparency-dev/merkle v0.0.1 // indirect
 	github.com/vbatts/tar-split v0.11.2 // indirect
-	github.com/xanzy/go-gitlab v0.81.0 // indirect
+	github.com/xanzy/go-gitlab v0.82.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/errs v1.3.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
@@ -195,12 +195,12 @@ require (
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/term v0.7.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
-	google.golang.org/api v0.115.0 // indirect
+	google.golang.org/api v0.116.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633 // indirect
 	google.golang.org/grpc v1.54.0 // indirect
