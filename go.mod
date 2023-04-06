@@ -20,7 +20,7 @@ require (
 	github.com/sigstore/cosign/v2 v2.0.1-0.20230404223517-fdeea9fd1574
 	github.com/sigstore/fulcio v1.2.0
 	github.com/sigstore/rekor v1.1.0
-	github.com/sigstore/sigstore v1.6.0
+	github.com/sigstore/sigstore v1.6.1
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.7.0
@@ -29,7 +29,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.18.0 // indirect
+	cloud.google.com/go/compute v1.19.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AliyunContainerService/ack-ram-tool/pkg/credentials/alibabacloudsdkgo/helper v0.2.0 // indirect
@@ -58,19 +58,19 @@ require (
 	github.com/alibabacloud-go/tea-xml v1.1.2 // indirect
 	github.com/aliyun/credentials-go v1.2.4 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.17.5 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.18.15 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.13.15 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.29 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.30 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.18.19 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.13.18 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.25 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.32 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.18.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecrpublic v1.15.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.12.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.18.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.25 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.12.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.14.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.18.7 // indirect
 	github.com/aws/smithy-go v1.13.5 // indirect
 	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.0.0-20230110223219-40efa3093a22 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
@@ -200,9 +200,9 @@ require (
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
-	google.golang.org/api v0.114.0 // indirect
+	google.golang.org/api v0.115.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
+	google.golang.org/genproto v0.0.0-20230331144136-dcfb400f0633 // indirect
 	google.golang.org/grpc v1.54.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.0 // indirect
