@@ -33,6 +33,13 @@ jobs:
       GITSIGN_LOG: "/tmp/gitsign.log"
 
     steps:
+      - name: test
+        script: |
+          echo ${{ startsWith(github.event_name, 'pull_request') }}
+          echo ${{ format('refs/pull/{0}/merge'}}
+          echo ${{ startsWith(github.event_name, 'pull_request') && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
+          exit 1
+
       - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           # Use the merge commit if type is pull_request/pull_request_target,
