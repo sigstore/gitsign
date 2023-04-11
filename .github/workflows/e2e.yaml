@@ -103,8 +103,8 @@ jobs:
 
           # Setup staging TUF root - https://github.com/sigstore/public-good-instance/blob/1023ed05b7a8cf28e6a7de73bf98dd5075d97858/playbooks/tuf.md#updating-tuf-metadata-for-staging
           rm -rf ~/.sigstore
-          wget http://storage.googleapis.com/tuf-root-staging/root.json
-          cosign initialize --mirror=tuf-root-staging --root=root.json
+          wget https://tuf-repo-cdn.sigstage.dev/root.json
+          cosign initialize --mirror=https://tuf-repo-cdn.sigstage.dev/root.json --root=root.json
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"
