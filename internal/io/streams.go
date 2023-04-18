@@ -31,6 +31,8 @@ type Streams struct {
 
 	TTYIn  io.Reader
 	TTYOut io.Writer
+
+	close []func() error
 }
 
 func New(logPath string) *Streams {
@@ -46,7 +48,7 @@ func New(logPath string) *Streams {
 		// As a janky way to preserve error message, tee stderr to
 		// a temp file.
 		if f, err := os.Create(logPath); err == nil {
-			defer f.Close()
+			s.close = append(s.close, f.Close)
 			s.Err = io.MultiWriter(s.Err, f)
 		}
 	}
@@ -55,7 +57,7 @@ func New(logPath string) *Streams {
 	// set the input/output if we can actually open it.
 	tty, err := tty.Open()
 	if err == nil {
-		defer tty.Close()
+		s.close = append(s.close, tty.Close)
 		s.TTYIn = tty.Input()
 		s.TTYOut = tty.Output()
 	} else {
@@ -77,6 +79,15 @@ func (s *Streams) Wrap(fn func() error) error {
 	if err := fn(); err != nil {
 		fmt.Fprintln(s.TTYOut, err)
 		return err
+	}
+	return nil
+}
+
+func (s *Streams) Close() error {
+	for _, fn := range s.close {
+		if err := fn(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -65,6 +65,7 @@ func New(cfg *config.Config) *cobra.Command {
 		DisableAutoGenTag: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s := io.New(o.Config.LogPath)
+			defer s.Close()
 			return s.Wrap(func() error {
 				switch {
 				case o.FlagVersion:
