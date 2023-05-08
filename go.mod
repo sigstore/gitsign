@@ -16,7 +16,7 @@ require (
 	github.com/jonboulle/clockwork v0.3.0
 	github.com/mattn/go-tty v0.0.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/secure-systems-lab/go-securesystemslib v0.5.0
+	github.com/secure-systems-lab/go-securesystemslib v0.6.0
 	github.com/sigstore/cosign/v2 v2.0.2
 	github.com/sigstore/fulcio v1.2.0
 	github.com/sigstore/rekor v1.1.1
