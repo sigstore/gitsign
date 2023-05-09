@@ -18,7 +18,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/secure-systems-lab/go-securesystemslib v0.6.0
 	github.com/sigstore/cosign/v2 v2.0.2
-	github.com/sigstore/fulcio v1.2.0
+	github.com/sigstore/fulcio v1.3.1
 	github.com/sigstore/rekor v1.1.1
 	github.com/sigstore/sigstore v1.6.4
 	github.com/spf13/cobra v1.7.0
@@ -116,7 +116,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/certificate-transparency-go v1.1.4 // indirect
+	github.com/google/certificate-transparency-go v1.1.5 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-containerregistry v0.14.1-0.20230409045903-ed5c185df419 // indirect
 	github.com/google/go-github/v50 v50.2.0 // indirect
@@ -158,6 +158,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sassoftware/relic v7.2.1+incompatible // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
@@ -185,11 +186,11 @@ require (
 	github.com/zeebo/errs v1.3.0 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel v1.14.0 // indirect
-	go.opentelemetry.io/otel/trace v1.14.0 // indirect
+	go.opentelemetry.io/otel v1.15.0 // indirect
+	go.opentelemetry.io/otel/trace v1.15.0 // indirect
 	go.step.sm/crypto v0.29.3 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20230125214544-b3c2aaf6208d // indirect
 	golang.org/x/mod v0.10.0 // indirect
@@ -213,12 +214,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.1.0 // indirect
-	k8s.io/api v0.26.1 // indirect
-	k8s.io/apimachinery v0.26.1 // indirect
+	k8s.io/api v0.26.3 // indirect
+	k8s.io/apimachinery v0.26.3 // indirect
 	k8s.io/client-go v0.26.1 // indirect
-	k8s.io/klog/v2 v2.90.0 // indirect
+	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230123231816-1cb3ae25d79a // indirect
-	k8s.io/utils v0.0.0-20230115233650-391b47cb4029 // indirect
+	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/release-utils v0.7.3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
