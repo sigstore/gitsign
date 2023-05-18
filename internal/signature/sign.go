@@ -54,9 +54,9 @@ type SignOptions struct {
 	// will fail if the Fulcio identity SAN email does not match the git committer email.
 	UserEmail string
 
-	// Rekor address - if specified, Rekor details are embedded directly in the
+	// Rekor client - if specified, Rekor details are embedded directly in the
 	// signature output.
-	RekorAddr string
+	Rekor rekor.Writer
 }
 
 // Identity is a copy of smimesign.Identity to allow for compatibility without
@@ -80,7 +80,7 @@ type SignResponse struct {
 	Signature []byte
 	Cert      *x509.Certificate
 	// LogEntry is the Rekor tlog entry from the signing operation.
-	// This is only populated if offline signing mode was used.
+	// This is only populated if offline signing mode was used (e.g. SignOpts.Rekor was passed in)
 	LogEntry *models.LogEntryAnon
 }
 
@@ -89,7 +89,7 @@ type SignResponse struct {
 func Sign(ctx context.Context, ident Identity, body []byte, opts SignOptions) (*SignResponse, error) {
 	cert, err := ident.Certificate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get idenity certificate: %w", err)
+		return nil, fmt.Errorf("failed to get identity certificate: %w", err)
 	}
 
 	// If specified, check if retrieved identity matches the expected identity.
@@ -108,7 +108,7 @@ func Sign(ctx context.Context, ident Identity, body []byte, opts SignOptions) (*
 
 	signer, err := ident.Signer()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get idenity signer: %w", err)
+		return nil, fmt.Errorf("failed to get identity signer: %w", err)
 	}
 
 	sd, err := cms.NewSignedData(body)
@@ -144,9 +144,9 @@ func Sign(ctx context.Context, ident Identity, body []byte, opts SignOptions) (*
 	}
 
 	var lea *models.LogEntryAnon
-	if opts.RekorAddr != "" {
+	if opts.Rekor != nil {
 		var err error
-		lea, err = attachRekorLogEntry(ctx, sd, cert, opts.RekorAddr)
+		lea, err = attachRekorLogEntry(ctx, sd, cert, opts.Rekor)
 		if err != nil {
 			return nil, err
 		}
@@ -243,12 +243,7 @@ func matchSAN(cert *x509.Certificate, name, email string) bool {
 	return false
 }
 
-func attachRekorLogEntry(ctx context.Context, sd *cms.SignedData, cert *x509.Certificate, addr string) (*models.LogEntryAnon, error) {
-	rekor, err := rekor.New(addr)
-	if err != nil {
-		return nil, err
-	}
-
+func attachRekorLogEntry(ctx context.Context, sd *cms.SignedData, cert *x509.Certificate, rekor rekor.Writer) (*models.LogEntryAnon, error) {
 	// Marshal commit attributes as it was signed.
 	raw := sd.Raw()
 	// We're creating a new signature, so this should generally always be len 1.

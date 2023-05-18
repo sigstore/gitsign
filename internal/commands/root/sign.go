@@ -88,10 +88,12 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		opts.UserName = o.Config.CommitterName
 		opts.UserEmail = o.Config.CommitterEmail
 	}
+
+	var fn git.SignFunc = git.LegacySHASign
 	if o.Config.RekorMode == "offline" {
-		opts.RekorAddr = o.Config.Rekor
+		fn = git.Sign
 	}
-	resp, err := git.Sign(ctx, rekor, userIdent, dataBuf.Bytes(), opts)
+	resp, err := fn(ctx, rekor, userIdent, dataBuf.Bytes(), opts)
 	if err != nil {
 		return fmt.Errorf("failed to sign message: %w", err)
 	}

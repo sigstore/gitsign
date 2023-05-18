@@ -2,6 +2,8 @@
 
 ## Offline Verification
 
+### How we sign
+
 In offline Rekor storage mode Gitsign will store a HashedRekord in Rekor
 corresponding to the commit content.
 
@@ -14,6 +16,23 @@ sha256(der(sort(system time | commit data | content type)))
 The resulting Rekor log entry fields and inclusion proof will be stored in the
 PKCS7 object as unauthenticated (i.e. not included in the cryptographic
 signature) attributes.
+
+### How we verify
+
+1. Recompute and compare commit content checksum from commit.
+2. Get Rekor LogEntry from signature.
+3. Verify Certificate against commit content checksum (ignoring cert NotAfter time).
+4. (if present) Verify signature against TSA cert.
+5. Verify Rekor LogEntry inclusion (offline).
+
+### What's stored in the commit signature
+
+- Commit content checksum (sha256)
+- Commit signing time (untrusted system time)
+- Protobuf encoded [Rekor TransparencyLogEntry](https://github.com/sigstore/protobuf-specs/blob/91485b44360d343dadd98fb7297a500f05e0b5b1/protos/sigstore_rekor.proto#L91)
+- (optional) TSA signature + cert
+
+Sample encoded TransparencyLogEntry:
 
 ```
 unauth_attr:
@@ -83,20 +102,49 @@ unauth_attr:
         030c - 69 51 75 4d 53 49 59 3d-0a               iQuMSIY=.
 ```
 
-These OIDs are defined by [Rekor](https://github.com/sigstore/rekor) and are
+This OID are defined by [Rekor](https://github.com/sigstore/rekor) and are
 used during verification to reconstruct the Rekor log entry and verify the
 commit signature.
 
+### What's stored in Rekor
+
+HashedRekord containing:
+
+- Commit content checksum
+- Fulcio certificate
+  - Public Key
+  - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)
+
 ## Online Verification
 
-In online Rekor storage mode Gitsign will store the Git commit SHA in rekor
-rather that persisting the Rekor log details in the commit itself. Gitsign is in
-the process of migrating clients to offline verification, but this section
+Note: Gitsign is in the process of migrating clients to offline verification, but this section
 explains how verification used to work.
+
+### How we sign
+
+In online Rekor storage mode Gitsign will store the Git commit SHA in Rekor
+rather that persisting the Rekor log details in the commit itself. This works by:
+
+1. Get Fulcio Cert
+2. Sign the commit body using cert
+3. Generate commit SHA (commit doesn't actually exist yet because the commit includes the signature)
+4. Sign the commit SHA using the same cert
+5. Upload HashedRekord of commit SHA to Rekor
+6. Store the signed commit body signature in commit
+
+### How we verify
 
 As part of signature verification, `gitsign` not only checks that the given
 signature matches the commit, but also that the commit exists within the Rekor
 transparency log.
+
+This is done by:
+
+1. Recompute and compare commit content checksum from commit.
+2. Validate the checksum signature using the public key in the signature's cert (ignoring cert NotAfter time).
+3. (if present) Verify signature against TSA cert.
+4. Search Rekor for an entry matching the commit SHA + cert. (this is what makes the process online)
+5. Verify Rekor LogEntry inclusion (offline).
 
 We can manually validate that the commit exists in the transparency log by
 running:
@@ -199,3 +247,18 @@ though they signed different content!
 Note that for Git tags, the annotated tag object SHA is what is used (i.e. the
 output of `git rev-parse <tag>`), **not** the SHA of the underlying tagged
 commit.
+
+### What's stored in the commit signature
+
+- Commit content checksum (sha256)
+- Commit signing time (untrusted system time)
+- (optional) TSA signature + cert
+
+### What's stored in Rekor
+
+HashedRekord containing:
+
+- Commit SHA checksum
+- Fulcio certificate
+  - Public Key
+  - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)

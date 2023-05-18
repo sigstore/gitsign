@@ -55,6 +55,7 @@ type Verifier interface {
 // Writer represents a mechanism to write content to Rekor.
 type Writer interface {
 	Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
+	WriteMessage(ctx context.Context, message, signature []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
 // Client implements a basic rekor implementation for writing and verifying Rekor data.

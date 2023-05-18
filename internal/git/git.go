@@ -26,18 +26,25 @@ import (
 	"github.com/sigstore/gitsign/pkg/rekor"
 )
 
+type SignFunc func(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error)
+
+// Sign signs the commit, uploading a HashedRekord of the commit content to Rekor
+// and embedding the Rekor log entry in the signature.
+// This is suitable for offline verification.
 func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error) {
+	opts.Rekor = rekor
+	return signature.Sign(ctx, ident, data, opts)
+}
+
+// LegacySHASign is the old-style signing that signs the commit content, but uploads a signed SHA to Rekor.
+// Verification for this style of signing relies on the Rekor Search API to match the signed SHA + commit content certs,
+// and cannot be done offline.
+// This may be removed in the future.
+func LegacySHASign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error) {
 	resp, err := signature.Sign(ctx, ident, data, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
-
-	// We're using offline verification style signing - nothing more to do.
-	if resp.LogEntry != nil {
-		return resp, nil
-	}
-
-	// Legacy SHA based signing - only do if we didn't get a tlog entry back.
 
 	// This uploads the commit SHA + sig(commit SHA) to the tlog using the same
 	// key used to sign the commit data itself.
