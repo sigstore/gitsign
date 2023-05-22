@@ -293,6 +293,8 @@ Gitsign stores data in 2 places:
 
    - If `rekorMode = offline`
 
+   Note: offline verification is new, and should be considered experimental for now.
+
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
    particular, users and organizations may be sensitive to the data contained
