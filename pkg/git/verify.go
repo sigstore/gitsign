@@ -74,7 +74,7 @@ func Verify(ctx context.Context, git Verifier, rekor rekor.Verifier, data, sig [
 	}
 	claims = append(claims, NewClaim(ClaimValidatedSignature, true))
 
-	if tlog, err := rekor.VerifyOffline(ctx, sig); err == nil {
+	if tlog, err := rekor.VerifyInclusion(ctx, sig, cert); err == nil {
 		return &VerificationSummary{
 			Cert:     cert,
 			LogEntry: tlog,
