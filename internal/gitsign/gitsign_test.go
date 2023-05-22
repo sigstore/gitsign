@@ -154,7 +154,7 @@ func (fakeRekor) Verify(ctx context.Context, commitSHA string, cert *x509.Certif
 	return nil, nil
 }
 
-func (fakeRekor) VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error) {
+func (fakeRekor) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	return nil, nil
 }
 

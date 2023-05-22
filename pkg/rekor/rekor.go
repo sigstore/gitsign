@@ -49,7 +49,7 @@ import (
 // Verifier represents a mechanism to get and verify Rekor entries for the given Git data.
 type Verifier interface {
 	Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
-	VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error)
+	VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
 // Writer represents a mechanism to write content to Rekor.
@@ -179,7 +179,7 @@ func rekorPubsFromClient(rekorClient *client.Rekor) (*cosign.TrustedTransparency
 // 1. Searching Rekor for an entry matching the commit SHA + cert.
 // 2. Use the same cert to verify the commit content.
 //
-// Note: While not truly deprecated, Client.VerifyOffline is generally preferred.
+// Note: While not truly deprecated, using offline verification is generally preferred.
 // This function relies on non-GA behavior of Rekor, and remains for backwards
 // compatibility with older signatures.
 func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
@@ -245,9 +245,10 @@ func (c *Client) PublicKeys() *cosign.TrustedTransparencyLogPubKeys {
 	return c.publicKeys
 }
 
-// VerifyOffline verifies a signature using offline verification.
-// Unlike Client.Verify, only the commit content is considered during verification.
-func (c *Client) VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error) {
+// VerifyInclusion verifies a signature's inclusion in Rekor using offline verification.
+// NOTE: This does **not** verify the correctness of the signature against the content.
+// Prefer using [git.Verify] instead for complete verification.
+func (c *Client) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	// Try decoding as PEM
 	var der []byte
 	if blk, _ := pem.Decode(sig); blk != nil {
@@ -261,27 +262,30 @@ func (c *Client) VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntr
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
 
-	// Generate verification options.
-	certs, err := sd.GetCertificates()
-	if err != nil {
-		return nil, fmt.Errorf("error getting signature certs: %w", err)
-	}
-	if len(certs) == 0 {
-		return nil, fmt.Errorf("no certificates found in signature")
-	}
-	cert := certs[0]
-
-	// Recompute HashedRekord body by rehashing the authenticated attributes.
+	// Extract signer from signature. The spec allows for multiple signers, but in
+	// practice for Git commits there's typically only ever 1 signer (the committer).
 	r := sd.Raw()
 	if len(r.SignerInfos) == 0 {
 		return nil, fmt.Errorf("no signers found in signature")
 	}
 	si := r.SignerInfos[0]
-	message, err := si.SignedAttrs.MarshaledForVerification()
+
+	// Double check cert matches the signer. This technically isn't needed
+	// since if this didn't match then the verify below should also fail,
+	// but this helps us distinguish the error in the unlikely event this does happen.
+	if _, err := si.FindCertificate([]*x509.Certificate{cert}); err != nil {
+		return nil, fmt.Errorf("signer certificate mismatch: %w", err)
+	}
+
+	// Get HashedRekord body from the signature.
+	// We are assuming here that the signature has already been authenticated against the
+	// cert, so it is okay to rely the precomputed checksum in the SignerInfo.
+	message, err := si.GetMessageDigestAttribute()
 	if err != nil {
 		return nil, err
 	}
 
+	// Reassemble the tlog entry from the signature pieces.
 	tlog, err := rekoroid.ToLogEntry(ctx, message, si.Signature, cert, si.UnsignedAttrs)
 	if err != nil {
 		return nil, err
