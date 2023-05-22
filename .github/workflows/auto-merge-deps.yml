@@ -24,18 +24,6 @@ jobs:
       - if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
 
-      - name: Approve a PR if not already approved
-        if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
-        run: |
-          gh pr checkout "$PR_URL" # sets the upstream metadata for `gh pr status`
-          if [ "$(gh pr status --json reviews -q '[.currentBranch.reviews[]| select(type=="object" and has("state"))| .state | select(match("APPROVED"))] | unique | .[0]')" != "APPROVED" ];
-          then gh pr review --approve "$PR_URL"
-          else echo "PR already approved, skipping additional approvals to minimize emails/notification noise.";
-          fi
-        env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
       - name: Enable auto-merge for Dependabot PRs
         if: ${{ steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch' }}
         run: gh pr merge --auto --squash "$PR_URL"
