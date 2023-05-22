@@ -77,19 +77,20 @@ The following config options are supported:
 
 ### Environment Variables
 
-| Environment Variable         | Sigstore<br>Prefix | Default                          | Description                                                                                                                                                                                                                                |
-| ---------------------------- | ------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GITSIGN_CREDENTIAL_CACHE     | ❌                 |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                                                                                                                                                |
-| GITSIGN_CONNECTOR_ID         | ✅                 |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com` |
-| GITSIGN_FULCIO_URL           | ✅                 | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                   |
-| GITSIGN_LOG                  | ❌                 |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                              |
-| GITSIGN_OIDC_CLIENT_ID       | ✅                 | sigstore                         | OIDC client ID for application                                                                                                                                                                                                             |
-| GITSIGN_OIDC_ISSUER          | ✅                 | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                 |
-| GITSIGN_OIDC_REDIRECT_URL    | ✅                 |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
-| GITSIGN_REKOR_URL            | ✅                 | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
-| GITSIGN_TIMESTAMP_SERVER_URL | ✅                 |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                          |
-| GITSIGN_TIMESTAMP_CERT_CHAIN | ✅                 |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                        |
-| GITSIGN_FULCIO_ROOT          | ✅                 |                                  | Path to PEM encoded certificate for Fulcio CA (additional alias: SIGSTORE_ROOT_FILE)                                                                                                                                                       |
+| Environment Variable         | Sigstore<br>Prefix | Default                          | Description                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------- | ------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GITSIGN_CREDENTIAL_CACHE     |                    |                                  | Optional path to [gitsign-credential-cache](cmd/gitsign-credential-cache/README.md) socket.                                                                                                                                                                                                                                                                                                                           |
+| GITSIGN_CONNECTOR_ID         | ✅                 |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com`                                                                                                                                                                            |
+| GITSIGN_FULCIO_URL           | ✅                 | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                                                                                                                                                                                              |
+| GITSIGN_LOG                  | ❌                 |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                                                                                                                                                                                                         |
+| GITSIGN_OIDC_CLIENT_ID       | ✅                 | sigstore                         | OIDC client ID for application                                                                                                                                                                                                                                                                                                                                                                                        |
+| GITSIGN_OIDC_ISSUER          | ✅                 | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                                                                                                                                                                                            |
+| GITSIGN_OIDC_REDIRECT_URL    | ✅                 |                                  | OIDC Redirect URL                                                                                                                                                                                                                                                                                                                                                                                                     |
+| GITSIGN_REKOR_URL            | ✅                 | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                                                                                                                                                                                               |
+| GITSIGN_TIMESTAMP_SERVER_URL | ✅                 |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                                                                                                                                                                                                     |
+| GITSIGN_TIMESTAMP_CERT_CHAIN | ✅                 |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                                                                                                                                                                   |
+| GITSIGN_FULCIO_ROOT          | ✅                 |                                  | Path to PEM encoded certificate for Fulcio CA (additional alias: SIGSTORE_ROOT_FILE)                                                                                                                                                                                                                                                                                                                                  |
+| GITSIGN_REKOR_MODE           | ❌                 | online                           | Rekor storage mode to operate in. One of [online, offline] (default: online)<br>online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.<br>offline - Hashed commit content is stored in Rekor, with Rekor attributes necessary for offline verification being stored in the commit itself.<br>Note: online verification will be deprecated in favor of offline in the future. |
 
 For environment variables that support `Sigstore Prefix`, the values may be
 provided with either a `GITSIGN_` or `SIGSTORE_` prefix - e.g.
@@ -279,12 +280,18 @@ Gitsign stores data in 2 places:
 
    To be able to verify signatures for ephemeral certs past their `Not After`
    time, Gitsign records commits and the code signing certificates to
-   [Rekor](https://docs.sigstore.dev/rekor/overview/). This data is a
+   [Rekor](https://docs.sigstore.dev/rekor/overview/).
+
+   - If `rekorMode = online` (default)
+
+   This data is a
    [HashedRekord](https://github.com/sigstore/rekor/blob/e375eb461cae524270889b57a249ff086bea6c05/types.md#hashed-rekord)
    containing a SHA256 hash of the commit SHA, as well as the code signing
    certificate. See
    [Verifying the Transparency Log](#verifying-the-transparency-log) for more
    details.
+
+   - If `rekorMode = offline`
 
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
@@ -324,25 +331,25 @@ PKCS7:
     cert:
         cert_info:
           version: 2
-          serialNumber: 4061203728062639434060493046878247211328523247
+          serialNumber: 0x2ECFB7E0D25F9A741FC3B19B56C4B74D25864788
           signature:
             algorithm: ecdsa-with-SHA384 (1.2.840.10045.4.3.3)
             parameter: <ABSENT>
-          issuer: O=sigstore.dev, CN=sigstore
+          issuer: O=sigstore.dev, CN=sigstore-intermediate
           validity:
-            notBefore: May  2 20:51:47 2022 GMT
-            notAfter: May  2 21:01:46 2022 GMT
+            notBefore: Jan 13 21:00:13 2023 GMT
+            notAfter: Jan 13 21:10:13 2023 GMT
           subject:
           key:
             algor:
               algorithm: id-ecPublicKey (1.2.840.10045.2.1)
               parameter: OBJECT:prime256v1 (1.2.840.10045.3.1.7)
             public_key:  (0 unused bits)
-              0000 - 04 ec 60 4b 67 aa 28 d9-34 f3 83 9c 17 a5   ..`Kg.(.4.....
-              000e - c8 a5 87 5e de db c2 65-c8 8b e6 dc c4 6f   ...^...e.....o
-              001c - 9c 87 60 05 42 18 f7 b7-0d 8f 06 f1 62 ce   ..`.B.......b.
-              002a - 9a 59 9d 71 12 55 1b c3-d4 c7 90 a5 f6 0a   .Y.q.U........
-              0038 - b4 1a b3 0e a7 3d 4e 12-38                  .....=N.8
+              0000 - 04 0d 3e f5 05 98 53 d2-68 21 9d e7 88 07   ..>...S.h!....
+              000e - 0a d9 bc 8e 9f e3 00 e0-5d 28 b2 41 24 a7   ........](.A$.
+              001c - a5 93 28 cc 45 d9 1e ee-a3 1c 8d 42 64 ab   ..(.E......Bd.
+              002a - 14 e6 ec 41 29 77 3a 0e-95 94 33 f7 40 62   ...A)w:...3.@b
+              0038 - cd 25 fd 17 35 be 4d d4-f9                  .%..5.M..
           issuerUID: <ABSENT>
           subjectUID: <ABSENT>
           extensions:
@@ -356,23 +363,17 @@ PKCS7:
               value:
                 0000 - 30 0a 06 08 2b 06 01 05-05 07 03 03      0...+.......
 
-              object: X509v3 Basic Constraints (2.5.29.19)
-              critical: TRUE
-              value:
-                0000 - 30                                       0
-                0002 - <SPACES/NULS>
-
               object: X509v3 Subject Key Identifier (2.5.29.14)
               critical: BOOL ABSENT
               value:
-                0000 - 04 14 a0 b1 ea 03 c5 08-4a 70 93 21 da   ........Jp.!.
-                000d - a3 a0 0b 4c 55 49 d3 06-3d               ...LUI..=
+                0000 - 04 14 46 eb 25 b9 3b 3d-87 71 6a eb ba   ..F.%.;=.qj..
+                000d - e4 a4 4b b0 f1 17 4b 46-58               ..K...KFX
 
               object: X509v3 Authority Key Identifier (2.5.29.35)
               critical: BOOL ABSENT
               value:
-                0000 - 30 16 80 14 58 c0 1e 5f-91 45 a5 66 a9   0...X.._.E.f.
-                000d - 7a cc 90 a1 93 22 d0 2a-c5 c5 fa         z....".*...
+                0000 - 30 16 80 14 df d3 e9 cf-56 24 11 96 f9   0.......V$...
+                000d - a8 d8 e9 28 55 a2 c6 2e-18 64 3f         ...(U....d?
 
               object: X509v3 Subject Alternative Name (2.5.29.17)
               critical: TRUE
@@ -383,27 +384,41 @@ PKCS7:
               object: undefined (1.3.6.1.4.1.57264.1.1)
               critical: BOOL ABSENT
               value:
-                0000 - 68 74 74 70 73 3a 2f 2f-67 69 74 68 75   https://githu
-                000d - 62 2e 63 6f 6d 2f 6c 6f-67 69 6e 2f 6f   b.com/login/o
-                001a - 61 75 74 68                              auth
+                0000 - 68 74 74 70 73 3a 2f 2f-61 63 63 6f 75   https://accou
+                000d - 6e 74 73 2e 67 6f 6f 67-6c 65 2e 63 6f   nts.google.co
+                001a - 6d                                       m
+
+              object: undefined (1.3.6.1.4.1.11129.2.4.2)
+              critical: BOOL ABSENT
+              value:
+                0000 - 04 7b 00 79 00 77 00 dd-3d 30 6a c6 c7   .{.y.w..=0j..
+                000d - 11 32 63 19 1e 1c 99 67-37 02 a2 4a 5e   .2c....g7..J^
+                001a - b8 de 3c ad ff 87 8a 72-80 2f 29 ee 8e   ..<....r./)..
+                0027 - 00 00 01 85 ac ee dc fa-00 00 04 03 00   .............
+                0034 - 48 30 46 02 21 00 a1 e2-05 30 53 6f fb   H0F.!....0So.
+                0041 - 05 28 b6 bb 41 77 a9 7c-21 f4 a9 49 8b   .(..Aw.|!..I.
+                004e - f8 a6 1f 35 85 a7 40 b3-07 5c cb 04 02   ...5..@..\...
+                005b - 21 00 f4 39 7b 17 5a 59-fa 10 1c f8 bf   !..9{.ZY.....
+                0068 - 46 cd bc de cc e8 39 7a-03 d4 1c 78 e5   F.....9z...x.
+                0075 - b1 e7 7a ba 66 79 f2 c8-                 ..z.fy..
         sig_alg:
           algorithm: ecdsa-with-SHA384 (1.2.840.10045.4.3.3)
           parameter: <ABSENT>
         signature:  (0 unused bits)
-          0000 - 30 65 02 31 00 af be f5-bf e7 05 f5 15 e2 07   0e.1...........
-          000f - 85 48 00 ce 81 1e 3e ba-7b 21 d3 e4 a4 8a e6   .H....>.{!.....
-          001e - e5 38 9f 01 8a 16 6c 4c-d3 94 af 77 f0 7d 6e   .8....lL...w.}n
-          002d - b1 9c f9 29 f9 2c b5 13-02 30 74 eb a5 5a 8a   ...).,...0t..Z.
-          003c - 77 a0 95 7f 42 8e df 6a-ed 26 96 cc b4 30 29   w...B..j.&...0)
-          004b - b7 94 18 32 c6 8d a5 a4-06 88 e2 01 51 c4 61   ...2........Q.a
-          005a - 36 1a 1a 55 ec df a4 0a-84 b5 03 6e 12         6..U.......n.
+          0000 - 30 65 02 30 5b 7c d7 ea-7c 5f 68 76 0b da 50   0e.0[|..|_hv..P
+          000f - 14 cc bf 4c 65 07 70 68-52 33 9a 85 57 ce f5   ...Le.phR3..W..
+          001e - ff 18 5b 8b 08 76 2a dd-7d 1a 19 7f b6 90 be   ..[..v*.}......
+          002d - ad 24 96 9a 2a 0a d6 02-31 00 ac 15 2b 1d 00   .$..*...1...+..
+          003c - 6e 26 95 66 c9 6d cd 7e-e0 cd 12 0e 60 8b f9   n&.f.m.~....`..
+          004b - 38 a9 0a dc 01 28 9a 39-e3 cd c9 eb a5 0c 08   8....(.9.......
+          005a - 71 47 39 c8 dc 9d db c3-cf 8e f5 cd e9         qG9..........
     crl:
       <EMPTY>
     signer_info:
         version: 1
         issuer_and_serial:
-          issuer: O=sigstore.dev, CN=sigstore
-          serial: 4061203728062639434060493046878247211328523247
+          issuer: O=sigstore.dev, CN=sigstore-intermediate
+          serial: 0x2ECFB7E0D25F9A741FC3B19B56C4B74D25864788
         digest_alg:
           algorithm: sha256 (2.16.840.1.101.3.4.2.1)
           parameter: <ABSENT>
@@ -414,190 +429,138 @@ PKCS7:
 
             object: signingTime (1.2.840.113549.1.9.5)
             value.set:
-              UTCTIME:May  2 20:51:49 2022 GMT
+              UTCTIME:Jan 13 21:00:13 2023 GMT
 
             object: messageDigest (1.2.840.113549.1.9.4)
             value.set:
               OCTET STRING:
-                0000 - 66 4e 98 f6 29 46 31 f6-ca 8f 21 44 06   fN..)F1...!D.
-                000d - 34 07 2a 8a b2 dd 64 29-4a e9 74 71 d0   4.*...d)J.tq.
-                001a - a1 84 ec d5 03 3f                        .....?
+                0000 - 21 e9 ce 7a 69 ff 22 57-43 a2 fc c9 12   !..zi."WC....
+                000d - 8a 67 c6 45 e7 31 88 4c-08 3f 26 9a 13   .g.E.1.L.?&..
+                001a - ac 85 d6 6d f5 8e                        ...m..
         digest_enc_alg:
           algorithm: ecdsa-with-SHA256 (1.2.840.10045.4.3.2)
           parameter: <ABSENT>
         enc_digest:
-          0000 - 30 45 02 20 58 02 c6 8c-30 51 df 4b 14 5e ff   0E. X...0Q.K.^.
-          000f - 54 a8 b3 44 0e 32 25 3a-2d 5b cf d9 e4 4e 4c   T..D.2%:-[...NL
-          001e - 37 47 af 6e d4 17 02 21-00 81 d9 4c fc b7 e3   7G.n...!...L...
-          002d - 92 7e cd a7 c8 84 d6 ae-47 93 88 bd 17 c2 92   .~......G......
-          003c - a3 d4 a3 00 ec f6 c9 5b-8b 81 9a               .......[...
+          0000 - 30 46 02 21 00 cc 5a 1e-9a 27 70 ba 1f 70 7d   0F.!..Z..'p..p}
+          000f - d6 f0 1c 56 f2 32 b3 d2-8f c4 63 dd 9c 82 cc   ...V.2....c....
+          001e - 69 30 2c cd 9e 90 f9 02-21 00 82 43 0a f7 79   i0,.....!..C..y
+          002d - 64 41 14 6b 28 03 ac 38-2b a3 82 bd a8 a1 ea   dA.k(..8+......
+          003c - 52 db cf f2 5f d4 84 4f-85 b4 53 53            R..._..O..SS
         unauth_attr:
-          <EMPTY>
-Certificate:
-    Data:
-        Version: 3 (0x2)
-        Serial Number:
-            b6:1c:55:19:85:4a:99:bd:57:12:0d:ec:75:bb:9a:1a:4e:cb:ef
-    Signature Algorithm: ecdsa-with-SHA384
-        Issuer: O=sigstore.dev, CN=sigstore
-        Validity
-            Not Before: May  2 20:51:47 2022 GMT
-            Not After : May  2 21:01:46 2022 GMT
-        Subject:
-        Subject Public Key Info:
-            Public Key Algorithm: id-ecPublicKey
-                Public-Key: (256 bit)
-                pub:
-                    04:ec:60:4b:67:aa:28:d9:34:f3:83:9c:17:a5:c8:
-                    a5:87:5e:de:db:c2:65:c8:8b:e6:dc:c4:6f:9c:87:
-                    60:05:42:18:f7:b7:0d:8f:06:f1:62:ce:9a:59:9d:
-                    71:12:55:1b:c3:d4:c7:90:a5:f6:0a:b4:1a:b3:0e:
-                    a7:3d:4e:12:38
-                ASN1 OID: prime256v1
-                NIST CURVE: P-256
-        X509v3 extensions:
-            X509v3 Key Usage: critical
-                Digital Signature
-            X509v3 Extended Key Usage:
-                Code Signing
-            X509v3 Basic Constraints: critical
-                CA:FALSE
-            X509v3 Subject Key Identifier:
-                A0:B1:EA:03:C5:08:4A:70:93:21:DA:A3:A0:0B:4C:55:49:D3:06:3D
-            X509v3 Authority Key Identifier:
-                keyid:58:C0:1E:5F:91:45:A5:66:A9:7A:CC:90:A1:93:22:D0:2A:C5:C5:FA
+            object: undefined (1.3.6.1.4.1.57264.3.8)
+            value.set:
+              INTEGER:6954358
 
-            X509v3 Subject Alternative Name: critical
-                email:billy@chainguard.dev
-            1.3.6.1.4.1.57264.1.1:
-                https://github.com/login/oauth
-    Signature Algorithm: ecdsa-with-SHA384
-         30:65:02:31:00:af:be:f5:bf:e7:05:f5:15:e2:07:85:48:00:
-         ce:81:1e:3e:ba:7b:21:d3:e4:a4:8a:e6:e5:38:9f:01:8a:16:
-         6c:4c:d3:94:af:77:f0:7d:6e:b1:9c:f9:29:f9:2c:b5:13:02:
-         30:74:eb:a5:5a:8a:77:a0:95:7f:42:8e:df:6a:ed:26:96:cc:
-         b4:30:29:b7:94:18:32:c6:8d:a5:a4:06:88:e2:01:51:c4:61:
-         36:1a:1a:55:ec:df:a4:0a:84:b5:03:6e:12
------BEGIN CERTIFICATE-----
-MIICFTCCAZugAwIBAgIUALYcVRmFSpm9VxIN7HW7mhpOy+8wCgYIKoZIzj0EAwMw
-KjEVMBMGA1UEChMMc2lnc3RvcmUuZGV2MREwDwYDVQQDEwhzaWdzdG9yZTAeFw0y
-MjA1MDIyMDUxNDdaFw0yMjA1MDIyMTAxNDZaMAAwWTATBgcqhkjOPQIBBggqhkjO
-PQMBBwNCAATsYEtnqijZNPODnBelyKWHXt7bwmXIi+bcxG+ch2AFQhj3tw2PBvFi
-zppZnXESVRvD1MeQpfYKtBqzDqc9ThI4o4HIMIHFMA4GA1UdDwEB/wQEAwIHgDAT
-BgNVHSUEDDAKBggrBgEFBQcDAzAMBgNVHRMBAf8EAjAAMB0GA1UdDgQWBBSgseoD
-xQhKcJMh2qOgC0xVSdMGPTAfBgNVHSMEGDAWgBRYwB5fkUWlZql6zJChkyLQKsXF
-+jAiBgNVHREBAf8EGDAWgRRiaWxseUBjaGFpbmd1YXJkLmRldjAsBgorBgEEAYO/
-MAEBBB5odHRwczovL2dpdGh1Yi5jb20vbG9naW4vb2F1dGgwCgYIKoZIzj0EAwMD
-aAAwZQIxAK++9b/nBfUV4geFSADOgR4+unsh0+SkiublOJ8BihZsTNOUr3fwfW6x
-nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
-7N+kCoS1A24S
------END CERTIFICATE-----
+            object: undefined (1.3.6.1.4.1.57264.3.9)
+            value.set:
+              INTEGER:6954357
+
+            object: undefined (1.3.6.1.4.1.57264.3.1)
+            value.set:
+              INTEGER:1673643613
+
+            object: undefined (1.3.6.1.4.1.57264.3.3)
+            value.set:
+              INTEGER:11117788
+
+            object: undefined (1.3.6.1.4.1.57264.3.2)
+            value.set:
+              PRINTABLESTRING:c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d
+
+            object: undefined (1.3.6.1.4.1.57264.3.7)
+            value.set:
+              PRINTABLESTRING:373443ac6ee5e01d4bfa00666f79d5c7cee0380684ebe571fc98bdffea82f972
+
+            object: undefined (1.3.6.1.4.1.57264.3.4)
+            value.set:
+              OCTET STRING:
+                0000 - 30 45 02 20 00 d0 88 ff-91 18 75 1c 90   0E. ......u..
+                000d - 4c aa f3 37 94 45 a8 ca-1e a4 de 60 10   L..7.E.....`.
+                001a - 0a 22 69 03 c9 2d d2 0e-1a 9f 02 21 00   ."i..-.....!.
+                0027 - af cd 78 85 f2 66 5f 22-c5 d3 a2 5c fc   ..x..f_"...\.
+                0034 - e2 c1 fe 0c f2 27 aa f0-fa fd 73 ca 5d   .....'....s.]
+                0041 - 58 98 9c 00 df 5c                        X....\
+
+            object: undefined (1.3.6.1.4.1.57264.3.5)
+            value.set:
+              UTF8STRING:rekor.sigstore.dev - 2605736670972794746
+6954358
+NzRDrG7l4B1L+gBmb3nVx87gOAaE6+Vx/Ji9/+qC+XI=
+Timestamp: 1673643613823629328
+
+\U2014 rekor.sigstore.dev wNI9ajBFAiB1IrUY3QV0nXQF0NFuo+1WtTRRYIKhaBI4rUj0Ry3WkwIhAI6D+kvZh+NhJ7Xi4HT0kPVB0nxGjR+cOHFOU1HJbUKF
+
+
+            object: undefined (1.3.6.1.4.1.57264.3.6)
+            value.set:
+              SEQUENCE:
+    0:d=0  hl=4 l= 858 cons: SEQUENCE
+    4:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :be961775858a32f96c8d12fb8db3c3101bb4d8296f37f53f74dc2cb51c22a9ad
+   70:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :92bd4aedddebab9be5678442a28bcfbada3300e04c0726368796a6d8b32fd909
+  136:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :6e5a335c4b2f89e25d5be75ed0a724b154e0f53367bd4888c625d96f4a1e6b79
+  202:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :67bce8699de01f6fc9ac8865ee5b08ee3a6617b57328b59cc342c55a4067652b
+  268:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :f06fad8a06e8b60133ec7847be1586d517728f2da95f6e81ec9d1e4b1bbfc9d1
+  334:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :32f164dcc4d2ff3b095c4f2d2b4beb25223cffd028a53fae3cac98f70e4bbd83
+  400:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :1c3b03f4eff02f6405ef856350ffd03650d5de5271a65f0cee51ffe4fc6a99af
+  466:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :c73ab44c0792697f44a5e237a47fff42f9c4dbf869071ee08e95dec222917f09
+  532:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :e1e7772b7c20874ea1b3bebb2fd4ec5b496bcf45c338495ddbe93ae1fbcabe2c
+  598:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :5da6951fe16688f8a256fc9adf3ccda1806b811e2bc50caab99ee61ded6ef6a3
+  664:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :e7d67f5102ddeda58eda651dcba76876d01955a4eca9fce4caaf9e0ba7521cdd
+  730:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :616429db6c7d20c5b0eff1a6e512ea57a0734b94ae0bc7c914679463e01a7fba
+  796:d=1  hl=2 l=  64 prim:  PRINTABLESTRING   :5a4ad1534b1e770f02bfde0de15008a6971cf1ffbfa963fc9c2a644973a8d2d1
+-----BEGIN PKCS7-----
+MIIJ3gYJKoZIhvcNAQcCoIIJzzCCCcsCAQExDTALBglghkgBZQMEAgEwCwYJKoZI
+hvcNAQcBoIICpTCCAqEwggInoAMCAQICFC7Pt+DSX5p0H8Oxm1bEt00lhkeIMAoG
+CCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln
+c3RvcmUtaW50ZXJtZWRpYXRlMB4XDTIzMDExMzIxMDAxM1oXDTIzMDExMzIxMTAx
+M1owADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABA0+9QWYU9JoIZ3niAcK2byO
+n+MA4F0oskEkp6WTKMxF2R7uoxyNQmSrFObsQSl3Og6VlDP3QGLNJf0XNb5N1Pmj
+ggFGMIIBQjAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYD
+VR0OBBYEFEbrJbk7PYdxauu65KRLsPEXS0ZYMB8GA1UdIwQYMBaAFN/T6c9WJBGW
++ajY6ShVosYuGGQ/MCIGA1UdEQEB/wQYMBaBFGJpbGx5QGNoYWluZ3VhcmQuZGV2
+MCkGCisGAQQBg78wAQEEG2h0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbTCBiwYK
+KwYBBAHWeQIEAgR9BHsAeQB3AN09MGrGxxEyYxkeHJlnNwKiSl643jyt/4eKcoAv
+Ke6OAAABhazu3PoAAAQDAEgwRgIhAKHiBTBTb/sFKLa7QXepfCH0qUmL+KYfNYWn
+QLMHXMsEAiEA9Dl7F1pZ+hAc+L9GzbzezOg5egPUHHjlsed6umZ58sgwCgYIKoZI
+zj0EAwMDaAAwZQIwW3zX6nxfaHYL2lAUzL9MZQdwaFIzmoVXzvX/GFuLCHYq3X0a
+GX+2kL6tJJaaKgrWAjEArBUrHQBuJpVmyW3NfuDNEg5gi/k4qQrcASiaOePNyeul
+DAhxRznI3J3bw8+O9c3pMYIG/zCCBvsCAQEwTzA3MRUwEwYDVQQKEwxzaWdzdG9y
+ZS5kZXYxHjAcBgNVBAMTFXNpZ3N0b3JlLWludGVybWVkaWF0ZQIULs+34NJfmnQf
+w7GbVsS3TSWGR4gwCwYJYIZIAWUDBAIBoGkwGAYJKoZIhvcNAQkDMQsGCSqGSIb3
+DQEHATAcBgkqhkiG9w0BCQUxDxcNMjMwMTEzMjEwMDEzWjAvBgkqhkiG9w0BCQQx
+IgQgIenOemn/IldDovzJEopnxkXnMYhMCD8mmhOshdZt9Y4wCgYIKoZIzj0EAwIE
+SDBGAiEAzFoemidwuh9wfdbwHFbyMrPSj8Rj3ZyCzGkwLM2ekPkCIQCCQwr3eWRB
+FGsoA6w4K6OCvaih6lLbz/Jf1IRPhbRTU6GCBdUwEwYKKwYBBAGDvzADCDEFAgNq
+HXYwEwYKKwYBBAGDvzADCTEFAgNqHXUwFAYKKwYBBAGDvzADATEGAgRjwcZdMBQG
+CisGAQQBg78wAwMxBgIEAKmk3DBQBgorBgEEAYO/MAMCMUITQGMwZDIzZDZhZDQw
+Njk3M2Y5NTU5ZjNiYTJkMWNhMDFmODQxNDdkOGZmYzViODQ0NWMyMjRmOThiOTU5
+MTgwMWQwUAYKKwYBBAGDvzADBzFCE0AzNzM0NDNhYzZlZTVlMDFkNGJmYTAwNjY2
+Zjc5ZDVjN2NlZTAzODA2ODRlYmU1NzFmYzk4YmRmZmVhODJmOTcyMFcGCisGAQQB
+g78wAwQxSQRHMEUCIADQiP+RGHUckEyq8zeURajKHqTeYBAKImkDyS3SDhqfAiEA
+r814hfJmXyLF06Jc/OLB/gzyJ6rw+v1zyl1YmJwA31wwggEMBgorBgEEAYO/MAMF
+MYH9DIH6cmVrb3Iuc2lnc3RvcmUuZGV2IC0gMjYwNTczNjY3MDk3Mjc5NDc0Ngo2
+OTU0MzU4Ck56UkRyRzdsNEIxTCtnQm1iM25WeDg3Z09BYUU2K1Z4L0ppOS8rcUMr
+WEk9ClRpbWVzdGFtcDogMTY3MzY0MzYxMzgyMzYyOTMyOAoK4oCUIHJla29yLnNp
+Z3N0b3JlLmRldiB3Tkk5YWpCRkFpQjFJclVZM1FWMG5YUUYwTkZ1bysxV3RUUlJZ
+SUtoYUJJNHJVajBSeTNXa3dJaEFJNkQra3ZaaCtOaEo3WGk0SFQwa1BWQjBueEdq
+UitjT0hGT1UxSEpiVUtGCjCCA24GCisGAQQBg78wAwYxggNeMIIDWhNAYmU5NjE3
+NzU4NThhMzJmOTZjOGQxMmZiOGRiM2MzMTAxYmI0ZDgyOTZmMzdmNTNmNzRkYzJj
+YjUxYzIyYTlhZBNAOTJiZDRhZWRkZGViYWI5YmU1Njc4NDQyYTI4YmNmYmFkYTMz
+MDBlMDRjMDcyNjM2ODc5NmE2ZDhiMzJmZDkwORNANmU1YTMzNWM0YjJmODllMjVk
+NWJlNzVlZDBhNzI0YjE1NGUwZjUzMzY3YmQ0ODg4YzYyNWQ5NmY0YTFlNmI3ORNA
+NjdiY2U4Njk5ZGUwMWY2ZmM5YWM4ODY1ZWU1YjA4ZWUzYTY2MTdiNTczMjhiNTlj
+YzM0MmM1NWE0MDY3NjUyYhNAZjA2ZmFkOGEwNmU4YjYwMTMzZWM3ODQ3YmUxNTg2
+ZDUxNzcyOGYyZGE5NWY2ZTgxZWM5ZDFlNGIxYmJmYzlkMRNAMzJmMTY0ZGNjNGQy
+ZmYzYjA5NWM0ZjJkMmI0YmViMjUyMjNjZmZkMDI4YTUzZmFlM2NhYzk4ZjcwZTRi
+YmQ4MxNAMWMzYjAzZjRlZmYwMmY2NDA1ZWY4NTYzNTBmZmQwMzY1MGQ1ZGU1Mjcx
+YTY1ZjBjZWU1MWZmZTRmYzZhOTlhZhNAYzczYWI0NGMwNzkyNjk3ZjQ0YTVlMjM3
+YTQ3ZmZmNDJmOWM0ZGJmODY5MDcxZWUwOGU5NWRlYzIyMjkxN2YwORNAZTFlNzc3
+MmI3YzIwODc0ZWExYjNiZWJiMmZkNGVjNWI0OTZiY2Y0NWMzMzg0OTVkZGJlOTNh
+ZTFmYmNhYmUyYxNANWRhNjk1MWZlMTY2ODhmOGEyNTZmYzlhZGYzY2NkYTE4MDZi
+ODExZTJiYzUwY2FhYjk5ZWU2MWRlZDZlZjZhMxNAZTdkNjdmNTEwMmRkZWRhNThl
+ZGE2NTFkY2JhNzY4NzZkMDE5NTVhNGVjYTlmY2U0Y2FhZjllMGJhNzUyMWNkZBNA
+NjE2NDI5ZGI2YzdkMjBjNWIwZWZmMWE2ZTUxMmVhNTdhMDczNGI5NGFlMGJjN2M5
+MTQ2Nzk0NjNlMDFhN2ZiYRNANWE0YWQxNTM0YjFlNzcwZjAyYmZkZTBkZTE1MDA4
+YTY5NzFjZjFmZmJmYTk2M2ZjOWMyYTY0NDk3M2E4ZDJkMQ==
+-----END PKCS7-----
 ```
-
-### Verifying the Transparency Log
-
-As part of signature verification, `gitsign` not only checks that the given
-signature matches the commit, but also that the commit exists within the Rekor
-transparency log.
-
-We can manually validate that the commit exists in the transparency log by
-running:
-
-```sh
-$ uuid=$(rekor-cli search --artifact <(git rev-parse HEAD | tr -d '\n') | tail -n 1)
-$ rekor-cli get --uuid=$uuid --format=json | jq .
-LogID: c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d
-Index: 2212633
-IntegratedTime: 2022-05-02T20:51:49Z
-UUID: d0444ed9897f31fefc820ade9a706188a3bb030055421c91e64475a8c955ae2c
-Body: {
-  "HashedRekordObj": {
-    "data": {
-      "hash": {
-        "algorithm": "sha256",
-        "value": "05b4f02a24d1c4c2c95dacaee30de2a6ce4b5b88fa981f4e7b456b76ea103141"
-      }
-    },
-    "signature": {
-      "content": "MEYCIQCeZwhnq9dgS7ZvU2K5m785V6PqqWAsmkNzAOsf8F++gAIhAKfW2qReBZL34Xrzd7r4JzUlJbf5eoeUZvKT+qsbbskL",
-      "publicKey": {
-        "content": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUNGVENDQVp1Z0F3SUJBZ0lVQUxZY1ZSbUZTcG05VnhJTjdIVzdtaHBPeSs4d0NnWUlLb1pJemowRUF3TXcKS2pFVk1CTUdBMVVFQ2hNTWMybG5jM1J2Y21VdVpHVjJNUkV3RHdZRFZRUURFd2h6YVdkemRHOXlaVEFlRncweQpNakExTURJeU1EVXhORGRhRncweU1qQTFNREl5TVRBeE5EWmFNQUF3V1RBVEJnY3Foa2pPUFFJQkJnZ3Foa2pPClBRTUJCd05DQUFUc1lFdG5xaWpaTlBPRG5CZWx5S1dIWHQ3YndtWElpK2JjeEcrY2gyQUZRaGozdHcyUEJ2RmkKenBwWm5YRVNWUnZEMU1lUXBmWUt0QnF6RHFjOVRoSTRvNEhJTUlIRk1BNEdBMVVkRHdFQi93UUVBd0lIZ0RBVApCZ05WSFNVRUREQUtCZ2dyQmdFRkJRY0RBekFNQmdOVkhSTUJBZjhFQWpBQU1CMEdBMVVkRGdRV0JCU2dzZW9ECnhRaEtjSk1oMnFPZ0MweFZTZE1HUFRBZkJnTlZIU01FR0RBV2dCUll3QjVma1VXbFpxbDZ6SkNoa3lMUUtzWEYKK2pBaUJnTlZIUkVCQWY4RUdEQVdnUlJpYVd4c2VVQmphR0ZwYm1kMVlYSmtMbVJsZGpBc0Jnb3JCZ0VFQVlPLwpNQUVCQkI1b2RIUndjem92TDJkcGRHaDFZaTVqYjIwdmJHOW5hVzR2YjJGMWRHZ3dDZ1lJS29aSXpqMEVBd01ECmFBQXdaUUl4QUsrKzliL25CZlVWNGdlRlNBRE9nUjQrdW5zaDArU2tpdWJsT0o4QmloWnNUTk9VcjNmd2ZXNngKblBrcCtTeTFFd0l3ZE91bFdvcDNvSlYvUW83ZmF1MG1sc3kwTUNtM2xCZ3l4bzJscEFhSTRnRlJ4R0UyR2hwVgo3TitrQ29TMUEyNFMKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
-      }
-    }
-  }
-}
-
-$ sig=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.content)
-$ cert=$(rekor-cli get --uuid=$uuid --format=json | jq -r .Body.HashedRekordObj.signature.publicKey.content)
-$ cosign verify-blob --cert <(echo $cert | base64 --decode) --signature <(echo $sig | base64 --decode) <(git rev-parse HEAD | tr -d '\n')
-tlog entry verified with uuid: d0444ed9897f31fefc820ade9a706188a3bb030055421c91e64475a8c955ae2c index: 2212633
-Verified OK
-$ echo $cert | base64 --decode | openssl x509 -text
-Certificate:
-    Data:
-        Version: 3 (0x2)
-        Serial Number:
-            b6:1c:55:19:85:4a:99:bd:57:12:0d:ec:75:bb:9a:1a:4e:cb:ef
-    Signature Algorithm: ecdsa-with-SHA384
-        Issuer: O=sigstore.dev, CN=sigstore
-        Validity
-            Not Before: May  2 20:51:47 2022 GMT
-            Not After : May  2 21:01:46 2022 GMT
-        Subject:
-        Subject Public Key Info:
-            Public Key Algorithm: id-ecPublicKey
-                Public-Key: (256 bit)
-                pub:
-                    04:ec:60:4b:67:aa:28:d9:34:f3:83:9c:17:a5:c8:
-                    a5:87:5e:de:db:c2:65:c8:8b:e6:dc:c4:6f:9c:87:
-                    60:05:42:18:f7:b7:0d:8f:06:f1:62:ce:9a:59:9d:
-                    71:12:55:1b:c3:d4:c7:90:a5:f6:0a:b4:1a:b3:0e:
-                    a7:3d:4e:12:38
-                ASN1 OID: prime256v1
-                NIST CURVE: P-256
-        X509v3 extensions:
-            X509v3 Key Usage: critical
-                Digital Signature
-            X509v3 Extended Key Usage:
-                Code Signing
-            X509v3 Basic Constraints: critical
-                CA:FALSE
-            X509v3 Subject Key Identifier:
-                A0:B1:EA:03:C5:08:4A:70:93:21:DA:A3:A0:0B:4C:55:49:D3:06:3D
-            X509v3 Authority Key Identifier:
-                keyid:58:C0:1E:5F:91:45:A5:66:A9:7A:CC:90:A1:93:22:D0:2A:C5:C5:FA
-
-            X509v3 Subject Alternative Name: critical
-                email:billy@chainguard.dev
-            1.3.6.1.4.1.57264.1.1:
-                https://github.com/login/oauth
-    Signature Algorithm: ecdsa-with-SHA384
-         30:65:02:31:00:af:be:f5:bf:e7:05:f5:15:e2:07:85:48:00:
-         ce:81:1e:3e:ba:7b:21:d3:e4:a4:8a:e6:e5:38:9f:01:8a:16:
-         6c:4c:d3:94:af:77:f0:7d:6e:b1:9c:f9:29:f9:2c:b5:13:02:
-         30:74:eb:a5:5a:8a:77:a0:95:7f:42:8e:df:6a:ed:26:96:cc:
-         b4:30:29:b7:94:18:32:c6:8d:a5:a4:06:88:e2:01:51:c4:61:
-         36:1a:1a:55:ec:df:a4:0a:84:b5:03:6e:12
------BEGIN CERTIFICATE-----
-MIICFTCCAZugAwIBAgIUALYcVRmFSpm9VxIN7HW7mhpOy+8wCgYIKoZIzj0EAwMw
-KjEVMBMGA1UEChMMc2lnc3RvcmUuZGV2MREwDwYDVQQDEwhzaWdzdG9yZTAeFw0y
-MjA1MDIyMDUxNDdaFw0yMjA1MDIyMTAxNDZaMAAwWTATBgcqhkjOPQIBBggqhkjO
-PQMBBwNCAATsYEtnqijZNPODnBelyKWHXt7bwmXIi+bcxG+ch2AFQhj3tw2PBvFi
-zppZnXESVRvD1MeQpfYKtBqzDqc9ThI4o4HIMIHFMA4GA1UdDwEB/wQEAwIHgDAT
-BgNVHSUEDDAKBggrBgEFBQcDAzAMBgNVHRMBAf8EAjAAMB0GA1UdDgQWBBSgseoD
-xQhKcJMh2qOgC0xVSdMGPTAfBgNVHSMEGDAWgBRYwB5fkUWlZql6zJChkyLQKsXF
-+jAiBgNVHREBAf8EGDAWgRRiaWxseUBjaGFpbmd1YXJkLmRldjAsBgorBgEEAYO/
-MAEBBB5odHRwczovL2dpdGh1Yi5jb20vbG9naW4vb2F1dGgwCgYIKoZIzj0EAwMD
-aAAwZQIxAK++9b/nBfUV4geFSADOgR4+unsh0+SkiublOJ8BihZsTNOUr3fwfW6x
-nPkp+Sy1EwIwdOulWop3oJV/Qo7fau0mlsy0MCm3lBgyxo2lpAaI4gFRxGE2GhpV
-7N+kCoS1A24S
------END CERTIFICATE-----
-```
-
-Notice that **the Rekor entry uses the same cert that was used to generate the
-git commit signature**. This can be used to correlate the 2 messages, even
-though they signed different content!
-
-Note that for Git tags, the annotated tag object SHA is what is used (i.e. the
-output of `git rev-parse <tag>`), **not** the SHA of the underlying tagged
-commit.

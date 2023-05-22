@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,6 +32,8 @@ import (
 	"github.com/go-openapi/swag"
 
 	"github.com/sigstore/cosign/v2/pkg/cosign"
+	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
+	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
 	rekor "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/index"
@@ -43,14 +46,16 @@ import (
 	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
-// Verifier represents a mechanism to get and verify Rekor entries for the given Git commit.
+// Verifier represents a mechanism to get and verify Rekor entries for the given Git data.
 type Verifier interface {
 	Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
+	VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error)
 }
 
 // Writer represents a mechanism to write content to Rekor.
 type Writer interface {
 	Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
+	WriteMessage(ctx context.Context, message, signature []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
 // Client implements a basic rekor implementation for writing and verifying Rekor data.
@@ -74,16 +79,21 @@ func New(url string, opts ...rekor.Option) (*Client, error) {
 	}, nil
 }
 
+// Deprecated: Use [WriteMessage] instead.
 func (c *Client) Write(ctx context.Context, commitSHA string, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	return c.WriteMessage(ctx, []byte(commitSHA), sig, cert)
+}
+
+func (c *Client) WriteMessage(ctx context.Context, message, signature []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	pem, err := cryptoutils.MarshalCertificateToPEM(cert)
 	if err != nil {
 		return nil, err
 	}
 	checkSum := sha256.New()
-	if _, err := checkSum.Write([]byte(commitSHA)); err != nil {
+	if _, err := checkSum.Write(message); err != nil {
 		return nil, err
 	}
-	return cosign.TLogUpload(ctx, c.Rekor, sig, checkSum, pem)
+	return cosign.TLogUpload(ctx, c.Rekor, signature, checkSum, pem)
 }
 
 func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
@@ -163,6 +173,15 @@ func rekorPubsFromClient(rekorClient *client.Rekor) (*cosign.TrustedTransparency
 	return &publicKeys, nil
 }
 
+// Verify verifies a commit using online verification.
+//
+// This is done by:
+// 1. Searching Rekor for an entry matching the commit SHA + cert.
+// 2. Use the same cert to verify the commit content.
+//
+// Note: While not truly deprecated, Client.VerifyOffline is generally preferred.
+// This function relies on non-GA behavior of Rekor, and remains for backwards
+// compatibility with older signatures.
 func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	e, err := c.get(ctx, []byte(commitSHA), cert)
 	if err != nil {
@@ -224,4 +243,53 @@ func extractCerts(e *models.LogEntryAnon) ([]*x509.Certificate, error) {
 
 func (c *Client) PublicKeys() *cosign.TrustedTransparencyLogPubKeys {
 	return c.publicKeys
+}
+
+// VerifyOffline verifies a signature using offline verification.
+// Unlike Client.Verify, only the commit content is considered during verification.
+func (c *Client) VerifyOffline(ctx context.Context, sig []byte) (*models.LogEntryAnon, error) {
+	// Try decoding as PEM
+	var der []byte
+	if blk, _ := pem.Decode(sig); blk != nil {
+		der = blk.Bytes
+	} else {
+		der = sig
+	}
+	// Parse signature
+	sd, err := cms.ParseSignedData(der)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
+	}
+
+	// Generate verification options.
+	certs, err := sd.GetCertificates()
+	if err != nil {
+		return nil, fmt.Errorf("error getting signature certs: %w", err)
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates found in signature")
+	}
+	cert := certs[0]
+
+	// Recompute HashedRekord body by rehashing the authenticated attributes.
+	r := sd.Raw()
+	if len(r.SignerInfos) == 0 {
+		return nil, fmt.Errorf("no signers found in signature")
+	}
+	si := r.SignerInfos[0]
+	message, err := si.SignedAttrs.MarshaledForVerification()
+	if err != nil {
+		return nil, err
+	}
+
+	tlog, err := rekoroid.ToLogEntry(ctx, message, si.Signature, cert, si.UnsignedAttrs)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := cosign.VerifyTLogEntryOffline(ctx, tlog, c.PublicKeys()); err != nil {
+		return nil, err
+	}
+
+	return tlog, nil
 }

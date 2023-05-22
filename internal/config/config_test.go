@@ -85,6 +85,7 @@ func TestGet(t *testing.T) {
 		Issuer:      "tacocat",
 		RedirectURL: "example.com",
 		ConnectorID: "bar",
+		RekorMode:   "online",
 	}
 
 	execFn = func() (io.Reader, error) {

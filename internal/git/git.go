@@ -18,20 +18,32 @@ package git
 import (
 	"bytes"
 	"context"
-	"crypto/x509"
 	"fmt"
 
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
-func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) ([]byte, *x509.Certificate, *models.LogEntryAnon, error) {
-	sig, cert, err := signature.Sign(ident, data, opts)
+type SignFunc func(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error)
+
+// Sign signs the commit, uploading a HashedRekord of the commit content to Rekor
+// and embedding the Rekor log entry in the signature.
+// This is suitable for offline verification.
+func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error) {
+	opts.Rekor = rekor
+	return signature.Sign(ctx, ident, data, opts)
+}
+
+// LegacySHASign is the old-style signing that signs the commit content, but uploads a signed SHA to Rekor.
+// Verification for this style of signing relies on the Rekor Search API to match the signed SHA + commit content certs,
+// and cannot be done offline.
+// This may be removed in the future.
+func LegacySHASign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data []byte, opts signature.SignOptions) (*signature.SignResponse, error) {
+	resp, err := signature.Sign(ctx, ident, data, opts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to sign message: %w", err)
+		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
 
 	// This uploads the commit SHA + sig(commit SHA) to the tlog using the same
@@ -40,23 +52,23 @@ func Sign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identity, data 
 	// using the same key, this is probably okay? e.g. even if you could cause a SHA1 collision,
 	// you would still need the underlying commit to be valid and using the same key which seems hard.
 
-	commit, err := git.ObjectHash(data, sig)
+	commit, err := git.ObjectHash(data, resp.Signature)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error generating commit hash: %w", err)
+		return nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
 
 	sv, err := ident.SignerVerifier()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error getting signer: %w", err)
+		return nil, fmt.Errorf("error getting signer: %w", err)
 	}
 	commitSig, err := sv.SignMessage(bytes.NewBufferString(commit))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error signing commit hash: %w", err)
+		return nil, fmt.Errorf("error signing commit hash: %w", err)
 	}
-	tlog, err := rekor.Write(ctx, commit, commitSig, cert)
+	resp.LogEntry, err = rekor.Write(ctx, commit, commitSig, resp.Cert)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error uploading tlog (commit): %w", err)
+		return nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 	}
 
-	return sig, cert, tlog, nil
+	return resp, nil
 }
