@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
@@ -46,7 +47,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	clock = clockwork.NewFakeClock()
+	clock = clockwork.NewFakeClockAt(time.Date(1984, time.April, 4, 0, 0, 0, 0, time.UTC))
 	os.Exit(m.Run())
 }
 
