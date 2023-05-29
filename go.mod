@@ -20,7 +20,7 @@ require (
 	github.com/sigstore/cosign/v2 v2.0.2
 	github.com/sigstore/fulcio v1.3.1
 	github.com/sigstore/protobuf-specs v0.1.0
-	github.com/sigstore/rekor v1.2.0
+	github.com/sigstore/rekor v1.2.1
 	github.com/sigstore/sigstore v1.6.4
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
