@@ -42,3 +42,8 @@ install-all: install-gitsign install-credential-cache
 .PHONY: unit-test
 unit-test:
 	go test -v ./...
+
+# These tests use live dependencies, and may otherwise modify state.
+.PHONY: e2e-test
+e2e-test:
+	go test -tags e2e -v ./...

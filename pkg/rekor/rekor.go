@@ -280,7 +280,7 @@ func (c *Client) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Cer
 	// Get HashedRekord body from the signature.
 	// We are assuming here that the signature has already been authenticated against the
 	// cert, so it is okay to rely the precomputed checksum in the SignerInfo.
-	message, err := si.GetMessageDigestAttribute()
+	message, err := si.SignedAttrs.MarshaledForVerification()
 	if err != nil {
 		return nil, err
 	}

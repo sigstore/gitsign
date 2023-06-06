@@ -25,3 +25,6 @@ jobs:
 
     - name: Unit Tests
       run: make unit-test
+
+    - name: Live dependency tests
+      run: make e2e-test
