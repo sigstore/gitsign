@@ -319,7 +319,7 @@ Git commit signatures use
 inspect the underlying data / certificate used by running:
 
 ```sh
-$ git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+$ git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
 PKCS7:
   type: pkcs7-signedData (1.2.840.113549.1.7.2)
   d.sign:
