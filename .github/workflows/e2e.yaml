@@ -90,7 +90,7 @@ jobs:
             --certificate-identity="https://github.com/${{ github.workflow_ref }}"
 
           # Extra debug info
-          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+          git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
       - name: Test Sign and Verify commit - offline verification
         env:
           GITSIGN_REKOR_MODE: "offline"
@@ -112,7 +112,7 @@ jobs:
             --certificate-identity="https://github.com/${{ github.workflow_ref }}"
 
           # Extra debug info
-          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+          git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
       - name: Test Sign and Verify commit - staging
         env:
           GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
@@ -141,7 +141,7 @@ jobs:
             --certificate-identity="https://github.com/${{ github.workflow_ref }}"
 
           # Extra debug info
-          git cat-file commit HEAD | sed -n '/BEGIN/, /END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
+          git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
 
       - name: Debug log
         if: failure()
