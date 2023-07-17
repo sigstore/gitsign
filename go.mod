@@ -18,7 +18,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0
 	github.com/sigstore/cosign/v2 v2.1.1
-	github.com/sigstore/fulcio v1.3.3
+	github.com/sigstore/fulcio v1.3.4
 	github.com/sigstore/protobuf-specs v0.2.0
 	github.com/sigstore/rekor v1.2.2
 	github.com/sigstore/sigstore v1.7.1
