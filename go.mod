@@ -21,7 +21,7 @@ require (
 	github.com/sigstore/fulcio v1.4.0
 	github.com/sigstore/protobuf-specs v0.2.0
 	github.com/sigstore/rekor v1.2.2
-	github.com/sigstore/sigstore v1.7.1
+	github.com/sigstore/sigstore v1.7.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.12.0

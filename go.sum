@@ -354,7 +354,7 @@ github.com/go-playground/universal-translator v0.18.1 h1:Bcnm0ZwsGyWbCzImXv+pAJn
 github.com/go-playground/universal-translator v0.18.1/go.mod h1:xekY+UJKNuX9WP91TpwSH2VMlDf28Uj24BCp08ZFTUY=
 github.com/go-playground/validator/v10 v10.14.1 h1:9c50NUPC30zyuKprjL3vNZ0m5oG+jU0zvx4AqHGnv4k=
 github.com/go-playground/validator/v10 v10.14.1/go.mod h1:9iXMNT7sEkjXb0I+enO7QXmzG6QCsPWY4zveKFVRSyU=
-github.com/go-rod/rod v0.113.3 h1:oLiKZW721CCMwA5g7977cWfcAKQ+FuosP47Zf1QiDrA=
+github.com/go-rod/rod v0.114.2 h1:Qwt+vZHHnb117zc0q+XjhAJCkB01hchWSxH/raCyLb4=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 h1:p104kn46Q8WdvHunIJ9dAyjPVtrBPhSr3KT2yUst43I=
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
@@ -684,8 +684,8 @@ github.com/sigstore/protobuf-specs v0.2.0 h1:YFG4UYfBSQ608m3ZnIOtRDggt+3g6sMoxRA
 github.com/sigstore/protobuf-specs v0.2.0/go.mod h1:5shUCxf82hGnjUEFVWiktcxwzdtn6EfeeJssxZ5Q5HE=
 github.com/sigstore/rekor v1.2.2 h1:5JK/zKZvcQpL/jBmHvmFj3YbpDMBQnJQ6ygp8xdF3bY=
 github.com/sigstore/rekor v1.2.2/go.mod h1:FGnWBGWzeNceJnp0x9eDFd41mI8aQqCjj+Zp0IEs0Qg=
-github.com/sigstore/sigstore v1.7.1 h1:fCATemikcBK0cG4+NcM940MfoIgmioY1vC6E66hXxks=
-github.com/sigstore/sigstore v1.7.1/go.mod h1:0PmMzfJP2Y9+lugD0wer4e7TihR5tM7NcIs3bQNk5xg=
+github.com/sigstore/sigstore v1.7.2 h1:MY0wSOhKWa8SIWSCO9SzFnUl+b7jbthgXHJpuUg31Qs=
+github.com/sigstore/sigstore v1.7.2/go.mod h1:2IPD5YXrXoznfnIoVsDF7ARC1Nha8xIdLpsC4kEQh5w=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.7.1 h1:rDHrG/63b3nBq3G9plg7iYnWN6lBhOfq/XultlCZgII=
 github.com/sigstore/sigstore/pkg/signature/kms/azure v1.7.1 h1:X3ezwolP+b1jP3R6XPOWhUU0TZKONiv6EIRuySlZGrY=
 github.com/sigstore/sigstore/pkg/signature/kms/gcp v1.7.1 h1:mj1KhdzzP1me994bt1UXhq5KZGSR1SoqxTqcT+hfPMk=
