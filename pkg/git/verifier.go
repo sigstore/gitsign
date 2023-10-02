@@ -90,7 +90,7 @@ func WithTimestampCertPool(pool *x509.CertPool) CertVerifierOption {
 // work.
 //
 // Signatures should be CMS/PKCS7 formatted.
-func (v *CertVerifier) Verify(ctx context.Context, data, sig []byte, detached bool) (*x509.Certificate, error) {
+func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool) (*x509.Certificate, error) {
 	// Try decoding as PEM
 	var der []byte
 	if blk, _ := pem.Decode(sig); blk != nil {

@@ -64,11 +64,8 @@ func (o *options) Run(w io.Writer, args []string) error {
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(out); err != nil {
-		return err
-	}
 
-	return nil
+	return enc.Encode(out)
 }
 
 func statement(repo *git.Repository, remote, revision string) (*in_toto.Statement, error) {
@@ -191,7 +188,7 @@ func parseSignature(raw []byte) ([]*predicate.SignerInfo, error) {
 	return out, nil
 }
 
-func New(cfg *config.Config) *cobra.Command {
+func New(_ *config.Config) *cobra.Command {
 	o := &options{}
 
 	cmd := &cobra.Command{
@@ -207,6 +204,7 @@ This command is experimental, and its CLI surface may change.`,
 			return o.Run(os.Stdout, args)
 		},
 	}
+
 	o.AddFlags(cmd)
 
 	return cmd
