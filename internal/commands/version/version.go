@@ -41,11 +41,8 @@ func New(cfg *config.Config) *cobra.Command {
 			fmt.Println("parsed config:")
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			if err := enc.Encode(cfg); err != nil {
-				return err
-			}
 
-			return nil
+			return enc.Encode(cfg)
 		},
 	}
 	return cmd

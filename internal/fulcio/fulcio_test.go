@@ -73,7 +73,7 @@ type fakeFulcio struct {
 	email  string
 }
 
-func (f *fakeFulcio) SigningCert(cr api.CertificateRequest, token string) (*api.CertificateResponse, error) {
+func (f *fakeFulcio) SigningCert(cr api.CertificateRequest, _ string) (*api.CertificateResponse, error) {
 	if want := keyAlgorithm(f.signer); want != cr.PublicKey.Algorithm {
 		return nil, fmt.Errorf("want algorithm %s, got %s", want, cr.PublicKey.Algorithm)
 	}

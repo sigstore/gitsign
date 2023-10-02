@@ -42,7 +42,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	o.CertVerifyOptions.AddFlags(cmd)
 }
 
-func (o *options) Run(w io.Writer, args []string) error {
+func (o *options) Run(_ io.Writer, args []string) error {
 	ctx := context.Background()
 	repo, err := gogit.PlainOpenWithOptions(".", &gogit.PlainOpenOptions{
 		DetectDotGit: true,

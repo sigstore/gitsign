@@ -34,7 +34,7 @@ type Client struct {
 	Intermediates *x509.CertPool
 }
 
-func (c *Client) GetCredentials(ctx context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
+func (c *Client) GetCredentials(_ context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
 	id, err := id()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error getting credential ID: %w", err)
@@ -74,7 +74,7 @@ func (c *Client) GetCredentials(ctx context.Context, cfg *config.Config) (crypto
 	return privateKey, resp.Cert, resp.Chain, nil
 }
 
-func (c *Client) StoreCert(ctx context.Context, priv crypto.PrivateKey, cert, chain []byte) error {
+func (c *Client) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain []byte) error {
 	id, err := id()
 	if err != nil {
 		return fmt.Errorf("error getting credential ID: %w", err)

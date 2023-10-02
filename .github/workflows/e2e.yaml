@@ -132,7 +132,7 @@ jobs:
           # Verify commit
           echo "========== git verify-commit =========="
           git verify-commit HEAD
-          
+
           echo "========== gitsign verify =========="
           gitsign verify \
             --certificate-github-workflow-repository=${{ github.repository }} \

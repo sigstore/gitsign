@@ -150,11 +150,11 @@ func generateData(t *testing.T, cert *x509.Certificate, priv crypto.Signer) ([]b
 
 type fakeRekor struct{}
 
-func (fakeRekor) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+func (fakeRekor) Verify(_ context.Context, _ string, _ *x509.Certificate) (*models.LogEntryAnon, error) {
 	return nil, nil
 }
 
-func (fakeRekor) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+func (fakeRekor) VerifyInclusion(_ context.Context, _ []byte, _ *x509.Certificate) (*models.LogEntryAnon, error) {
 	return nil, nil
 }
 

@@ -265,11 +265,11 @@ type fakeSV struct {
 	signature.SignerVerifier
 }
 
-func (fakeSV) SignMessage(message io.Reader, opts ...signature.SignOption) ([]byte, error) {
+func (fakeSV) SignMessage(_ io.Reader, _ ...signature.SignOption) ([]byte, error) {
 	return []byte("tacocat"), nil
 }
 
-func fakeRekor(ctx context.Context, rekorClient *client.Rekor, signature, pemBytes []byte) (*models.LogEntryAnon, error) {
+func fakeRekor(_ context.Context, _ *client.Rekor, _, _ []byte) (*models.LogEntryAnon, error) {
 	id := "foo"
 	index := int64(1)
 	return &models.LogEntryAnon{
