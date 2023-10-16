@@ -23,11 +23,11 @@ require (
 	github.com/sigstore/fulcio v1.4.0
 	github.com/sigstore/protobuf-specs v0.2.1
 	github.com/sigstore/rekor v1.3.2
-	github.com/sigstore/sigstore v1.7.3
+	github.com/sigstore/sigstore v1.7.4
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.14.0
-	golang.org/x/oauth2 v0.12.0
+	golang.org/x/oauth2 v0.13.0
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
 	google.golang.org/protobuf v1.31.0
 )
