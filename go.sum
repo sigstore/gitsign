@@ -766,8 +766,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH
 github.com/prometheus/client_golang v1.17.0 h1:rl2sfwZMtSthVU752MqfjQozy7blglC+1SOtjMAMh+Q=
 github.com/prometheus/client_golang v1.17.0/go.mod h1:VeL+gMmOAxkS2IqfCq0ZmHSL+LjWfWDUmp1mBz9JgUY=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16 h1:v7DLqVdK4VrYkVD5diGdl4sxJurKJEMnODWRJlxV9oM=
-github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16/go.mod h1:oMQmHW1/JoDwqLtg57MGgP/Fb1CJEYF2imWWhWtMkYU=
+github.com/prometheus/client_model v0.5.0 h1:VQw1hfvPvk3Uv6Qf29VrPF32JB6rtbgI6cYPYQjL0Qw=
+github.com/prometheus/client_model v0.5.0/go.mod h1:dTiFglRmd66nLR9Pv9f0mZi7B7fk5Pm3gvsjB5tr+kI=
 github.com/prometheus/common v0.44.0 h1:+5BrQJwiBB9xsMygAB3TNvpQKOwlkc25LbISbrdOOfY=
 github.com/prometheus/common v0.44.0/go.mod h1:ofAIvZbQ1e/nugmZGz4/qCb9Ap1VoSTIO7x0VV9VvuY=
 github.com/prometheus/procfs v0.11.1 h1:xRC8Iq1yyca5ypa9n1EZnWZkt7dwcoRPQwX/5gwaUuI=
@@ -807,8 +807,8 @@ github.com/shibumi/go-pathspec v1.3.0 h1:QUyMZhFo0Md5B8zV8x2tesohbb5kfbpTi9rBnKh
 github.com/shibumi/go-pathspec v1.3.0/go.mod h1:Xutfslp817l2I1cZvgcfeMQJG5QnU2lh5tVaaMCl3jE=
 github.com/sigstore/cosign/v2 v2.2.0 h1:MV/ALD1/e/JgxXXCdCNxlIRk2NB3Irb4MKPozd8SPR8=
 github.com/sigstore/cosign/v2 v2.2.0/go.mod h1:Kcm7lTZbpiEpA3wPCqRygTUdLpX8CNT+36rODTCBr1M=
-github.com/sigstore/fulcio v1.4.0 h1:05+k8BFvwTQzfCkVxESWzCN4b70KIRliGYz0Upmdrs8=
-github.com/sigstore/fulcio v1.4.0/go.mod h1:wcjlktbhoy6+ZTxO3yXpvqUxsLV+JEH4FF3a5Jz4VPI=
+github.com/sigstore/fulcio v1.4.3 h1:9JcUCZjjVhRF9fmhVuz6i1RyhCc/EGCD7MOl+iqCJLQ=
+github.com/sigstore/fulcio v1.4.3/go.mod h1:BQPWo7cfxmJwgaHlphUHUpFkp5+YxeJes82oo39m5og=
 github.com/sigstore/protobuf-specs v0.2.1 h1:KIoM7E3C4uaK092q8YoSj/XSf9720f8dlsbYwwOmgEA=
 github.com/sigstore/protobuf-specs v0.2.1/go.mod h1:xPqQGnH/HllKuZ4VFPz/g+78epWM/NLRGl7Fuy45UdE=
 github.com/sigstore/rekor v1.3.2 h1:o0M/hGYpYhleenrYaMQbJha/w8Zj0Z7vEuND2eZq/Zo=
