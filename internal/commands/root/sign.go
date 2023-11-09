@@ -73,7 +73,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		return fmt.Errorf("failed to read message from stdin: %w", err)
 	}
 
-	rekor, err := rekor.NewClient(o.Config.Rekor)
+	rekor, err := rekor.NewClientContext(ctx, o.Config.Rekor)
 	if err != nil {
 		return fmt.Errorf("failed to create rekor client: %w", err)
 	}

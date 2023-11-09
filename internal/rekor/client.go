@@ -15,11 +15,19 @@
 package rekor
 
 import (
+	"context"
+
 	gitrekor "github.com/sigstore/gitsign/pkg/rekor"
 	rekor "github.com/sigstore/rekor/pkg/client"
 )
 
 // NewClient returns a new Rekor client with common client options set.
+// Deprecated: Use NewClientContext instead.
 func NewClient(url string) (*gitrekor.Client, error) {
-	return gitrekor.New(url, rekor.WithUserAgent("gitsign"))
+	return NewClientContext(context.TODO(), url)
+}
+
+// NewClientContext returns a new Rekor client with common client options set.
+func NewClientContext(ctx context.Context, url string) (*gitrekor.Client, error) {
+	return gitrekor.NewWithOptions(ctx, url, gitrekor.WithClientOption(rekor.WithUserAgent("gitsign")))
 }
