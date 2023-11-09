@@ -43,7 +43,6 @@ import (
 	hashedrekord_v001 "github.com/sigstore/rekor/pkg/types/hashedrekord/v0.0.1"
 	rekord_v001 "github.com/sigstore/rekor/pkg/types/rekord/v0.0.1"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 // Verifier represents a mechanism to get and verify Rekor entries for the given Git data.
@@ -64,12 +63,26 @@ type Client struct {
 	publicKeys *cosign.TrustedTransparencyLogPubKeys
 }
 
+// Deprecated: Use NewWithOptions instead.
 func New(url string, opts ...rekor.Option) (*Client, error) {
-	c, err := rekor.GetRekorClient(url, opts...)
+	return NewWithOptions(context.TODO(), url, WithClientOption(opts...))
+}
+
+func NewWithOptions(ctx context.Context, url string, opts ...Option) (*Client, error) {
+	// Defaults
+	o := &options{
+		rekorPublicKeys: cosign.GetRekorPubs,
+	}
+	for _, f := range opts {
+		f(o)
+	}
+
+	c, err := rekor.GetRekorClient(url, o.clientOpts...)
 	if err != nil {
 		return nil, err
 	}
-	pubs, err := rekorPubsFromClient(c)
+
+	pubs, err := o.rekorPublicKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,21 +169,6 @@ func (c *Client) findTLogEntriesByPayloadAndPK(ctx context.Context, payload, pub
 		return nil, err
 	}
 	return searchIndex.GetPayload(), nil
-}
-
-// rekorPubsFromClient returns a RekorPubKey keyed by the log ID from the Rekor client.
-// NOTE: This **must not** be used in the verification path, but may be used in the
-// sign path to validate return responses are consistent from Rekor.
-func rekorPubsFromClient(rekorClient *client.Rekor) (*cosign.TrustedTransparencyLogPubKeys, error) {
-	publicKeys := cosign.NewTrustedTransparencyLogPubKeys()
-	pubOK, err := rekorClient.Pubkey.GetPublicKey(nil)
-	if err != nil {
-		return nil, fmt.Errorf("unable to fetch rekor public key from rekor: %w", err)
-	}
-	if err := publicKeys.AddTransparencyLogPubKey([]byte(pubOK.Payload), tuf.Active); err != nil {
-		return nil, fmt.Errorf("constructRekorPubKey: %w", err)
-	}
-	return &publicKeys, nil
 }
 
 // Verify verifies a commit using online verification.

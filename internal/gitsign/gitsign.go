@@ -74,7 +74,7 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 		return nil, fmt.Errorf("error creating Git verifier: %w", err)
 	}
 
-	rekor, err := rekorinternal.NewClient(cfg.Rekor)
+	rekor, err := rekorinternal.NewClientContext(ctx, cfg.Rekor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rekor client: %w", err)
 	}
