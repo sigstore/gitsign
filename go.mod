@@ -12,7 +12,7 @@ require (
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/go-openapi/runtime v0.27.1
 	github.com/go-openapi/strfmt v0.22.0
-	github.com/go-openapi/swag v0.22.7
+	github.com/go-openapi/swag v0.22.9
 	github.com/google/go-cmp v0.6.0
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/jonboulle/clockwork v0.4.0
