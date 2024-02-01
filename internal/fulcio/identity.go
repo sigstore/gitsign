@@ -194,8 +194,13 @@ func NewIdentityFactory(in io.Reader, out io.Writer) *IdentityFactory {
 
 func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (*Identity, error) {
 	clientID := cfg.ClientID
+	htmlPage, err := oauth.GetInteractiveSuccessHTML(cfg.Autoclose, cfg.AutocloseTimeout)
+	if err != nil {
+		fmt.Fprintln(f.out, "error getting interactive success html, default to original page")
+		htmlPage = oauth.InteractiveSuccessHTML
+	}
 	defaultFlow := &oauthflow.InteractiveIDTokenGetter{
-		HTMLPage: oauth.InteractiveSuccessHTML,
+		HTMLPage: htmlPage,
 		Input:    f.in,
 		Output:   f.out,
 	}

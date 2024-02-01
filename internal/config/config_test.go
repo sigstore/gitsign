@@ -82,10 +82,12 @@ func TestGet(t *testing.T) {
 		// Default value
 		ClientID: "sigstore",
 		// Overridden by env var
-		Issuer:      "tacocat",
-		RedirectURL: "example.com",
-		ConnectorID: "bar",
-		RekorMode:   "online",
+		Issuer:           "tacocat",
+		RedirectURL:      "example.com",
+		ConnectorID:      "bar",
+		RekorMode:        "online",
+		Autoclose:        false,
+		AutocloseTimeout: 10,
 	}
 
 	execFn = func() (io.Reader, error) {
