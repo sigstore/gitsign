@@ -203,10 +203,27 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 	}
 	var authFlow oauthflow.TokenGetter = defaultFlow
 
-	if providers.Enabled(ctx) {
-		idToken, err := providers.Provide(ctx, clientID)
+	// If enabled, try OIDC token providers to get a token. unless the token provider is "interactive" (in which case always do default interactive flow).
+	var provider providers.Interface
+	if cfg.TokenProvider == "" && providers.Enabled(ctx) {
+		// If no token provider is set, look for any available provider to use.
+		provider = defaultFlowProvider{}
+	} else if cfg.TokenProvider != "" && cfg.TokenProvider != "interactive" {
+		fmt.Fprintln(f.out, "using token provider", cfg.TokenProvider)
+
+		// If a token provider is explicitly set always use it, unless it's "interactive",
+		// which means always use the default interactive flow.
+		p, err := providers.ProvideFrom(ctx, cfg.TokenProvider)
+		if err != nil {
+			return nil, fmt.Errorf("error getting token provider %q: %w", cfg.TokenProvider, err)
+		}
+		provider = p
+	}
+	if provider != nil {
+		idToken, err := provider.Provide(ctx, clientID)
 		if err != nil {
 			fmt.Fprintln(f.out, "error getting id token:", err)
+			return nil, fmt.Errorf("error getting id token: %w", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
 	}
@@ -238,4 +255,14 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 		CertPEM:    cert.CertPEM,
 		ChainPEM:   cert.ChainPEM,
 	}, nil
+}
+
+type defaultFlowProvider struct{}
+
+func (defaultFlowProvider) Enabled(ctx context.Context) bool {
+	return providers.Enabled(ctx)
+}
+
+func (defaultFlowProvider) Provide(ctx context.Context, audience string) (string, error) {
+	return providers.Provide(ctx, audience)
 }

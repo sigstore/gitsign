@@ -63,6 +63,10 @@ type Config struct {
 	// See https://github.com/sigstore/sigstore/blob/c645ceb9d075499f3a4b3f183d3a6864640fa956/pkg/oauthflow/flow.go#L49-L53
 	// for more details.
 	ConnectorID string
+	// TokenProviders select a OIDC token provider to use to fetch tokens. If not set, all providers are attempted.
+	// See https://github.com/sigstore/cosign/tree/main/pkg/providers for more details.
+	// Valid values are: [interactive, spiffe, google-workload-identity, google-impersonation, github-actions, filesystem, buildkite-agent]
+	TokenProvider string
 
 	// Timestamp Authority address to use to get a trusted timestamp
 	TimestampURL string
@@ -117,6 +121,7 @@ func Get() (*Config, error) {
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
 		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
 		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
+		out.TokenProvider = envOrValue(fmt.Sprintf("%s_TOKEN_PROVIDER", prefix), out.TokenProvider)
 		out.TimestampURL = envOrValue(fmt.Sprintf("%s_TIMESTAMP_SERVER_URL", prefix), out.TimestampURL)
 		out.TimestampCert = envOrValue(fmt.Sprintf("%s_TIMESTAMP_CERT_CHAIN", prefix), out.TimestampCert)
 	}
@@ -190,6 +195,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.LogPath = v
 		case strings.EqualFold(k, "gitsign.connectorID"):
 			out.ConnectorID = v
+		case strings.EqualFold(k, "gitsign.tokenProvider"):
+			out.TokenProvider = v
 		case strings.EqualFold(k, "gitsign.timestampServerURL"):
 			out.TimestampURL = v
 		case strings.EqualFold(k, "gitsign.timestampCertChain"):
