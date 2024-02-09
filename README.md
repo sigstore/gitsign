@@ -62,18 +62,19 @@ $ git config --local gitsign.fulcio https://fulcio.example.com
 
 The following config options are supported:
 
-| Option             | Default                          | Description                                                                                                                                                                                                                                |
-| ------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| fulcio             | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                   |
-| logPath            |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                              |
-| clientID           | sigstore                         | OIDC client ID for application                                                                                                                                                                                                             |
-| issuer             | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                 |
-| matchCommitter     | false                            | If true, verify that the committer matches certificate user identity. See [docs/committer-verification.md](./docs/committer-verification.md) for more details.                                                                             |
-| redirectURL        |                                  | OIDC Redirect URL                                                                                                                                                                                                                          |
-| rekor              | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                    |
-| connectorID        |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com` |
-| timestampServerURL |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                          |
-| timestampCertChain |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                        |
+| Option             | Default                          | Description                                                                                                                                                                                                                                                                      |
+| ------------------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fulcio             | https://fulcio.sigstore.dev      | Address of Fulcio server                                                                                                                                                                                                                                                         |
+| logPath            |                                  | Path to log status output. Helpful for debugging when no TTY is available in the environment.                                                                                                                                                                                    |
+| clientID           | sigstore                         | OIDC client ID for application                                                                                                                                                                                                                                                   |
+| issuer             | https://oauth2.sigstore.dev/auth | OIDC provider to be used to issue ID token                                                                                                                                                                                                                                       |
+| matchCommitter     | false                            | If true, verify that the committer matches certificate user identity. See [docs/committer-verification.md](./docs/committer-verification.md) for more details.                                                                                                                   |
+| redirectURL        |                                  | OIDC Redirect URL                                                                                                                                                                                                                                                                |
+| rekor              | https://rekor.sigstore.dev       | Address of Rekor server                                                                                                                                                                                                                                                          |
+| connectorID        |                                  | Optional Connector ID to auto-select to pre-select auth flow to use. For the public sigstore instance, valid values are:<br>- `https://github.com/login/oauth`<br>- `https://accounts.google.com`<br>- `https://login.microsoftonline.com`                                       |
+| tokenProvider      |                                  | Optional OIDC token provider to use to fetch tokens. If not set, any available providers are used. valid values are:<br>- `interactive`<br>- `spiffe`<br>- `google-workload-identity`<br>- `google-impersonation`<br>- `github-actions`<br>- `filesystem`<br>- `buildkite-agent` |
+| timestampServerURL |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                                                                |
+| timestampCertChain |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                              |
 
 ### Environment Variables
 
@@ -153,10 +154,10 @@ Validated Certificate claims: true
 
 **NOTE**: `gitsign verify` is preferred over
 [`git verify-commit`](https://git-scm.com/docs/git-verify-commit) and
-[`git verify-tag`](https://git-scm.com/docs/git-verify-tag). The git commands
-do not pass through any expected identity information to the signing tools, so
-they only verify cryptographic integrity and that the data exists on Rekor, but
-not **who** put the data there.
+[`git verify-tag`](https://git-scm.com/docs/git-verify-tag). The git commands do
+not pass through any expected identity information to the signing tools, so they
+only verify cryptographic integrity and that the data exists on Rekor, but not
+**who** put the data there.
 
 Using these commands will still work, but a warning being displayed.
 
@@ -293,7 +294,8 @@ Gitsign stores data in 2 places:
 
    - If `rekorMode = offline`
 
-   Note: offline verification is new, and should be considered experimental for now.
+   Note: offline verification is new, and should be considered experimental for
+   now.
 
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
