@@ -27,9 +27,13 @@ import (
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
 
+type Client interface {
+	GetCert(crypto.Signer) (*api.CertificateResponse, error)
+}
+
 // Client provides a fulcio client with helpful options for configuring OIDC
 // flows.
-type Client struct {
+type ClientImpl struct {
 	api.LegacyClient
 	oidc OIDCOptions
 }
@@ -43,20 +47,20 @@ type OIDCOptions struct {
 	TokenGetter  oauthflow.TokenGetter
 }
 
-func NewClient(fulcioURL string, opts OIDCOptions) (*Client, error) {
+func NewClient(fulcioURL string, opts OIDCOptions) (*ClientImpl, error) {
 	u, err := url.Parse(fulcioURL)
 	if err != nil {
 		return nil, err
 	}
 	client := api.NewClient(u, api.WithUserAgent("gitsign"))
-	return &Client{
+	return &ClientImpl{
 		LegacyClient: client,
 		oidc:         opts,
 	}, nil
 }
 
 // GetCert exchanges the given private key for a Fulcio certificate.
-func (c *Client) GetCert(priv crypto.Signer) (*api.CertificateResponse, error) {
+func (c *ClientImpl) GetCert(priv crypto.Signer) (*api.CertificateResponse, error) {
 	pubBytes, err := x509.MarshalPKIXPublicKey(priv.Public())
 	if err != nil {
 		return nil, err

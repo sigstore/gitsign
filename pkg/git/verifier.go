@@ -23,6 +23,8 @@ import (
 	"time"
 
 	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
+	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
+	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 // Verifier verifies git commit signature data.
@@ -138,4 +140,17 @@ func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool
 	}
 
 	return cert, nil
+}
+
+// NewDefaultVerifier returns a new CertVerifier with the default Fulcio roots loaded from the local TUF client.
+// See https://docs.sigstore.dev/system_config/custom_components/ for how to customize this behavior.
+func NewDefaultVerifier(ctx context.Context) (*CertVerifier, error) {
+	if err := tuf.Initialize(ctx, tuf.DefaultRemoteRoot, nil); err != nil {
+		return nil, err
+	}
+	root, intermediate, err := fulcioroots.New(x509.NewCertPool(), fulcioroots.FromTUF(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return NewCertVerifier(WithRootPool(root), WithIntermediatePool(intermediate))
 }

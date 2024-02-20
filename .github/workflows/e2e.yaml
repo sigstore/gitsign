@@ -3,14 +3,14 @@ name: E2E
 on:
   push:
   pull_request_target:
-    branches: ['main']
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Enable OIDC
+      id-token: write # Enable OIDC
 
       # The rest of these are sanity-check settings, since I'm not sure if the
       # org default is permissive or restricted.
@@ -43,12 +43,14 @@ jobs:
           # for the e2e tests, so insert our own logic here.
           # This is effectively a ternary of the form ${{ <condition> && <true> || <false> }}.
           # See https://docs.github.com/en/actions/learn-github-actions/expressions for more details.
-          ref: ${{ startsWith(github.event_name, 'pull_request') && format('refs/pull/{0}/merge', github.event.number) || github.ref }}
+          ref:
+            ${{ startsWith(github.event_name, 'pull_request') &&
+            format('refs/pull/{0}/merge', github.event.number) || github.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: '1.21'
+          go-version: "1.21"
           check-latest: true
 
       - name: Install Gitsign
@@ -146,3 +148,8 @@ jobs:
       - name: Debug log
         if: failure()
         run: cat "${GITSIGN_LOG}"
+
+      - name: e2e unit tests
+        run: |
+          set -e
+          make e2e-test
