@@ -120,7 +120,7 @@ func TestGetCert(t *testing.T) {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	email := "foo@example.com"
 
-	client := &Client{
+	client := &ClientImpl{
 		// fakeFulcio is what will be doing the validation.
 		LegacyClient: &fakeFulcio{
 			signer: key,

@@ -34,6 +34,7 @@ import (
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/signerverifier"
+	"github.com/sigstore/gitsign/pkg/fulcio"
 	"github.com/sigstore/sigstore/pkg/oauth"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -233,8 +234,8 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 		return nil, fmt.Errorf("generating private key: %w", err)
 	}
 
-	client, err := NewClient(cfg.Fulcio,
-		OIDCOptions{
+	client, err := fulcio.NewClient(cfg.Fulcio,
+		fulcio.OIDCOptions{
 			Issuer:      cfg.Issuer,
 			ClientID:    clientID,
 			RedirectURL: cfg.RedirectURL,
