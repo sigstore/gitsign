@@ -86,8 +86,8 @@ func TestGet(t *testing.T) {
 		RedirectURL:      "example.com",
 		ConnectorID:      "bar",
 		RekorMode:        "online",
-		Autoclose:        false,
-		AutocloseTimeout: 10,
+		Autoclose:        true,
+		AutocloseTimeout: 6,
 	}
 
 	execFn = func() (io.Reader, error) {

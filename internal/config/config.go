@@ -83,7 +83,7 @@ type Config struct {
 	CommitterEmail string
 	MatchCommitter bool
 
-	// Autoclose specifies whether to close window after sucessful authentication
+	// Autoclose specifies whether to close window after successful authentication
 	Autoclose bool
 	// AutocloseTimeout specifies the time to wait before closing the window
 	AutocloseTimeout int
@@ -106,8 +106,8 @@ func Get() (*Config, error) {
 		Issuer:   "https://oauth2.sigstore.dev/auth",
 		// TODO: default to offline
 		RekorMode:        "online",
-		Autoclose:        false,
-		AutocloseTimeout: 10,
+		Autoclose:        true,
+		AutocloseTimeout: 6,
 	}
 
 	// Get values from config file.
@@ -220,8 +220,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			if i, err := strconv.Atoi(v); err == nil && i > 0 {
 				out.AutocloseTimeout = i
 			} else {
-				log.Printf("invalid gitsign.autocloseTimeout value %q, defaulting to 10", v)
-				out.AutocloseTimeout = 10
+				log.Printf("invalid gitsign.autocloseTimeout value %q, defaulting to 6", v)
+				out.AutocloseTimeout = 6
 			}
 		}
 	}
