@@ -75,8 +75,8 @@ The following config options are supported:
 | tokenProvider      |                                  | Optional OIDC token provider to use to fetch tokens. If not set, any available providers are used. valid values are:<br>- `interactive`<br>- `spiffe`<br>- `google-workload-identity`<br>- `google-impersonation`<br>- `github-actions`<br>- `filesystem`<br>- `buildkite-agent` |
 | timestampServerURL |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                                                                |
 | timestampCertChain |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                              |
-| autoclose          |                                  | If true, autoclose the browser window after `autocloseTimeout`. In order for autoclose to work you must also set `connectorID`. |
-| autocloseTimeout   |                                  | If `autoclose` is true, this is how long to wait until the window is closed. |
+| autoclose          |    true                              | If true, autoclose the browser window after `autocloseTimeout`. In order for autoclose to work you must also set `connectorID`. |
+| autocloseTimeout   |   6                               | If `autoclose` is true, this is how long to wait until the window is closed. |
 
 ### Environment Variables
 
