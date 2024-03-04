@@ -53,6 +53,11 @@ jobs:
           go-version: "1.21"
           check-latest: true
 
+      - name: e2e unit tests
+        run: |
+          set -e
+          make e2e-test
+
       - name: Install Gitsign
         run: |
           set -e
@@ -148,8 +153,3 @@ jobs:
       - name: Debug log
         if: failure()
         run: cat "${GITSIGN_LOG}"
-
-      - name: e2e unit tests
-        run: |
-          set -e
-          make e2e-test
