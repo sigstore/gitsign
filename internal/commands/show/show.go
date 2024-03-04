@@ -200,7 +200,7 @@ Prints an in-toto style predicate for the specified revision.
 If no revision is specified, HEAD is used.
 
 This command is experimental, and its CLI surface may change.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			return o.Run(os.Stdout, args)
 		},
 	}
