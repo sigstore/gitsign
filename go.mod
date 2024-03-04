@@ -11,14 +11,13 @@ require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.11.1-0.20240221104814-686a0f7a4928
 	github.com/go-openapi/runtime v0.27.1
-	github.com/go-openapi/strfmt v0.22.0
+	github.com/go-openapi/strfmt v0.22.1
 	github.com/go-openapi/swag v0.22.9
 	github.com/google/go-cmp v0.6.0
 	github.com/in-toto/in-toto-golang v0.9.0
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-tty v0.0.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/psanford/memfs v0.0.0-20230130182539-4dbf7e3e865e
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/cosign/v2 v2.2.3
 	github.com/sigstore/fulcio v1.4.3
@@ -191,7 +190,7 @@ require (
 	github.com/xanzy/go-gitlab v0.96.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zeebo/errs v1.3.0 // indirect
-	go.mongodb.org/mongo-driver v1.13.1 // indirect
+	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	go.opentelemetry.io/otel v1.22.0 // indirect
