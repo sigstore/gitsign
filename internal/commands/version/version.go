@@ -29,7 +29,7 @@ func New(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "print Gitsign version",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			v := version.GetVersionInfo()
 			fmt.Println("gitsign version", v.GitVersion)
 			if len(v.Env) > 0 {

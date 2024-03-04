@@ -67,7 +67,7 @@ gitsign initialize -root <url>
 
 # initialize with an out-of-band root key file and custom repository mirror.
 gitsign initialize -mirror <url> -root <url>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return initialize.DoInitialize(cmd.Context(), o.Root, o.Mirror)
 		},
 	}

@@ -128,7 +128,7 @@ This should generally be used over git verify-commit, since verify will
 check the identity included in the signature's certificate.
 
 If no revision is specified, HEAD is used.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			// Simulate unknown flag errors.
 			if o.Cert != "" {
 				return fmt.Errorf("unknown flag: --certificate")
