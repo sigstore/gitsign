@@ -18,7 +18,6 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/mattn/go-tty v0.0.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/psanford/memfs v0.0.0-20230130182539-4dbf7e3e865e
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/cosign/v2 v2.2.3
 	github.com/sigstore/fulcio v1.4.3
@@ -27,7 +26,7 @@ require (
 	github.com/sigstore/sigstore v1.8.1
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/crypto v0.19.0
+	golang.org/x/crypto v0.20.0
 	golang.org/x/oauth2 v0.17.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
 	google.golang.org/protobuf v1.32.0
