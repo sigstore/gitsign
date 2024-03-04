@@ -28,10 +28,6 @@ jobs:
       security-events: none
       statuses: none
 
-    env:
-      # Output logs to file in case we need to inspect errors.
-      GITSIGN_LOG: "/tmp/gitsign.log"
-
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
