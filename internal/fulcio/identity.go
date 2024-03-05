@@ -197,13 +197,13 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 
 	// Autoclose only works if we don't go through the identity selection page
 	// (otherwise it'll show a countdown timer that doesn't work)
-	autoclose := false
-	if cfg.ConnectorID != "" {
-		autoclose = true
+	if cfg.ConnectorID == "" {
+		cfg.Autoclose = false
 	}
-	html, err := oauth.GetInteractiveSuccessHTML(autoclose, 6)
+	html, err := oauth.GetInteractiveSuccessHTML(cfg.Autoclose, cfg.AutocloseTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("error generating interactive HTML: %w", err)
+		fmt.Println("error getting interactive success html, using static default", err)
+		html = oauth.InteractiveSuccessHTML
 	}
 	defaultFlow := &oauthflow.InteractiveIDTokenGetter{
 		HTMLPage: html,

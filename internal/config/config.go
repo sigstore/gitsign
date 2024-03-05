@@ -19,8 +19,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -80,6 +82,11 @@ type Config struct {
 	CommitterName  string
 	CommitterEmail string
 	MatchCommitter bool
+
+	// Autoclose specifies whether to close window after successful authentication
+	Autoclose bool
+	// AutocloseTimeout specifies the time to wait before closing the window
+	AutocloseTimeout int
 }
 
 // Get fetches the gitsign config options for the repo in the current working
@@ -98,7 +105,9 @@ func Get() (*Config, error) {
 		ClientID: "sigstore",
 		Issuer:   "https://oauth2.sigstore.dev/auth",
 		// TODO: default to offline
-		RekorMode: "online",
+		RekorMode:        "online",
+		Autoclose:        true,
+		AutocloseTimeout: 6,
 	}
 
 	// Get values from config file.
@@ -124,6 +133,8 @@ func Get() (*Config, error) {
 		out.TokenProvider = envOrValue(fmt.Sprintf("%s_TOKEN_PROVIDER", prefix), out.TokenProvider)
 		out.TimestampURL = envOrValue(fmt.Sprintf("%s_TIMESTAMP_SERVER_URL", prefix), out.TimestampURL)
 		out.TimestampCert = envOrValue(fmt.Sprintf("%s_TIMESTAMP_CERT_CHAIN", prefix), out.TimestampCert)
+		out.Autoclose = envOrValue(fmt.Sprintf("%s_AUTOCLOSE", prefix), fmt.Sprintf("%t", out.Autoclose)) == "true"
+		out.AutocloseTimeout, _ = strconv.Atoi(envOrValue(fmt.Sprintf("%s_AUTOCLOSE_TIMEOUT", prefix), fmt.Sprintf("%d", out.AutocloseTimeout)))
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
@@ -203,6 +214,15 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.TimestampCert = v
 		case strings.EqualFold(k, "gitsign.matchCommitter"):
 			out.MatchCommitter = strings.EqualFold(v, "true")
+		case strings.EqualFold(k, "gitsign.autoclose"):
+			out.Autoclose = strings.EqualFold(v, "true")
+		case strings.EqualFold(k, "gitsign.autocloseTimeout"):
+			if i, err := strconv.Atoi(v); err == nil && i > 0 {
+				out.AutocloseTimeout = i
+			} else {
+				log.Printf("invalid gitsign.autocloseTimeout value %q, defaulting to 6", v)
+				out.AutocloseTimeout = 6
+			}
 		}
 	}
 }
