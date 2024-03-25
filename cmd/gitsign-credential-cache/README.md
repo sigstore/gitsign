@@ -73,6 +73,53 @@ After that you can enable and start socket service
 systemctl --user enable --now gitsign-credential-cache.socket
 ```
 
+### Launchd agent
+
+To configure gitsign-credential-cache to run in the background on login in Mac OS, create a launchd config in `~/Library/LaunchAgents/gitsign-credential-cache.plist` with the following content:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>gitsign-credential-cache</string>
+	<key>LimitLoadToSessionType</key>
+	<array>
+		<string>Aqua</string>
+		<string>Background</string>
+		<string>LoginWindow</string>
+		<string>StandardIO</string>
+		<string>System</string>
+	</array>
+	<key>ProgramArguments</key>
+	<array>
+                <string>/opt/homebrew/bin/gitsign-credential-cache</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>/opt/homebrew/var/log/gitsign-credential-cache.log</string>
+	<key>StandardOutPath</key>
+	<string>/opt/homebrew/var/log/gitsign-credential-cache.log</string>
+</dict>
+</plist>
+```
+
+The agent will be automatically enabled on next login. To launch the agent, run:
+
+```sh
+launchctl start gitsign-credential-cache
+```
+
+Configure your shell potining to the cache:
+
+```sh
+export GITSIGN_CREDENTIAL_CACHE="$HOME/Library/Caches/sigstore/gitsign/cache.sock"
+```
+
 ### Forwarding cache over SSH
 
 (Requires gitsign >= v0.5)
