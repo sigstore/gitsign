@@ -78,7 +78,8 @@ kos:
     preserve_import_paths: false
     base_import_paths: false
     sbom: spdx
-    base_image: cgr.dev/chainguard/git:latest
+    # then it have a shell
+    base_image: cgr.dev/chainguard/git:latest-dev
     platforms:
       - linux/amd64
       - linux/arm64
