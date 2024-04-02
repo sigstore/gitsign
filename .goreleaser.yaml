@@ -1,70 +1,88 @@
 project_name: gitsign
 
-builds:
-- id: gitsign
-  mod_timestamp: '{{ .CommitTimestamp }}'
-  env:
-  - CGO_ENABLED=0
-  flags:
-  - -trimpath
-  goos:
-  - linux
-  - darwin
-  - freebsd
-  - windows
-  goarch:
-  - amd64
-  - arm64
-  ldflags:
-  - "-s -w"
-  - "-extldflags=-zrelro"
-  - "-extldflags=-znow"
-  - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
-
-- id: gitsign-credential-cache
-  mod_timestamp: '{{ .CommitTimestamp }}'
-  main: ./cmd/gitsign-credential-cache
-  binary: gitsign-credential-cache
-  env:
-  - CGO_ENABLED=0
-  flags:
-  - -trimpath
-  goos:
-  - linux
-  - darwin
-  - freebsd
-  # - windows # TODO: fix undefined: syscall.Umask for windows builds
-  goarch:
-  - amd64
-  - arm64
-  ldflags:
-  - "-s -w"
-  - "-extldflags=-zrelro"
-  - "-extldflags=-znow"
-  - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
-
-nfpms:
-- id: default
-  package_name: gitsign
-  vendor: Sigstore
-  homepage: https://github.com/sigstore/gitsign
-  maintainer: Billy Lynch <info@sigstore.dev>
-  description: Keyless git commit signing using OIDC identity
-  builds:
-    - gitsign
-    - gitsign-credential-cache
-  formats:
-  - apk
-  - deb
-  - rpm
-
-archives:
-- id: binary
-  format: binary
-  allow_different_binary_count: true
-
 gomod:
   proxy: true
+
+builds:
+  - id: gitsign
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+      - freebsd
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+      - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
+
+  - id: gitsign-credential-cache
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    main: ./cmd/gitsign-credential-cache
+    binary: gitsign-credential-cache
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    goos:
+      - linux
+      - darwin
+      - freebsd
+      # - windows # TODO: fix undefined: syscall.Umask for windows builds
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w"
+      - "-extldflags=-zrelro"
+      - "-extldflags=-znow"
+      - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
+
+nfpms:
+  - id: default
+    package_name: gitsign
+    vendor: Sigstore
+    homepage: https://github.com/sigstore/gitsign
+    maintainer: Billy Lynch <info@sigstore.dev>
+    description: Keyless git commit signing using OIDC identity
+    builds:
+      - gitsign
+      - gitsign-credential-cache
+    formats:
+      - apk
+      - deb
+      - rpm
+
+archives:
+  - id: binary
+    format: binary
+    allow_different_binary_count: true
+
+kos:
+  - id: gitsign
+    repository: github.com/sigstore/gitsign
+    tags:
+      - 'v{{ .Version }}'
+    ldflags:
+      - "-s -w -extldflags=-zrelro -extldflags=-znow -buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
+    main: .
+    bare: true
+    preserve_import_paths: false
+    base_import_paths: false
+    sbom: spdx
+    base_image: cgr.dev/chainguard/git:latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm
 
 checksum:
   name_template: 'checksums.txt'
@@ -73,24 +91,24 @@ source:
   enabled: true
 
 sboms:
-- id: binaries
-  artifacts: binary
-- id: packages
-  artifacts: package
+  - id: binaries
+    artifacts: binary
+  - id: packages
+    artifacts: package
 
 signs:
-- cmd: cosign
-  env:
-  - COSIGN_YES=true
-  certificate: '${artifact}.pem'
-  signature: '${artifact}.sig'
-  args:
-    - sign-blob
-    - '--output-certificate=${certificate}'
-    - '--output-signature=${signature}'
-    - '${artifact}'
-  artifacts: binary
-  output: true
+  - cmd: cosign
+    env:
+      - COSIGN_YES=true
+    certificate: '${artifact}.pem'
+    signature: '${artifact}.sig'
+    args:
+      - sign-blob
+      - '--output-certificate=${certificate}'
+      - '--output-signature=${signature}'
+      - '${artifact}'
+    artifacts: binary
+    output: true
 
 release:
   prerelease: allow

@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write # needed to write releases
   id-token: write # needed for keyless signing
+  packages: write # needed for push images
 
 jobs:
   release:
@@ -23,9 +24,21 @@ jobs:
           go-version: '1.22'
           check-latest: true
 
+      - uses: imjasonh/setup-crane@e82f1b9a8007d399333baba4d75915558e9fb6a4 # v0.2
+
       - uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 # v3.4.0
 
       - uses: anchore/sbom-action/download-syft@ab5d7b5f48981941c4c5d6bf33aeb98fe3bae38c # v0.15.10
+
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> "$GITHUB_ENV"
+
+      - name: Login to GitHub Containers
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: goreleaser/goreleaser-action@7ec5c2b0c6cdda6e8bbb49444bc797dd33d74dd8 # v5.0.0
         with:
@@ -33,3 +46,11 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KO_DOCKER_REPO: ghcr.io/sigstore/gitsign
+
+      - name: sign image
+        run: |
+          digest=$(crane digest ghcr.io/sigstore/gitsign:${{ env.RELEASE_VERSION }})
+          cosign sign "ghcr.io/sigstore/gitsign@${digest}"
+        env:
+          COSIGN_YES: true
