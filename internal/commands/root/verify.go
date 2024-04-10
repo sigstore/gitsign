@@ -39,9 +39,6 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 	if o.FlagSign {
 		return errors.New("specify --help, --sign, or --verify")
 	}
-	if len(o.FlagLocalUser) > 0 {
-		return errors.New("local-user cannot be specified for verification")
-	}
 	if o.FlagDetachedSignature {
 		return errors.New("detach-sign cannot be specified for verification")
 	}
