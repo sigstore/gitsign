@@ -124,9 +124,9 @@ jobs:
         run: |
           set -e
 
-          # Setup staging TUF root - https://github.com/sigstore/public-good-instance/blob/1023ed05b7a8cf28e6a7de73bf98dd5075d97858/playbooks/tuf.md#updating-tuf-metadata-for-staging
+          # Initialize with staging TUF root - https://github.com/sigstore/root-signing-staging
           rm -rf ~/.sigstore
-          wget https://tuf-repo-cdn.sigstage.dev/root.json
+          wget -O root.json -U "gitsign e2e test" https://tuf-repo-cdn.sigstage.dev/4.root.json
           gitsign initialize --mirror=https://tuf-repo-cdn.sigstage.dev --root=root.json
 
           # Sign commit
