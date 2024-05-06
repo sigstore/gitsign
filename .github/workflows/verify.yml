@@ -42,7 +42,7 @@ jobs:
         uses: golangci/golangci-lint-action@38e1018663fa5173f3968ea0777460d3de38f256 # v5.3.0
         timeout-minutes: 5
         with:
-          version: v1.56
+          version: v1.57
 
   generate-docs:
     name: generate-docs
