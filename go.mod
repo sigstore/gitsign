@@ -27,7 +27,7 @@ require (
 	golang.org/x/crypto v0.22.0
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028
-	google.golang.org/protobuf v1.34.0
+	google.golang.org/protobuf v1.34.1
 )
 
 require (
