@@ -245,7 +245,7 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 		return nil, err
 	}
 
-	rekorHost, rekorBasePath := utils.StripUrl(config.Rekor)
+	rekorHost, rekorBasePath := utils.StripURL(config.Rekor)
 	tc := &rekorclient.TransportConfig{
 		Host:     rekorHost,
 		BasePath: rekorBasePath,
