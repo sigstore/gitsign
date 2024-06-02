@@ -60,25 +60,27 @@ type Attestor struct {
 	repo    *git.Repository
 	sv      *sign.SignerVerifier
 	rekorFn rekorUpload
+	config  *gitsignconfig.Config
 }
 
-func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload) *Attestor {
+func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config) *Attestor {
 	return &Attestor{
 		repo:    repo,
 		sv:      sv,
 		rekorFn: rekorFn,
+		config:  config,
 	}
 }
 
 // WriteFile is a convenience wrapper around WriteAttestation that takes in a filepath rather than an io.Reader.
-func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string, config *gitsignconfig.Config) (plumbing.Hash, error) {
+func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string) (plumbing.Hash, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 	defer f.Close()
 
-	return a.WriteAttestation(ctx, refName, sha, f, attType, config)
+	return a.WriteAttestation(ctx, refName, sha, f, attType)
 }
 
 type Reader interface {
@@ -110,7 +112,7 @@ func NewNamedReader(r io.Reader, name string) Reader {
 // sha: Commit SHA you are attesting to.
 // input: Attestation file input.
 // attType: Attestation type. See [attestation.GenerateStatement] for allowed values.
-func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string, config *gitsignconfig.Config) (plumbing.Hash, error) {
+func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string) (plumbing.Hash, error) {
 	b, err := io.ReadAll(input)
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -126,7 +128,7 @@ func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plu
 	// Step 1: Write the files
 
 	// Create the DSSE, sign it, store it.
-	sig, err := a.signPayload(ctx, sha, b, attType, config)
+	sig, err := a.signPayload(ctx, sha, b, attType)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -224,7 +226,7 @@ func encode(store storage.Storer, enc Encoder) (plumbing.Hash, error) {
 	return store.SetEncodedObject(obj)
 }
 
-func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string, config *gitsignconfig.Config) ([]byte, error) {
+func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
 	// Generate attestation
 	sh, err := attestation.GenerateStatement(attestation.GenerateOpts{
 		Predicate: bytes.NewBuffer(b),
@@ -245,7 +247,7 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 		return nil, err
 	}
 
-	rekorHost, rekorBasePath := utils.StripURL(config.Rekor)
+	rekorHost, rekorBasePath := utils.StripURL(a.config.Rekor)
 	tc := &rekorclient.TransportConfig{
 		Host:     rekorHost,
 		BasePath: rekorBasePath,

@@ -84,9 +84,9 @@ func (o *options) Run(ctx context.Context) error {
 	}
 	defer sv.Close()
 
-	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation)
+	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config)
 
-	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType, o.Config)
+	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType)
 	if err != nil {
 		return err
 	}
