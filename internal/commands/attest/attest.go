@@ -79,14 +79,14 @@ func (o *options) Run(ctx context.Context) error {
 		OIDCIssuer:   o.Config.Issuer,
 		OIDCClientID: o.Config.ClientID,
 	})
-	if err != nil {
-		return fmt.Errorf("getting signer: %w", err)
-	}
+	// if err != nil {
+	// 	return fmt.Errorf("getting signer: %w", err)
+	// }
 	defer sv.Close()
 
 	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation)
 
-	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType)
+	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType, o.Config)
 	if err != nil {
 		return err
 	}

@@ -19,6 +19,7 @@ import (
 	"crypto/sha1" // #nosec G505
 	"crypto/x509"
 	"encoding/hex"
+	"net/url"
 )
 
 // certHexFingerprint calculated the hex SHA1 fingerprint of a certificate.
@@ -34,4 +35,10 @@ func certFingerprint(cert *x509.Certificate) []byte {
 
 	fpr := sha1.Sum(cert.Raw) // nolint:gosec
 	return fpr[:]
+}
+
+// StripUrl returns the baseHost with the basePath given a full endpoint
+func StripUrl(endpoint string) (string, string) {
+	u, _ := url.Parse(endpoint)
+	return u.Host, u.Path
 }

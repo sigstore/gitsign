@@ -37,6 +37,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
+	gitsignconfig "github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -72,7 +73,7 @@ func TestAttestCommitRef(t *testing.T) {
 	content := readFile(t, filepath.Join("testdata/", name))
 
 	attestor := NewAttestor(repo, sv, fakeRekor)
-
+	cfg, _ := gitsignconfig.Get()
 	fc := []fileContent{
 		{
 			Name:    filepath.Join(sha.String(), "test.json"),
@@ -84,7 +85,7 @@ func TestAttestCommitRef(t *testing.T) {
 		},
 	}
 	t.Run("base", func(t *testing.T) {
-		attest1, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest1, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -93,7 +94,7 @@ func TestAttestCommitRef(t *testing.T) {
 
 	t.Run("noop", func(t *testing.T) {
 		// Write same attestation to the same commit - should be a no-op.
-		attest2, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest2, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -111,7 +112,7 @@ func TestAttestCommitRef(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		attest3, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -151,6 +152,8 @@ func TestAttestTreeRef(t *testing.T) {
 
 	attestor := NewAttestor(repo, sv, fakeRekor)
 
+	cfg, _ := gitsignconfig.Get()
+
 	fc := []fileContent{
 		{
 			Name:    filepath.Join(sha.String(), "test.json"),
@@ -162,7 +165,7 @@ func TestAttestTreeRef(t *testing.T) {
 		},
 	}
 	t.Run("base", func(t *testing.T) {
-		attest1, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest1, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -171,7 +174,7 @@ func TestAttestTreeRef(t *testing.T) {
 
 	t.Run("noop", func(t *testing.T) {
 		// Write same attestation to the same commit - should be a no-op.
-		attest2, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest2, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -189,7 +192,7 @@ func TestAttestTreeRef(t *testing.T) {
 		}
 		sha = resolveTree(t, repo, sha)
 
-		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -200,7 +203,7 @@ func TestAttestTreeRef(t *testing.T) {
 		// Make a new commit, write new attestation.
 		sha = resolveTree(t, repo, writeRepo(t, w, fs, "testdata/bar.txt"))
 
-		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom", cfg)
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}

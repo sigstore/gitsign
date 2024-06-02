@@ -26,15 +26,18 @@ import (
 	"sort"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage"
+	"github.com/go-openapi/strfmt"
 	"github.com/jonboulle/clockwork"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
 	"github.com/sigstore/cosign/v2/pkg/cosign/attestation"
 	"github.com/sigstore/cosign/v2/pkg/types"
+	utils "github.com/sigstore/gitsign/internal"
+	gitsignconfig "github.com/sigstore/gitsign/internal/config"
 	rekorclient "github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	dssesig "github.com/sigstore/sigstore/pkg/signature/dsse"
@@ -68,14 +71,14 @@ func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpl
 }
 
 // WriteFile is a convenience wrapper around WriteAttestation that takes in a filepath rather than an io.Reader.
-func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string) (plumbing.Hash, error) {
+func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string, config *gitsignconfig.Config) (plumbing.Hash, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 	defer f.Close()
 
-	return a.WriteAttestation(ctx, refName, sha, f, attType)
+	return a.WriteAttestation(ctx, refName, sha, f, attType, config)
 }
 
 type Reader interface {
@@ -107,7 +110,7 @@ func NewNamedReader(r io.Reader, name string) Reader {
 // sha: Commit SHA you are attesting to.
 // input: Attestation file input.
 // attType: Attestation type. See [attestation.GenerateStatement] for allowed values.
-func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string) (plumbing.Hash, error) {
+func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string, config *gitsignconfig.Config) (plumbing.Hash, error) {
 	b, err := io.ReadAll(input)
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -123,7 +126,7 @@ func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plu
 	// Step 1: Write the files
 
 	// Create the DSSE, sign it, store it.
-	sig, err := a.signPayload(ctx, sha, b, attType)
+	sig, err := a.signPayload(ctx, sha, b, attType, config)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -175,7 +178,7 @@ func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plu
 	// Step 3: Make the commit
 
 	// Grab the user from the repository config so we know who to attribute the commit to.
-	cfg, err := a.repo.ConfigScoped(config.GlobalScope)
+	cfg, err := a.repo.ConfigScoped(gitconfig.GlobalScope)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -221,7 +224,7 @@ func encode(store storage.Storer, enc Encoder) (plumbing.Hash, error) {
 	return store.SetEncodedObject(obj)
 }
 
-func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
+func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string, config *gitsignconfig.Config) ([]byte, error) {
 	// Generate attestation
 	sh, err := attestation.GenerateStatement(attestation.GenerateOpts{
 		Predicate: bytes.NewBuffer(b),
@@ -242,8 +245,15 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 		return nil, err
 	}
 
+	rekorHost, rekorBasePath := utils.StripUrl(config.Rekor)
+	tc := &rekorclient.TransportConfig{
+		Host:     rekorHost,
+		BasePath: rekorBasePath,
+	}
+	rcfg := rekorclient.NewHTTPClientWithConfig(strfmt.Default, tc)
+
 	// Upload to rekor
-	entry, err := a.rekorFn(ctx, rekorclient.Default, envelope, a.sv.Cert)
+	entry, err := a.rekorFn(ctx, rcfg, envelope, a.sv.Cert)
 	if err != nil {
 		return nil, err
 	}
