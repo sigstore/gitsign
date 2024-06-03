@@ -300,8 +300,8 @@ github.com/go-openapi/validate v0.24.0 h1:LdfDKwNbpB6Vn40xhTdNZAnfLECL81w+VX3Bum
 github.com/go-openapi/validate v0.24.0/go.mod h1:iyeX1sEufmv3nPbBdX3ieNviWnOZaJ1+zquzJEf2BAQ=
 github.com/go-piv/piv-go v1.11.0 h1:5vAaCdRTFSIW4PeqMbnsDlUZ7odMYWnHBDGdmtU/Zhg=
 github.com/go-piv/piv-go v1.11.0/go.mod h1:NZ2zmjVkfFaL/CF8cVQ/pXdXtuj110zEKGdJM6fJZZM=
-github.com/go-rod/rod v0.114.7 h1:h4pimzSOUnw7Eo41zdJA788XsawzHjJMyzCE3BrBww0=
-github.com/go-rod/rod v0.114.7/go.mod h1:aiedSEFg5DwG/fnNbUOTPMTTWX3MRj6vIs/a684Mthw=
+github.com/go-rod/rod v0.116.0 h1:ypRryjTys3EnqHskJ/TdgodFMvXV0EHvmy4bSkKZgHM=
+github.com/go-rod/rod v0.116.0/go.mod h1:aiedSEFg5DwG/fnNbUOTPMTTWX3MRj6vIs/a684Mthw=
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 h1:tfuBGBXKqDEevZMzYi5KSi8KkcZtzBcTgAUUtapy0OI=
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572/go.mod h1:9Pwr4B2jHnOSGXyyzV8ROjYa2ojvAY6HCGYYfMoC3Ls=
@@ -586,8 +586,8 @@ github.com/sigstore/protobuf-specs v0.3.2 h1:nCVARCN+fHjlNCk3ThNXwrZRqIommIeNKWw
 github.com/sigstore/protobuf-specs v0.3.2/go.mod h1:RZ0uOdJR4OB3tLQeAyWoJFbNCBFrPQdcokntde4zRBA=
 github.com/sigstore/rekor v1.3.6 h1:QvpMMJVWAp69a3CHzdrLelqEqpTM3ByQRt5B5Kspbi8=
 github.com/sigstore/rekor v1.3.6/go.mod h1:JDTSNNMdQ/PxdsS49DJkJ+pRJCO/83nbR5p3aZQteXc=
-github.com/sigstore/sigstore v1.8.3 h1:G7LVXqL+ekgYtYdksBks9B38dPoIsbscjQJX/MGWkA4=
-github.com/sigstore/sigstore v1.8.3/go.mod h1:mqbTEariiGA94cn6G3xnDiV6BD8eSLdL/eA7bvJ0fVs=
+github.com/sigstore/sigstore v1.8.4 h1:g4ICNpiENFnWxjmBzBDWUn62rNFeny/P77HUC8da32w=
+github.com/sigstore/sigstore v1.8.4/go.mod h1:1jIKtkTFEeISen7en+ZPWdDHazqhxco/+v9CNjc7oNg=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.3 h1:LTfPadUAo+PDRUbbdqbeSl2OuoFQwUFTnJ4stu+nwWw=
 github.com/sigstore/sigstore/pkg/signature/kms/aws v1.8.3/go.mod h1:QV/Lxlxm0POyhfyBtIbTWxNeF18clMlkkyL9mu45y18=
 github.com/sigstore/sigstore/pkg/signature/kms/azure v1.8.3 h1:xgbPRCr2npmmsuVVteJqi/ERw9+I13Wou7kq0Yk4D8g=
