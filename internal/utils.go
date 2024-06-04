@@ -39,6 +39,9 @@ func certFingerprint(cert *x509.Certificate) []byte {
 
 // StripURL returns the baseHost with the basePath given a full endpoint
 func StripURL(endpoint string) (string, string) {
-	u, _ := url.Parse(endpoint)
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", ""
+	}
 	return u.Host, u.Path
 }

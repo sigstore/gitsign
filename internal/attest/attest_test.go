@@ -72,7 +72,10 @@ func TestAttestCommitRef(t *testing.T) {
 	name := "test.json"
 	content := readFile(t, filepath.Join("testdata/", name))
 
-	cfg, _ := gitsignconfig.Get()
+	cfg, err := gitsignconfig.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
 
