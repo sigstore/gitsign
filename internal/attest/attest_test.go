@@ -37,6 +37,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
+	gitsignconfig "github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -71,7 +72,12 @@ func TestAttestCommitRef(t *testing.T) {
 	name := "test.json"
 	content := readFile(t, filepath.Join("testdata/", name))
 
-	attestor := NewAttestor(repo, sv, fakeRekor)
+	cfg, err := gitsignconfig.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
 
 	fc := []fileContent{
 		{
@@ -149,7 +155,9 @@ func TestAttestTreeRef(t *testing.T) {
 	name := "test.json"
 	content := readFile(t, filepath.Join("testdata", name))
 
-	attestor := NewAttestor(repo, sv, fakeRekor)
+	cfg, _ := gitsignconfig.Get()
+
+	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
 
 	fc := []fileContent{
 		{

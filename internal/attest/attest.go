@@ -26,15 +26,18 @@ import (
 	"sort"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage"
+	"github.com/go-openapi/strfmt"
 	"github.com/jonboulle/clockwork"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
 	"github.com/sigstore/cosign/v2/pkg/cosign/attestation"
 	"github.com/sigstore/cosign/v2/pkg/types"
+	utils "github.com/sigstore/gitsign/internal"
+	gitsignconfig "github.com/sigstore/gitsign/internal/config"
 	rekorclient "github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	dssesig "github.com/sigstore/sigstore/pkg/signature/dsse"
@@ -57,13 +60,15 @@ type Attestor struct {
 	repo    *git.Repository
 	sv      *sign.SignerVerifier
 	rekorFn rekorUpload
+	config  *gitsignconfig.Config
 }
 
-func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload) *Attestor {
+func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config) *Attestor {
 	return &Attestor{
 		repo:    repo,
 		sv:      sv,
 		rekorFn: rekorFn,
+		config:  config,
 	}
 }
 
@@ -175,7 +180,7 @@ func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plu
 	// Step 3: Make the commit
 
 	// Grab the user from the repository config so we know who to attribute the commit to.
-	cfg, err := a.repo.ConfigScoped(config.GlobalScope)
+	cfg, err := a.repo.ConfigScoped(gitconfig.GlobalScope)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -242,8 +247,15 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 		return nil, err
 	}
 
+	rekorHost, rekorBasePath := utils.StripURL(a.config.Rekor)
+	tc := &rekorclient.TransportConfig{
+		Host:     rekorHost,
+		BasePath: rekorBasePath,
+	}
+	rcfg := rekorclient.NewHTTPClientWithConfig(strfmt.Default, tc)
+
 	// Upload to rekor
-	entry, err := a.rekorFn(ctx, rekorclient.Default, envelope, a.sv.Cert)
+	entry, err := a.rekorFn(ctx, rcfg, envelope, a.sv.Cert)
 	if err != nil {
 		return nil, err
 	}
