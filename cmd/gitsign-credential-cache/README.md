@@ -110,3 +110,115 @@ also updated to match).
   the socket forwarding will fail if a file already exists on the remote path
   (see [thread](https://marc.info/?l=openssh-unix-dev&m=151998074424424&w=2) for
   more discussion).
+
+
+## Running it as a launchctl service on macOS
+
+If you are a macOS user, you can run `gitsign-credential-cache` as a launchctl service by running the following commands in your terminal:
+
+```sh
+cat <<EOF > /tmp/gitsign-credential-cache.sh
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v gitsign &> /dev/null; then
+    echo "gitsign command not found. Please install it before running this script: https://docs.sigstore.dev/signing/gitsign/"
+    exit 1
+fi
+
+if ! command -v gitsign-credential-cache &> /dev/null; then
+    echo "gitsign-credential-cache command not found. Please install it before running this script: 'go install github.com/sigstore/gitsign/cmd/gitsign-credential-cache@latest'"
+    exit 1
+fi
+
+launch_agents_dir="${HOME}/Library/LaunchAgents"
+plist_name="my.gitsign-credential-cache.plist"
+plist_path="${launch_agents_dir}/${plist_name}"
+gitsign_cache_dir="${HOME}/Library/Caches/sigstore/gitsign"
+gitsign_cache_path="${gitsign_cache_dir}/cache.sock"
+
+if [ -f "${plist_path}" ]; then
+    echo "The plist file ${plist_path} already exists. Please remove it or use a different name."
+    exit 1
+fi
+
+if [ -f "${gitsign_cache_path}" ]; then
+    echo "The gitsign cache path ${gitsign_cache_path} already exists. Please remove it or use a different name."
+    exit 1
+fi
+
+mkdir -pv "${launch_agents_dir}"
+
+# https://github.com/sigstore/gitsign/blob/main/cmd/gitsign-credential-cache/README.md
+cat << EOF > "${plist_path}"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>KeepAlive</key>
+    <true/>
+    <key>Label</key>
+    <string>my.gitsign-credential-cache</string>
+    <key>ProgramArguments</key>
+    <array>
+            <string>/opt/homebrew/bin/gitsign-credential-cache</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardErrorPath</key>
+    <string>/opt/homebrew/var/log/gitsign-credential-cache.log</string>
+    <key>StandardOutPath</key>
+    <string>/opt/homebrew/var/log/gitsign-credential-cache.log</string>
+</dict>
+</plist>
+EOF
+
+chmod 644 "${plist_path}"
+chown $(whoami) "${plist_path}"
+
+echo "Created plist file: ${plist_path}"
+
+launchctl load -wF "${plist_path}"
+plutil -lint "${plist_path}"
+
+if [ ! -d "${gitsign_cache_dir}" ]; then
+    echo "The gitsign cache directory ${gitsign_cache_dir} does not exist. Creating it now."
+    mkdir -pv "${gitsign_cache_dir}"
+fi
+
+export GITSIGN_CREDENTIAL_CACHE="${gitsign_cache_path}"
+
+if [ -f "${HOME}/.zshrc" ]; then
+    shell_config_file="${HOME}/.zshrc"
+elif [ -f "${HOME}/.bashrc" ]; then
+    shell_config_file="${HOME}/.bashrc"
+else
+    echo "No .bashrc or .zshrc found in your home directory."
+    exit 1
+fi
+
+export_line="export GITSIGN_CREDENTIAL_CACHE=\"${gitsign_cache_path}\""
+if ! grep -qF -- "${export_line}" "${shell_config_file}"; then
+    echo "${export_line}" >> "${shell_config_file}"
+    echo "Added GITSIGN_CREDENTIAL_CACHE to ${shell_config_file}. Please restart your shell to apply the changes: 'source ${shell_config_file}'"
+else
+    echo "GITSIGN_CREDENTIAL_CACHE already exists in ${shell_config_file}!"
+fi
+EOF
+chmod +x /tmp/gitsign-credential-cache.sh
+echo "Running the script to create the launchctl service..."
+/tmp/gitsign-credential-cache.sh
+```
+
+Once you did that now you should be able to see the `gitsign-credential-cache` service running by running the following command:
+
+```sh
+$ launchctl list | grep -i "my.gitsign"
+2398    0       my.gitsign-credential-cache
+```
+
+and of course if you would like to tail the logs of your service you can do so by running the following command:
+
+```sh
+tail -f /opt/homebrew/var/log/gitsign-credential-cache.log
+```
