@@ -48,9 +48,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KO_DOCKER_REPO: ghcr.io/sigstore/gitsign
 
-      - name: sign image
+      - name: get the digest
+        id: digest
         run: |
           digest=$(crane digest ghcr.io/sigstore/gitsign:${{ env.RELEASE_VERSION }})
-          cosign sign "ghcr.io/sigstore/gitsign@${digest}"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: sign image
+        run: |
+          cosign sign "ghcr.io/sigstore/gitsign@${{ steps.digest.outputs.digest }}"
         env:
           COSIGN_YES: true
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@173725a1209d09b31f9d30a3890cf2757ebbff0d # v1.1.2
+        with:
+          subject-name: ghcr.io/sigstore/gitsign
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
