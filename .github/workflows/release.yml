@@ -61,7 +61,7 @@ jobs:
           COSIGN_YES: true
 
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@534b352d658f90498fd148d231fdbf88f3886a3a # v1.3.1
+        uses: actions/attest-build-provenance@bdd51370e0416ac948727f861e03c2f05d32d78e # v1.3.2
         with:
           subject-name: ghcr.io/sigstore/gitsign
           subject-digest: ${{ steps.digest.outputs.digest }}
