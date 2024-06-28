@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type RekorVerificationMode int
@@ -57,6 +58,9 @@ type Config struct {
 
 	// OIDC client ID for application
 	ClientID string
+	// File containing the OIDC Client Secret
+	clientSecretFile string
+
 	// OIDC Redirect URL
 	RedirectURL string
 	// OIDC provider to be used to issue ID token
@@ -87,6 +91,23 @@ type Config struct {
 	Autoclose bool
 	// AutocloseTimeout specifies the time to wait before closing the window
 	AutocloseTimeout int
+}
+
+// CLientSecret retrieves the OIDC client secret from the file provided
+func (o *Config) ClientSecret() (string, error) {
+	if o.clientSecretFile != "" {
+		clientSecretBytes, err := os.ReadFile(o.clientSecretFile)
+		if err != nil {
+			return "", fmt.Errorf("reading OIDC client secret: %w", err)
+		}
+		if !utf8.Valid(clientSecretBytes) {
+			return "", fmt.Errorf("OIDC client secret in file %s not valid utf8", o.clientSecretFile)
+		}
+		clientSecretString := string(clientSecretBytes)
+		clientSecretString = strings.TrimSpace(clientSecretString)
+		return clientSecretString, nil
+	}
+	return "", nil
 }
 
 // Get fetches the gitsign config options for the repo in the current working
@@ -127,6 +148,7 @@ func Get() (*Config, error) {
 		out.FulcioRoot = envOrValue(fmt.Sprintf("%s_FULCIO_ROOT", prefix), out.FulcioRoot)
 		out.Rekor = envOrValue(fmt.Sprintf("%s_REKOR_URL", prefix), out.Rekor)
 		out.ClientID = envOrValue(fmt.Sprintf("%s_OIDC_CLIENT_ID", prefix), out.ClientID)
+		out.clientSecretFile = envOrValue(fmt.Sprintf("%s_OIDC_CLIENT_SECRET_FILE", prefix), out.clientSecretFile)
 		out.RedirectURL = envOrValue(fmt.Sprintf("%s_OIDC_REDIRECT_URL", prefix), out.RedirectURL)
 		out.Issuer = envOrValue(fmt.Sprintf("%s_OIDC_ISSUER", prefix), out.Issuer)
 		out.ConnectorID = envOrValue(fmt.Sprintf("%s_CONNECTOR_ID", prefix), out.ConnectorID)
@@ -198,6 +220,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.RekorMode = v
 		case strings.EqualFold(k, "gitsign.clientID"):
 			out.ClientID = v
+		case strings.EqualFold(k, "gitsign.clientSecretFile"):
+			out.clientSecretFile = v
 		case strings.EqualFold(k, "gitsign.redirectURL"):
 			out.RedirectURL = v
 		case strings.EqualFold(k, "gitsign.issuer"):
