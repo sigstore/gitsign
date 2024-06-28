@@ -195,6 +195,12 @@ func NewIdentityFactory(in io.Reader, out io.Writer) *IdentityFactory {
 func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (*Identity, error) {
 	clientID := cfg.ClientID
 
+	clientSecret, err := cfg.ClientSecret()
+
+	if err != nil {
+		return nil, err
+	}
+
 	// Autoclose only works if we don't go through the identity selection page
 	// (otherwise it'll show a countdown timer that doesn't work)
 	if cfg.ConnectorID == "" {
@@ -247,10 +253,11 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 
 	client, err := fulcio.NewClient(cfg.Fulcio,
 		fulcio.OIDCOptions{
-			Issuer:      cfg.Issuer,
-			ClientID:    clientID,
-			RedirectURL: cfg.RedirectURL,
-			TokenGetter: authFlow,
+			Issuer:       cfg.Issuer,
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+			RedirectURL:  cfg.RedirectURL,
+			TokenGetter:  authFlow,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("error creating Fulcio client: %w", err)
