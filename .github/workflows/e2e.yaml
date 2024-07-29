@@ -2,16 +2,13 @@ name: E2E
 
 on:
   push:
-  pull_request_target:
-    branches: ["main"]
+  pull_request:
   workflow_dispatch:
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Enable OIDC
-
       # The rest of these are sanity-check settings, since I'm not sure if the
       # org default is permissive or restricted.
       # See https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
@@ -20,6 +17,7 @@ jobs:
       checks: none
       contents: read
       deployments: none
+      id-token: none
       issues: none
       packages: none
       pages: none
@@ -30,24 +28,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          # Use the merge commit if type is pull_request/pull_request_target,
-          # else use the default ref.
-          # By default pull_request_target will use the base branch as the
-          # target since it was originally intended for trusted workloads.
-          # However, we need to use this to have access to the OIDC creds
-          # for the e2e tests, so insert our own logic here.
-          # This is effectively a ternary of the form ${{ <condition> && <true> || <false> }}.
-          # See https://docs.github.com/en/actions/learn-github-actions/expressions for more details.
-          ref:
-            ${{ startsWith(github.event_name, 'pull_request') &&
-            format('refs/pull/{0}/merge', github.event.number) || github.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
         with:
           go-version: "1.22"
           check-latest: true
+
+      - name: Get test OIDC token
+        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@main
+
+      - name: export OIDC token
+        run: |
+          echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
 
       - name: e2e unit tests
         run: |
@@ -87,10 +80,9 @@ jobs:
 
           echo "========== gitsign verify =========="
           gitsign verify \
-            --certificate-github-workflow-repository=${{ github.repository }} \
-            --certificate-github-workflow-sha=${{ github.sha }} \
+            --certificate-github-workflow-repository="sigstore-conformance/extremely-dangerous-public-oidc-beacon" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
+            --certificate-identity="https://github.com/sigstore-conformance/extremely-dangerous-public-oidc-beacon/.github/workflows/extremely-dangerous-oidc-beacon.yml@refs/heads/main"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
@@ -109,39 +101,9 @@ jobs:
 
           echo "========== gitsign verify =========="
           gitsign verify \
-            --certificate-github-workflow-repository=${{ github.repository }} \
-            --certificate-github-workflow-sha=${{ github.sha }} \
+            --certificate-github-workflow-repository="sigstore-conformance/extremely-dangerous-public-oidc-beacon" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
-
-          # Extra debug info
-          git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
-      - name: Test Sign and Verify commit - staging
-        env:
-          GITSIGN_OIDC_ISSUER: "https://oauth2.sigstage.dev/auth"
-          GITSIGN_FULCIO_URL: "https://fulcio.sigstage.dev"
-          GITSIGN_REKOR_URL: "https://rekor.sigstage.dev"
-        run: |
-          set -e
-
-          # Initialize with staging TUF root - https://github.com/sigstore/root-signing-staging
-          rm -rf ~/.sigstore
-          wget -O root.json -U "gitsign e2e test" https://tuf-repo-cdn.sigstage.dev/4.root.json
-          gitsign initialize --mirror=https://tuf-repo-cdn.sigstage.dev --root=root.json
-
-          # Sign commit
-          git commit --allow-empty -S --message="Signed commit"
-
-          # Verify commit
-          echo "========== git verify-commit =========="
-          git verify-commit HEAD
-
-          echo "========== gitsign verify =========="
-          gitsign verify \
-            --certificate-github-workflow-repository=${{ github.repository }} \
-            --certificate-github-workflow-sha=${{ github.sha }} \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            --certificate-identity="https://github.com/${{ github.workflow_ref }}"
+            --certificate-identity="https://github.com/sigstore-conformance/extremely-dangerous-public-oidc-beacon/.github/workflows/extremely-dangerous-oidc-beacon.yml@refs/heads/main"
 
           # Extra debug info
           git cat-file commit HEAD | sed -n '/-BEGIN/, /-END/p' | sed 's/^ //g' | sed 's/gpgsig //g' | sed 's/SIGNED MESSAGE/PKCS7/g' | openssl pkcs7 -print -print_certs -text
