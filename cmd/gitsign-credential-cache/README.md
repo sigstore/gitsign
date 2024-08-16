@@ -192,18 +192,29 @@ if [ -f "${HOME}/.zshrc" ]; then
     shell_config_file="${HOME}/.zshrc"
 elif [ -f "${HOME}/.bashrc" ]; then
     shell_config_file="${HOME}/.bashrc"
+elif [ -f "${HOME}/.config/fish/config.fish" ]; then
+    if [ ! -f "${HOME}/.config/fish/conf.d/gitsign-credential-cache.fish" ]; then
+        echo "set -x GITSIGN_CREDENTIAL_CACHE \"${gitsign_cache_path}\"" > "${HOME}/.config/fish/conf.d/gitsign-credential-cache.fish"
+        echo "Added GITSIGN_CREDENTIAL_CACHE to ${HOME}/.config/fish/conf.d/gitsign-credential-cache.fish. Please restart your shell to apply the changes."
+    else
+        echo "GITSIGN_CREDENTIAL_CACHE already exists in ${HOME}/.config/fish/conf.d/gitsign-credential-cache.fish!"
+    fi
+    shell_config_file=""
 else
     echo "No .bashrc or .zshrc found in your home directory."
     exit 1
 fi
 
-export_line="export GITSIGN_CREDENTIAL_CACHE=\"${gitsign_cache_path}\""
-if ! grep -qF -- "${export_line}" "${shell_config_file}"; then
-    echo "${export_line}" >> "${shell_config_file}"
-    echo "Added GITSIGN_CREDENTIAL_CACHE to ${shell_config_file}. Please restart your shell to apply the changes: 'source ${shell_config_file}'"
-else
-    echo "GITSIGN_CREDENTIAL_CACHE already exists in ${shell_config_file}!"
+if [ ! -z "${shell_config_file}" ]; then
+    export_line="export GITSIGN_CREDENTIAL_CACHE=\"${gitsign_cache_path}\""
+    if ! grep -qF -- "${export_line}" "${shell_config_file}"; then
+        echo "${export_line}" >> "${shell_config_file}"
+        echo "Added GITSIGN_CREDENTIAL_CACHE to ${shell_config_file}. Please restart your shell to apply the changes: 'source ${shell_config_file}'"
+    else
+        echo "GITSIGN_CREDENTIAL_CACHE already exists in ${shell_config_file}!"
+    fi
 fi
+
 EOF
 chmod +x /tmp/gitsign-credential-cache.sh
 echo "Running the script to create the launchctl service..."
