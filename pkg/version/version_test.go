@@ -17,6 +17,7 @@ package version
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,6 +31,15 @@ func TestVersionText(t *testing.T) {
 }
 
 func TestEnv(t *testing.T) {
+	for _, envVar := range os.Environ() {
+		for _, prefix := range envVarPrefixes {
+			if strings.HasPrefix(envVar, prefix) {
+				t.Setenv(strings.Split(envVar, "=")[0], "") // t.Setenv restores value during cleanup
+				break
+			}
+		}
+	}
+
 	os.Setenv("GITSIGN_CONNECTOR_ID", "foobar")
 	os.Setenv("GITSIGN_TEST", "foo")
 	os.Setenv("TUF_ROOT", "bar")
@@ -40,6 +50,14 @@ func TestEnv(t *testing.T) {
 		"TUF_ROOT=bar",
 	}
 
+	if diff := cmp.Diff(got.Env, want); diff != "" {
+		t.Error(diff)
+	}
+
+	// want doesn't change because the variable is set to nothing and must be
+	// ignored
+	os.Setenv("SIGSTORE_ROOT_FILE", "")
+	got = GetVersionInfo()
 	if diff := cmp.Diff(got.Env, want); diff != "" {
 		t.Error(diff)
 	}
