@@ -3,9 +3,11 @@ package cms
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/asn1"
 	"errors"
 
 	"github.com/github/smimesign/ietf-cms/protocol"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 // Verify verifies the SingerInfos' signatures. Each signature's associated
@@ -118,6 +120,23 @@ func (sd *SignedData) verify(econtent []byte, opts x509.VerifyOptions, tsOpts x5
 		cert, err := si.FindCertificate(certs)
 		if err != nil {
 			return nil, err
+		}
+
+		// Handle certificates where the Subject Alternative Name is not set to
+		// a supported GeneralName (RFC 5280 4.2.1.6). Go only supports DNS, IP
+		// addresses, email addresses, or URIs as SANs. Fulcio can issue a
+		// certificate with an OtherName GeneralName, so remove the unhandled
+		// critical SAN extension before verifying.
+		// This matches https://github.com/sigstore/cosign/blob/a0752eb40b500316ac417baf4926a2c2d99b39b8/pkg/cosign/verify.go#L236-L248
+		if len(cert.UnhandledCriticalExtensions) > 0 {
+			var unhandledExts []asn1.ObjectIdentifier
+			for _, oid := range cert.UnhandledCriticalExtensions {
+				if !oid.Equal(cryptoutils.SANOID) {
+					unhandledExts = append(unhandledExts, oid)
+				}
+			}
+
+			cert.UnhandledCriticalExtensions = unhandledExts
 		}
 
 		algo := si.X509SignatureAlgorithm()
