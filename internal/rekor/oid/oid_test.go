@@ -51,7 +51,7 @@ func TestOID(t *testing.T) {
 	}
 
 	if diff := cmp.Diff(tlog, got); diff != "" {
-		t.Errorf(diff)
+		t.Error(diff)
 	}
 }
 
