@@ -36,7 +36,7 @@ builds:
       - linux
       - darwin
       - freebsd
-      # - windows # TODO: fix undefined: syscall.Umask for windows builds
+      - windows
     goarch:
       - amd64
       - arm64
