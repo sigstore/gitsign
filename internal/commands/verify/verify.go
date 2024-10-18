@@ -148,6 +148,9 @@ If no revision is specified, HEAD is used.`,
 	// --certificate-chain: We only support reading from a TUF root at the moment.
 	// TODO: add support for this.
 	_ = cmd.Flags().MarkHidden("certificate-chain")
+	// --ca-intermediates and --ca-roots
+	_ = cmd.Flags().MarkHidden("ca-intermediates")
+	_ = cmd.Flags().MarkHidden("ca-roots")
 
 	return cmd
 }
