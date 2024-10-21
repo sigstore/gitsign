@@ -21,7 +21,6 @@ import (
 	"net/rpc"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/coreos/go-systemd/v22/activation"
 	"github.com/spf13/pflag"
@@ -38,9 +37,6 @@ var (
 
 func main() {
 	pflag.Parse()
-	// Override default umask so created files are always scoped to the
-	// current user.
-	syscall.Umask(0077)
 
 	if *versionFlag {
 		v := version.GetVersionInfo()
@@ -93,6 +89,16 @@ func main() {
 		if err != nil {
 			log.Fatalf("error opening socket: %v", err)
 		}
+
+		// Previously, we used syscall.Umask(0077) to ensure this was
+		// permissioned only to the current user. Windows doesn't have this
+		// syscall, so we're switching over to an explicit Chmod on the socket
+		// path.
+		// Also see https://github.com/golang/go/issues/11822
+		if err := os.Chmod(path, 0700); err != nil {
+			log.Fatalf("error setting socket permissions: %v", err)
+		}
+
 		go connToChan(l, connChan)
 	}
 	srv := rpc.NewServer()
