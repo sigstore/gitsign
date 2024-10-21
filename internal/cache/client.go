@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"encoding/asn1"
 	"fmt"
 	"net/rpc"
 	"os"
@@ -59,6 +60,17 @@ func (c *Client) GetCredentials(_ context.Context, cfg *config.Config) (crypto.P
 	}
 	// There should really only be 1 cert, but check them all anyway.
 	for _, cert := range certs {
+		if len(cert.UnhandledCriticalExtensions) > 0 {
+			var unhandledExts []asn1.ObjectIdentifier
+			for _, oid := range cert.UnhandledCriticalExtensions {
+				if !oid.Equal(cryptoutils.SANOID) {
+					unhandledExts = append(unhandledExts, oid)
+				}
+			}
+
+			cert.UnhandledCriticalExtensions = unhandledExts
+		}
+
 		if _, err := cert.Verify(x509.VerifyOptions{
 			Roots:         c.Roots,
 			Intermediates: c.Intermediates,
