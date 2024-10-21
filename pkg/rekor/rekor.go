@@ -25,7 +25,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
@@ -110,12 +109,16 @@ func (c *Client) WriteMessage(ctx context.Context, message, signature []byte, ce
 }
 
 func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	h := sha256.New()
+	h.Write(data)
+	hash := hex.EncodeToString(h.Sum(nil))
+
 	pem, err := cryptoutils.MarshalCertificateToPEM(cert)
 	if err != nil {
 		return nil, err
 	}
 
-	uuids, err := c.findTLogEntriesByPayloadAndPK(ctx, data, pem)
+	uuids, err := c.findTLogEntriesByPK(ctx, pem)
 	if err != nil {
 		return nil, err
 	}
@@ -132,13 +135,20 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 			return nil, err
 		}
 
-		// Verify that the cert used in the tlog matches the cert
-		// used to sign the data.
-		tlogCerts, err := extractCerts(e)
+		// Extract the hash of payload the entry is for
+		// and its certificates
+		entryHash, tlogCerts, err := extractData(e)
 		if err != nil {
 			fmt.Println("could not extract cert", err)
 			continue
 		}
+		if entryHash != hash {
+			fmt.Println("hashes don't match")
+			continue
+		}
+
+		// Verify that the cert used in the tlog matches the cert
+		// used to sign the data.
 		for _, c := range tlogCerts {
 			if cert.Equal(c) {
 				return e, nil
@@ -149,15 +159,13 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 	return nil, errors.New("could not find matching tlog entry")
 }
 
-// findTLogEntriesByPayloadAndPK is roughly equivalent to cosign.FindTLogEntriesByPayload,
-// but also filters by the public key used.
-func (c *Client) findTLogEntriesByPayloadAndPK(ctx context.Context, payload, pubKey []byte) (uuids []string, err error) {
+// findTLogEntriesByPK is roughly equivalent to cosign.FindTLogEntriesByPayload,
+// but only filters by the public key used. Earlier, this filtered on both the
+// payload and the public key, but returned uuids of entries that matched
+// either.
+func (c *Client) findTLogEntriesByPK(ctx context.Context, pubKey []byte) (uuids []string, err error) {
 	params := index.NewSearchIndexParamsWithContext(ctx)
 	params.Query = &models.SearchIndex{}
-
-	h := sha256.New()
-	h.Write(payload)
-	params.Query.Hash = fmt.Sprintf("sha256:%s", strings.ToLower(hex.EncodeToString(h.Sum(nil))))
 
 	params.Query.PublicKey = &models.SearchIndexPublicKey{
 		Content: strfmt.Base64(pubKey),
@@ -188,55 +196,60 @@ func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certif
 	return e, cosign.VerifyTLogEntryOffline(ctx, e, c.publicKeys)
 }
 
-// extractCerts is taken from cosign's cmd/cosign/cli/verify/verify_blob.go.
+// extractData extracts the data hash and certs from a given LogEntryAnon.
 // TODO: Refactor this into a shared lib.
-func extractCerts(e *models.LogEntryAnon) ([]*x509.Certificate, error) {
+func extractData(e *models.LogEntryAnon) (string, []*x509.Certificate, error) {
 	b, err := base64.StdEncoding.DecodeString(e.Body.(string))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	pe, err := models.UnmarshalProposedEntry(bytes.NewReader(b), runtime.JSONConsumer())
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	eimpl, err := types.CreateVersionedEntry(pe)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	var publicKeyB64 []byte
+	var (
+		publicKeyB64 []byte
+		entryHash    string
+	)
 	switch e := eimpl.(type) {
 	case *rekord_v001.V001Entry:
+		entryHash = *e.RekordObj.Data.Hash.Value
 		publicKeyB64, err = e.RekordObj.Signature.PublicKey.Content.MarshalText()
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	case *hashedrekord_v001.V001Entry:
+		entryHash = *e.HashedRekordObj.Data.Hash.Value
 		publicKeyB64, err = e.HashedRekordObj.Signature.PublicKey.Content.MarshalText()
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	default:
-		return nil, errors.New("unexpected tlog entry type")
+		return "", nil, errors.New("unexpected tlog entry type")
 	}
 
 	publicKey, err := base64.StdEncoding.DecodeString(string(publicKeyB64))
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(publicKey)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
 	if len(certs) == 0 {
-		return nil, errors.New("no certs found in pem tlog")
+		return "", nil, errors.New("no certs found in pem tlog")
 	}
 
-	return certs, err
+	return entryHash, certs, err
 }
 
 func (c *Client) PublicKeys() *cosign.TrustedTransparencyLogPubKeys {
