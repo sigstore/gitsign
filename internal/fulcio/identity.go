@@ -99,7 +99,7 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 
 	if cacheClient != nil {
 		if err := id.CacheCert(ctx, cacheClient); err != nil {
-			fmt.Fprintf(out, "error storing identity in cache: %v", err)
+			fmt.Fprintf(out, "error storing identity in cache: %v\n", err)
 		}
 	}
 
