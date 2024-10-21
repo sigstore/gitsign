@@ -56,7 +56,7 @@ func (s *Service) GetCredential(req api.GetCredentialRequest, resp *api.Credenti
 	fmt.Println("Get", req.ID)
 	i, ok := s.store.Get(req.ID)
 	if ok {
-		fmt.Println("found cred!")
+		fmt.Println("gitsign-credential-cache: found credential!")
 		cred, ok := i.(*api.Credential)
 		if !ok {
 			return fmt.Errorf("unknown credential type %T", i)
@@ -71,7 +71,7 @@ func (s *Service) GetCredential(req api.GetCredentialRequest, resp *api.Credenti
 	}
 
 	// If nothing is in the cache, fallback to interactive flow.
-	fmt.Println("no cred found, going through intereractive flow...")
+	fmt.Println("gitsign-credential-cache: no cached credential found, falling back to interactive flow...")
 	idf := fulcio.NewIdentityFactory(os.Stdin, os.Stdout)
 	id, err := idf.NewIdentity(ctx, req.Config)
 	if err != nil {
