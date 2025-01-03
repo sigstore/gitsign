@@ -251,6 +251,7 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 	tc := &rekorclient.TransportConfig{
 		Host:     rekorHost,
 		BasePath: rekorBasePath,
+		Schemes:  []string{"https"},
 	}
 	rcfg := rekorclient.NewHTTPClientWithConfig(strfmt.Default, tc)
 
