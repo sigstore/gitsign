@@ -90,7 +90,7 @@ func TestAttestCommitRef(t *testing.T) {
 		},
 	}
 	t.Run("base", func(t *testing.T) {
-		attest1, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest1, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -99,7 +99,7 @@ func TestAttestCommitRef(t *testing.T) {
 
 	t.Run("noop", func(t *testing.T) {
 		// Write same attestation to the same commit - should be a no-op.
-		attest2, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest2, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -117,7 +117,7 @@ func TestAttestCommitRef(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		attest3, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -170,7 +170,7 @@ func TestAttestTreeRef(t *testing.T) {
 		},
 	}
 	t.Run("base", func(t *testing.T) {
-		attest1, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest1, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -179,7 +179,7 @@ func TestAttestTreeRef(t *testing.T) {
 
 	t.Run("noop", func(t *testing.T) {
 		// Write same attestation to the same commit - should be a no-op.
-		attest2, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest2, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -197,7 +197,7 @@ func TestAttestTreeRef(t *testing.T) {
 		}
 		sha = resolveTree(t, repo, sha)
 
-		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
@@ -208,7 +208,7 @@ func TestAttestTreeRef(t *testing.T) {
 		// Make a new commit, write new attestation.
 		sha = resolveTree(t, repo, writeRepo(t, w, fs, "testdata/bar.txt"))
 
-		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom")
+		attest3, err := attestor.WriteAttestation(ctx, TreeRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}

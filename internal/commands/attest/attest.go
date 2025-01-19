@@ -46,7 +46,7 @@ type options struct {
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.FlagObjectType, "objtype", FlagObjectTypeCommit, "[commit | tree] - Git object type to attest")
 	cmd.Flags().StringVarP(&o.FlagPath, "filepath", "f", "", "attestation filepath")
-	cmd.Flags().StringVar(&o.FlagAttestationType, "type", "", `specify a predicate type (slsaprovenance|link|spdx|spdxjson|cyclonedx|vuln|custom) or an URI (default "custom")`)
+	cmd.Flags().StringVar(&o.FlagAttestationType, "type", "", `specify a predicate type URI`)
 }
 
 func (o *options) Run(ctx context.Context) error {

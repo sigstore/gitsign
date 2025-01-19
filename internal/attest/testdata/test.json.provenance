@@ -1,1 +1,1 @@
-{"_type":"https://in-toto.io/Statement/v0.1","predicateType":"https://cosign.sigstore.dev/attestation/v1","subject":[{"name":"","digest":{"sha256":"{{.}}"}}],"predicate":{"Data":"{\"foo\":\"bar\"}","Timestamp":"1984-04-04T00:00:00Z"}}
+{"_type":"https://in-toto.io/Statement/v1","subject":[{"digest":{"gitCommit":"{{.}}"}}],"predicateType":"custom-pred-type","predicate":{"foo":"bar"}}
