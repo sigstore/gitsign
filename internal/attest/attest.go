@@ -236,7 +236,7 @@ func generateStatement(pred []byte, attType string, sha plumbing.Hash) (*spb.Sta
 	var predPb structpb.Struct
 	err := json.Unmarshal(pred, &predPb)
 	if err != nil {
-	   return  nil, err
+		return nil, err
 	}
 
 	return &spb.Statement{
@@ -265,7 +265,7 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 
 	rekorHost, rekorBasePath := utils.StripURL(a.config.Rekor)
 
-tc := &rekorclient.TransportConfig{
+	tc := &rekorclient.TransportConfig{
 		Host:     rekorHost,
 		BasePath: rekorBasePath,
 		Schemes:  []string{"https"},
