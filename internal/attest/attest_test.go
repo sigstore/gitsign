@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -79,22 +80,22 @@ func TestAttestCommitRef(t *testing.T) {
 
 	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
 
-	fc := []fileContent{
+	ad := []gitAttestData{
 		{
-			Name:    filepath.Join(sha.String(), "test.json"),
-			Content: readFile(t, "testdata/test.json"),
-		},
-		{
-			Name:    filepath.Join(sha.String(), "test.json.sig"),
-			Content: generateAttestation(t, sha),
+			sha:         sha,
+			predName:    "test.json",
+			predicate:   readFile(t, "testdata/test.json"),
+			attName:     "test.json.sig",
+			attestation: generateAttestation(t, sha),
 		},
 	}
+
 	t.Run("base", func(t *testing.T) {
 		attest1, err := attestor.WriteAttestation(ctx, CommitRef, sha, NewNamedReader(bytes.NewBufferString(content), name), "custom-pred-type")
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		verifyContent(t, repo, attest1, fc)
+		verifyContent(t, repo, attest1, ad)
 	})
 
 	t.Run("noop", func(t *testing.T) {
@@ -103,7 +104,7 @@ func TestAttestCommitRef(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		verifyContent(t, repo, attest2, fc)
+		verifyContent(t, repo, attest2, ad)
 	})
 
 	t.Run("new commit", func(t *testing.T) {
@@ -121,17 +122,16 @@ func TestAttestCommitRef(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		fc = append(fc,
-			fileContent{
-				Name:    filepath.Join(sha.String(), "test.json"),
-				Content: content,
-			},
-			fileContent{
-				Name:    filepath.Join(sha.String(), "test.json.sig"),
-				Content: generateAttestation(t, sha),
+		ad = append(ad,
+			gitAttestData{
+				sha:         sha,
+				predName:    "test.json",
+				predicate:   readFile(t, "testdata/test.json"),
+				attName:     "test.json.sig",
+				attestation: generateAttestation(t, sha),
 			},
 		)
-		verifyContent(t, repo, attest3, fc)
+		verifyContent(t, repo, attest3, ad)
 	})
 }
 
@@ -159,14 +159,13 @@ func TestAttestTreeRef(t *testing.T) {
 
 	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
 
-	fc := []fileContent{
+	ad := []gitAttestData{
 		{
-			Name:    filepath.Join(sha.String(), "test.json"),
-			Content: readFile(t, "testdata/test.json"),
-		},
-		{
-			Name:    filepath.Join(sha.String(), "test.json.sig"),
-			Content: generateAttestation(t, sha),
+			sha:         sha,
+			predName:    "test.json",
+			predicate:   readFile(t, "testdata/test.json"),
+			attName:     "test.json.sig",
+			attestation: generateAttestation(t, sha),
 		},
 	}
 	t.Run("base", func(t *testing.T) {
@@ -174,7 +173,7 @@ func TestAttestTreeRef(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		verifyContent(t, repo, attest1, fc)
+		verifyContent(t, repo, attest1, ad)
 	})
 
 	t.Run("noop", func(t *testing.T) {
@@ -183,7 +182,7 @@ func TestAttestTreeRef(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		verifyContent(t, repo, attest2, fc)
+		verifyContent(t, repo, attest2, ad)
 	})
 
 	t.Run("new commit same tree", func(t *testing.T) {
@@ -201,7 +200,7 @@ func TestAttestTreeRef(t *testing.T) {
 		if err != nil {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
-		verifyContent(t, repo, attest3, fc)
+		verifyContent(t, repo, attest3, ad)
 	})
 
 	t.Run("new commit new tree", func(t *testing.T) {
@@ -213,26 +212,28 @@ func TestAttestTreeRef(t *testing.T) {
 			t.Fatalf("WriteAttestation: %v", err)
 		}
 
-		fc = append(fc,
-			fileContent{
-				Name:    filepath.Join(sha.String(), "test.json"),
-				Content: content,
-			},
-			fileContent{
-				Name:    filepath.Join(sha.String(), "test.json.sig"),
-				Content: generateAttestation(t, sha),
+		ad = append(ad,
+			gitAttestData{
+				sha:         sha,
+				predName:    "test.json",
+				predicate:   readFile(t, "testdata/test.json"),
+				attName:     "test.json.sig",
+				attestation: generateAttestation(t, sha),
 			},
 		)
-		verifyContent(t, repo, attest3, fc)
+		verifyContent(t, repo, attest3, ad)
 	})
 }
 
-type fileContent struct {
-	Name    string
-	Content string
+type gitAttestData struct {
+	sha         plumbing.Hash
+	predName    string
+	predicate   string
+	attName     string
+	attestation string
 }
 
-func verifyContent(t *testing.T, repo *git.Repository, sha plumbing.Hash, want []fileContent) {
+func verifyContent(t *testing.T, repo *git.Repository, sha plumbing.Hash, want []gitAttestData) {
 	t.Helper()
 
 	commit, err := repo.CommitObject(sha)
@@ -240,32 +241,40 @@ func verifyContent(t *testing.T, repo *git.Repository, sha plumbing.Hash, want [
 		t.Fatal(err)
 	}
 
-	files, err := commit.Files()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	got := []fileContent{}
-	if err := files.ForEach(func(c *object.File) error {
-		content, err := c.Contents()
+	for _, w := range want {
+		// We'll just check the raw predicate file that was written,
+		// that doesn't get marshaled so it should be untouched.
+		fname := fmt.Sprintf("%v/%v", w.sha, w.predName)
+		gotPredFile, err := commit.File(fname)
 		if err != nil {
-			return err
+			t.Fatal(err)
+		}
+		gotPred, err := gotPredFile.Contents()
+		if err != nil {
+			t.Fatal(err)
+		}
+		diff := cmp.Diff(w.predicate, gotPred)
+		if diff != "" {
+			t.Errorf("fname %v does not match: %v", fname, diff)
 		}
 
-		got = append(got, fileContent{
-			Name:    c.Name,
-			Content: content,
-		})
-
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if diff := cmp.Diff(want, got, cmpopts.SortSlices(func(i, j fileContent) bool {
-		return i.Name < j.Name
-	})); diff != "" {
-		t.Error(diff)
+		// The attestation does get marshalled though, so we can't do
+		// a simple diff, instead we'll need to parse things...
+		fname = fmt.Sprintf("%v/%v", w.sha, w.attName)
+		gotE := readDsse(t, commit, fname)
+		wantE := parseDsse(t, w.attestation)
+		// Ignore payload because we're going to handle that special
+		diff = cmp.Diff(gotE, wantE, cmpopts.IgnoreFields(dsse.Envelope{}, "Payload"))
+		if diff != "" {
+			t.Errorf("fname %v does not match: %v", fname, diff)
+		}
+		// Now let's check the payload.
+		gotJ := parsePayload(t, gotE)
+		wantJ := parsePayload(t, wantE)
+		diff = cmp.Diff(gotJ, wantJ)
+		if diff != "" {
+			t.Errorf("fname payload %v does not match: %v", fname, diff)
+		}
 	}
 }
 
@@ -284,6 +293,40 @@ func fakeRekor(_ context.Context, _ *client.Rekor, _, _ []byte) (*models.LogEntr
 		LogID:    &id,
 		LogIndex: &index,
 	}, nil
+}
+
+func parsePayload(t *testing.T, d *dsse.Envelope) interface{} {
+	p, err := base64.StdEncoding.DecodeString(d.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var j interface{}
+	err = json.Unmarshal([]byte(p), &j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return j
+}
+
+func parseDsse(t *testing.T, content string) *dsse.Envelope {
+	var e dsse.Envelope
+	err := json.Unmarshal([]byte(content), &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &e
+}
+
+func readDsse(t *testing.T, commit *object.Commit, fname string) *dsse.Envelope {
+	f, err := commit.File(fname)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := f.Contents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parseDsse(t, c)
 }
 
 func readFile(t *testing.T, path string) string {
