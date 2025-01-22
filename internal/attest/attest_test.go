@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/go-git/go-billy/v5"
@@ -42,10 +41,6 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore/pkg/signature"
-)
-
-var (
-	tmpl = template.Must(template.ParseFiles("testdata/test.json.provenance"))
 )
 
 func TestMain(m *testing.M) {

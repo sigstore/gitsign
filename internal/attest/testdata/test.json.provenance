@@ -1,1 +1,0 @@
-{"_type":"https://in-toto.io/Statement/v1","subject":[{"digest":{"gitCommit":"{{.}}"}}],"predicateType":"custom-pred-type","predicate":{"foo":"bar"}}
