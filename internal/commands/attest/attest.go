@@ -46,7 +46,7 @@ type options struct {
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.FlagObjectType, "objtype", FlagObjectTypeCommit, "[commit | tree] - Git object type to attest")
 	cmd.Flags().StringVarP(&o.FlagPath, "filepath", "f", "", "attestation filepath")
-	cmd.Flags().StringVar(&o.FlagAttestationType, "type", "", `specify a predicate type (slsaprovenance|link|spdx|spdxjson|cyclonedx|vuln|custom) or an URI (default "custom")`)
+	cmd.Flags().StringVar(&o.FlagAttestationType, "type", "", `specify a predicate type URI`)
 }
 
 func (o *options) Run(ctx context.Context) error {
@@ -63,6 +63,7 @@ func (o *options) Run(ctx context.Context) error {
 	// If we're attaching the attestation to a tree, resolve the tree SHA.
 	sha := head.Hash()
 	refName := attCommitRef
+	digestType := attest.DigestTypeCommit
 	if o.FlagObjectType == FlagObjectTypeTree {
 		commit, err := repo.CommitObject(head.Hash())
 		if err != nil {
@@ -71,6 +72,7 @@ func (o *options) Run(ctx context.Context) error {
 		sha = commit.TreeHash
 
 		refName = attTreeRef
+		digestType = attest.DigestTypeTree
 	}
 
 	sv, err := sign.SignerFromKeyOpts(ctx, "", "", cosignopts.KeyOpts{
@@ -84,7 +86,7 @@ func (o *options) Run(ctx context.Context) error {
 	}
 	defer sv.Close()
 
-	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config)
+	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config, digestType)
 
 	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType)
 	if err != nil {

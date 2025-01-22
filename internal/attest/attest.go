@@ -32,9 +32,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage"
 	"github.com/go-openapi/strfmt"
+	spb "github.com/in-toto/attestation/go/v1"
 	"github.com/jonboulle/clockwork"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
-	"github.com/sigstore/cosign/v2/pkg/cosign/attestation"
 	"github.com/sigstore/cosign/v2/pkg/types"
 	utils "github.com/sigstore/gitsign/internal"
 	gitsignconfig "github.com/sigstore/gitsign/internal/config"
@@ -42,11 +42,15 @@ import (
 	"github.com/sigstore/rekor/pkg/generated/models"
 	dssesig "github.com/sigstore/sigstore/pkg/signature/dsse"
 	signatureoptions "github.com/sigstore/sigstore/pkg/signature/options"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
-	CommitRef = "refs/attestations/commits"
-	TreeRef   = "refs/attestations/trees"
+	CommitRef        = "refs/attestations/commits"
+	TreeRef          = "refs/attestations/trees"
+	DigestTypeCommit = "gitCommit"
+	DigestTypeTree   = "gitTree"
 )
 
 var (
@@ -57,18 +61,20 @@ var (
 type rekorUpload func(ctx context.Context, rekorClient *rekorclient.Rekor, signature []byte, pemBytes []byte) (*models.LogEntryAnon, error)
 
 type Attestor struct {
-	repo    *git.Repository
-	sv      *sign.SignerVerifier
-	rekorFn rekorUpload
-	config  *gitsignconfig.Config
+	repo       *git.Repository
+	sv         *sign.SignerVerifier
+	rekorFn    rekorUpload
+	config     *gitsignconfig.Config
+	digestType string
 }
 
-func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config) *Attestor {
+func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config, digestType string) *Attestor {
 	return &Attestor{
-		repo:    repo,
-		sv:      sv,
-		rekorFn: rekorFn,
-		config:  config,
+		repo:       repo,
+		sv:         sv,
+		rekorFn:    rekorFn,
+		config:     config,
+		digestType: digestType,
 	}
 }
 
@@ -111,7 +117,7 @@ func NewNamedReader(r io.Reader, name string) Reader {
 // refName: What ref to write to (e.g. refs/attestations/commits)
 // sha: Commit SHA you are attesting to.
 // input: Attestation file input.
-// attType: Attestation type. See [attestation.GenerateStatement] for allowed values.
+// attType: Attestation (predicate) type URI corresponding to the input (predicate).
 func (a *Attestor) WriteAttestation(ctx context.Context, refName string, sha plumbing.Hash, input Reader, attType string) (plumbing.Hash, error) {
 	b, err := io.ReadAll(input)
 	if err != nil {
@@ -226,18 +232,32 @@ func encode(store storage.Storer, enc Encoder) (plumbing.Hash, error) {
 	return store.SetEncodedObject(obj)
 }
 
-func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
-	// Generate attestation
-	sh, err := attestation.GenerateStatement(attestation.GenerateOpts{
-		Predicate: bytes.NewBuffer(b),
-		Type:      attType,
-		Digest:    sha.String(),
-		Time:      clock.Now,
-	})
+func generateStatement(pred []byte, attType string, digestType string, sha plumbing.Hash) (*spb.Statement, error) {
+	sub := []*spb.ResourceDescriptor{{
+		Digest: map[string]string{digestType: sha.String()},
+	}}
+
+	var predPb structpb.Struct
+	err := json.Unmarshal(pred, &predPb)
 	if err != nil {
 		return nil, err
 	}
-	payload, err := json.Marshal(sh)
+
+	return &spb.Statement{
+		Type:          spb.StatementTypeUri,
+		Subject:       sub,
+		PredicateType: attType,
+		Predicate:     &predPb,
+	}, nil
+}
+
+func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
+	sh, err := generateStatement(b, attType, a.digestType, sha)
+
+	if err != nil {
+		return nil, err
+	}
+	payload, err := protojson.Marshal(sh)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +268,7 @@ func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte,
 	}
 
 	rekorHost, rekorBasePath := utils.StripURL(a.config.Rekor)
+
 	tc := &rekorclient.TransportConfig{
 		Host:     rekorHost,
 		BasePath: rekorBasePath,

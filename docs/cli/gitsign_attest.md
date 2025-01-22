@@ -12,7 +12,7 @@ gitsign attest [flags]
   -f, --filepath string   attestation filepath
   -h, --help              help for attest
       --objtype string    [commit | tree] - Git object type to attest (default "commit")
-      --type string       specify a predicate type (slsaprovenance|link|spdx|spdxjson|cyclonedx|vuln|custom) or an URI (default "custom")
+      --type string       specify a predicate type URI
 ```
 
 ### SEE ALSO
