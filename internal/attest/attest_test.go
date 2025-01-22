@@ -301,7 +301,7 @@ func parsePayload(t *testing.T, d *dsse.Envelope) interface{} {
 		t.Fatal(err)
 	}
 	var j interface{}
-	err = json.Unmarshal([]byte(p), &j)
+	err = json.Unmarshal(p, &j)
 	if err != nil {
 		t.Fatal(err)
 	}
