@@ -78,7 +78,7 @@ func TestAttestCommitRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
+	attestor := NewAttestor(repo, sv, fakeRekor, cfg, DigestTypeCommit)
 
 	ad := []gitAttestData{
 		{
@@ -86,7 +86,7 @@ func TestAttestCommitRef(t *testing.T) {
 			predName:    "test.json",
 			predicate:   readFile(t, "testdata/test.json"),
 			attName:     "test.json.sig",
-			attestation: generateAttestation(t, sha),
+			attestation: generateAttestation(t, "gitCommit", sha),
 		},
 	}
 
@@ -128,7 +128,7 @@ func TestAttestCommitRef(t *testing.T) {
 				predName:    "test.json",
 				predicate:   readFile(t, "testdata/test.json"),
 				attName:     "test.json.sig",
-				attestation: generateAttestation(t, sha),
+				attestation: generateAttestation(t, "gitCommit", sha),
 			},
 		)
 		verifyContent(t, repo, attest3, ad)
@@ -157,7 +157,7 @@ func TestAttestTreeRef(t *testing.T) {
 
 	cfg, _ := gitsignconfig.Get()
 
-	attestor := NewAttestor(repo, sv, fakeRekor, cfg)
+	attestor := NewAttestor(repo, sv, fakeRekor, cfg, DigestTypeTree)
 
 	ad := []gitAttestData{
 		{
@@ -165,7 +165,7 @@ func TestAttestTreeRef(t *testing.T) {
 			predName:    "test.json",
 			predicate:   readFile(t, "testdata/test.json"),
 			attName:     "test.json.sig",
-			attestation: generateAttestation(t, sha),
+			attestation: generateAttestation(t, "gitTree", sha),
 		},
 	}
 	t.Run("base", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestAttestTreeRef(t *testing.T) {
 				predName:    "test.json",
 				predicate:   readFile(t, "testdata/test.json"),
 				attName:     "test.json.sig",
-				attestation: generateAttestation(t, sha),
+				attestation: generateAttestation(t, "gitTree", sha),
 			},
 		)
 		verifyContent(t, repo, attest3, ad)
@@ -360,17 +360,17 @@ func writeRepo(t *testing.T, w *git.Worktree, fs billy.Filesystem, path string) 
 	return sha
 }
 
-func generateAttestation(t *testing.T, h plumbing.Hash) string {
+func generateAttestation(t *testing.T, digestType string, h plumbing.Hash) string {
 	t.Helper()
 
-	b := new(bytes.Buffer)
-	if err := tmpl.Execute(b, h); err != nil {
-		t.Fatal(err)
-	}
+	statement := fmt.Sprintf(
+		`{"_type":"https://in-toto.io/Statement/v1","subject":[{"digest":{"%s":"%s"}}],"predicateType":"custom-pred-type","predicate":{"foo":"bar"}}`,
+		digestType,
+		h.String())
 
 	att := dsse.Envelope{
 		PayloadType: "application/vnd.in-toto+json",
-		Payload:     base64.StdEncoding.EncodeToString(bytes.TrimSpace(b.Bytes())),
+		Payload:     base64.StdEncoding.EncodeToString([]byte(statement)),
 		Signatures:  []dsse.Signature{{Sig: "dGFjb2NhdA=="}},
 	}
 

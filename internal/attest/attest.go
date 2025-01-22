@@ -47,8 +47,10 @@ import (
 )
 
 const (
-	CommitRef = "refs/attestations/commits"
-	TreeRef   = "refs/attestations/trees"
+	CommitRef        = "refs/attestations/commits"
+	TreeRef          = "refs/attestations/trees"
+	DigestTypeCommit = "gitCommit"
+	DigestTypeTree   = "gitTree"
 )
 
 var (
@@ -59,18 +61,20 @@ var (
 type rekorUpload func(ctx context.Context, rekorClient *rekorclient.Rekor, signature []byte, pemBytes []byte) (*models.LogEntryAnon, error)
 
 type Attestor struct {
-	repo    *git.Repository
-	sv      *sign.SignerVerifier
-	rekorFn rekorUpload
-	config  *gitsignconfig.Config
+	repo       *git.Repository
+	sv         *sign.SignerVerifier
+	rekorFn    rekorUpload
+	config     *gitsignconfig.Config
+	digestType string
 }
 
-func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config) *Attestor {
+func NewAttestor(repo *git.Repository, sv *sign.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config, digestType string) *Attestor {
 	return &Attestor{
-		repo:    repo,
-		sv:      sv,
-		rekorFn: rekorFn,
-		config:  config,
+		repo:       repo,
+		sv:         sv,
+		rekorFn:    rekorFn,
+		config:     config,
+		digestType: digestType,
 	}
 }
 
@@ -228,9 +232,9 @@ func encode(store storage.Storer, enc Encoder) (plumbing.Hash, error) {
 	return store.SetEncodedObject(obj)
 }
 
-func generateStatement(pred []byte, attType string, sha plumbing.Hash) (*spb.Statement, error) {
+func generateStatement(pred []byte, attType string, digestType string, sha plumbing.Hash) (*spb.Statement, error) {
 	sub := []*spb.ResourceDescriptor{{
-		Digest: map[string]string{"gitCommit": sha.String()},
+		Digest: map[string]string{digestType: sha.String()},
 	}}
 
 	var predPb structpb.Struct
@@ -248,7 +252,7 @@ func generateStatement(pred []byte, attType string, sha plumbing.Hash) (*spb.Sta
 }
 
 func (a *Attestor) signPayload(ctx context.Context, sha plumbing.Hash, b []byte, attType string) ([]byte, error) {
-	sh, err := generateStatement(b, attType, sha)
+	sh, err := generateStatement(b, attType, a.digestType, sha)
 
 	if err != nil {
 		return nil, err
