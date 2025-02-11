@@ -15,26 +15,34 @@
 
 GIT_VERSION ?= $(shell git describe --tags --always --dirty)
 
+ARCH ?= $(shell uname -m)
+
+CGO_FLAG=0
+# Fix `-buildmode=pie requires external (cgo) linking, but cgo is not enabled`
+ifeq ($(ARCH),riscv64)
+    CGO_FLAG=1
+endif
+
 LDFLAGS=-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion=$(GIT_VERSION)
 
 .PHONY: build-gitsign
 build-gitsign:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" .
+	CGO_ENABLED=$(CGO_FLAG) go build -trimpath -ldflags "$(LDFLAGS)" .
 
 .PHONY: build-credential-cache
 build-credential-cache:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" ./cmd/gitsign-credential-cache
+	CGO_ENABLED=$(CGO_FLAG) go build -trimpath -ldflags "$(LDFLAGS)" ./cmd/gitsign-credential-cache
 
 .PHONY: build-all
 build-all: build-gitsign build-credential-cache
 
 .PHONY: install-gitsign
 install-gitsign:
-	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/sigstore/gitsign
+	CGO_ENABLED=$(CGO_FLAG) go install -trimpath -ldflags "$(LDFLAGS)" github.com/sigstore/gitsign
 
 .PHONY: install-credential-cache
 install-credential-cache:
-	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/sigstore/gitsign/cmd/gitsign-credential-cache
+	CGO_ENABLED=$(CGO_FLAG) go install -trimpath -ldflags "$(LDFLAGS)" github.com/sigstore/gitsign/cmd/gitsign-credential-cache
 
 .PHONY: install-all
 install-all: install-gitsign install-credential-cache
