@@ -106,8 +106,9 @@ func TestAttestCommitRef(t *testing.T) {
 		// Make a new commit, write new attestation.
 
 		sha, err = w.Commit("empty commit", &git.CommitOptions{
-			Author:    &object.Signature{},
-			Committer: &object.Signature{},
+			Author:            &object.Signature{},
+			Committer:         &object.Signature{},
+			AllowEmptyCommits: true,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -183,8 +184,9 @@ func TestAttestTreeRef(t *testing.T) {
 	t.Run("new commit same tree", func(t *testing.T) {
 		// Make a new commit, but since this will point to the same tree, attestation is a no-op.
 		sha, err = w.Commit("empty commit", &git.CommitOptions{
-			Author:    &object.Signature{},
-			Committer: &object.Signature{},
+			Author:            &object.Signature{},
+			Committer:         &object.Signature{},
+			AllowEmptyCommits: true,
 		})
 		if err != nil {
 			t.Fatal(err)
