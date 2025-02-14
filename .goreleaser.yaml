@@ -1,4 +1,5 @@
 project_name: gitsign
+version: 2
 
 gomod:
   proxy: true
@@ -63,12 +64,14 @@ nfpms:
 
 archives:
   - id: binary
-    format: binary
+    formats:
+      - binary
     allow_different_binary_count: true
 
 kos:
   - id: gitsign
-    repository: github.com/sigstore/gitsign
+    repositories:
+      - github.com/sigstore/gitsign
     tags:
       - 'v{{ .Version }}'
     ldflags:
