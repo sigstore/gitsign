@@ -76,7 +76,7 @@ func New(cfg *config.Config) *cobra.Command {
 							return item.RunE(item, cmd.Flags().Args())
 						}
 					}
-				case o.FlagSign:
+				case o.FlagSign, o.FlagDetachedSignature:
 					return commandSign(o, s, args...)
 				case o.FlagVerify:
 					return commandVerify(o, s, args...)
