@@ -5,7 +5,7 @@
 ### How we sign
 
 In offline Rekor storage mode Gitsign will store a HashedRekord in Rekor
-corresponding to the commit content.
+corresponding to the commit or tag content.
 
 Unfortunately this is a bit complex to query manually. Roughly this is:
 
@@ -19,16 +19,31 @@ signature) attributes.
 
 ### How we verify
 
+For commits:
 1. Recompute and compare commit content checksum from commit.
 2. Get Rekor LogEntry from signature.
 3. Verify Certificate against commit content checksum (ignoring cert NotAfter time).
 4. (if present) Verify signature against TSA cert.
 5. Verify Rekor LogEntry inclusion (offline).
 
-### What's stored in the commit signature
+For tags:
+1. Recompute and compare tag content checksum from tag.
+2. Get Rekor LogEntry from signature.
+3. Verify Certificate against tag content checksum (ignoring cert NotAfter time).
+4. (if present) Verify signature against TSA cert.
+5. Verify Rekor LogEntry inclusion (offline).
 
+### What's stored in the signature
+
+For commits:
 - Commit content checksum (sha256)
 - Commit signing time (untrusted system time)
+- Protobuf encoded [Rekor TransparencyLogEntry](https://github.com/sigstore/protobuf-specs/blob/91485b44360d343dadd98fb7297a500f05e0b5b1/protos/sigstore_rekor.proto#L91)
+- (optional) TSA signature + cert
+
+For tags:
+- Tag content checksum (sha256)
+- Tag signing time (untrusted system time)
 - Protobuf encoded [Rekor TransparencyLogEntry](https://github.com/sigstore/protobuf-specs/blob/91485b44360d343dadd98fb7297a500f05e0b5b1/protos/sigstore_rekor.proto#L91)
 - (optional) TSA signature + cert
 
@@ -108,9 +123,14 @@ commit signature.
 
 ### What's stored in Rekor
 
-HashedRekord containing:
-
+For commits, a HashedRekord containing:
 - Commit content checksum
+- Fulcio certificate
+  - Public Key
+  - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)
+
+For tags, a HashedRekord containing:
+- Tag content checksum
 - Fulcio certificate
   - Public Key
   - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)
@@ -248,17 +268,28 @@ Note that for Git tags, the annotated tag object SHA is what is used (i.e. the
 output of `git rev-parse <tag>`), **not** the SHA of the underlying tagged
 commit.
 
-### What's stored in the commit signature
+### What's stored in the signature
 
+For commits:
 - Commit content checksum (sha256)
 - Commit signing time (untrusted system time)
 - (optional) TSA signature + cert
 
+For tags:
+- Tag content checksum (sha256)
+- Tag signing time (untrusted system time)
+- (optional) TSA signature + cert
+
 ### What's stored in Rekor
 
-HashedRekord containing:
-
+For commits, a HashedRekord containing:
 - Commit SHA checksum
+- Fulcio certificate
+  - Public Key
+  - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)
+
+For tags, a HashedRekord containing:
+- Tag SHA checksum
 - Fulcio certificate
   - Public Key
   - [Signer Identity info](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md)

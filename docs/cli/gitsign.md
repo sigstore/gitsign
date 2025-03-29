@@ -26,5 +26,6 @@ gitsign [flags]
 * [gitsign initialize](gitsign_initialize.md)	 - Initializes Sigstore root to retrieve trusted certificate and key targets for verification.
 * [gitsign show](gitsign_show.md)	 - Show source predicate information
 * [gitsign verify](gitsign_verify.md)	 - Verify a commit
+* [gitsign verify-tag](gitsign_verify-tag.md)	 - Verify a tag
 * [gitsign version](gitsign_version.md)	 - print Gitsign version
 
