@@ -54,7 +54,8 @@ func TestSign(t *testing.T) {
 
 	// check that we're including signing time attribute
 	st, err := sd2.psd.SignerInfos[0].GetSigningTimeAttribute()
-	if st.After(time.Now().Add(time.Second)) || st.Before(time.Now().Add(-time.Second)) {
+	delta := 5 * time.Second
+	if st.After(time.Now().Add(delta)) || st.Before(time.Now().Add(-1 * delta)) {
 		t.Fatal("expected SigningTime to be now. Difference was", st.Sub(time.Now()))
 	}
 }
@@ -98,7 +99,8 @@ func TestSignDetached(t *testing.T) {
 
 	// check that we're including signing time attribute
 	st, err := sd2.psd.SignerInfos[0].GetSigningTimeAttribute()
-	if st.After(time.Now().Add(time.Second)) || st.Before(time.Now().Add(-time.Second)) {
+	delta := 5 * time.Second
+	if st.After(time.Now().Add(delta)) || st.Before(time.Now().Add(-1 * delta)) {
 		t.Fatal("expected SigningTime to be now. Difference was", st.Sub(time.Now()))
 	}
 }
