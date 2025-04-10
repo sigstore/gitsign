@@ -1,37 +1,52 @@
-linters:
-  enable:
-  - asciicheck
-  - errcheck
-  - errorlint
-  - gofmt
-  - goimports
-  - gosec
-  - gocritic
-  - importas
-  - prealloc
-  - revive
-  - misspell
-  - stylecheck
-  - tparallel
-  - unconvert
-  - unparam
-  - unused
-  - whitespace
-output:
-  uniq-by-line: false
-issues:
-  exclude-rules:
-  - path: _test\.go
-    linters:
-    - errcheck
-    - gosec
-  - text: "SA1019: package golang.org/x/crypto/openpgp"
-    linters:
-    - staticcheck
-  exclude-dirs:
-    - internal/fork
-  max-issues-per-linter: 0
-  max-same-issues: 0
+version: "2"
 run:
   issues-exit-code: 1
-  timeout: 10m
+linters:
+  enable:
+    - asciicheck
+    - errorlint
+    - gocritic
+    - gosec
+    - importas
+    - misspell
+    - prealloc
+    - revive
+    - staticcheck
+    - tparallel
+    - unconvert
+    - unparam
+    - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+          - gosec
+        path: _test\.go
+      - linters:
+          - staticcheck
+        text: 'SA1019: package golang.org/x/crypto/openpgp'
+    paths:
+      - internal/fork
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - internal/fork
+      - third_party$
+      - builtin$
+      - examples$
