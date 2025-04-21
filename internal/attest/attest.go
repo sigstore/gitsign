@@ -339,7 +339,7 @@ func buildTree(repo *git.Repository, attCommit *object.Commit, targetSHA plumbin
 
 // appendTree adds a set of entries to an existing tree.
 // If the existing tree is the zero-SHA, then a new tree is created.
-func appendTree(repo *git.Repository, treeSHA plumbing.Hash, new []object.TreeEntry) (plumbing.Hash, error) {
+func appendTree(repo *git.Repository, treeSHA plumbing.Hash, newEntries []object.TreeEntry) (plumbing.Hash, error) {
 	// Build set of entries.
 	files := map[string]object.TreeEntry{}
 
@@ -356,7 +356,7 @@ func appendTree(repo *git.Repository, treeSHA plumbing.Hash, new []object.TreeEn
 	}
 
 	// Append new values - this will overwrite old entries.
-	for _, t := range new {
+	for _, t := range newEntries {
 		files[t.Name] = t
 	}
 
