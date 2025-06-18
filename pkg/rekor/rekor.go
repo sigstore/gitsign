@@ -193,7 +193,11 @@ func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certif
 	if err != nil {
 		return nil, err
 	}
-	return e, cosign.VerifyTLogEntryOffline(ctx, e, c.publicKeys)
+	tm, err := cosign.TrustedRoot()
+	if err != nil {
+		return nil, err
+	}
+	return e, cosign.VerifyTLogEntryOffline(ctx, e, c.publicKeys, tm)
 }
 
 // extractData extracts the data hash and certs from a given LogEntryAnon.
@@ -302,7 +306,11 @@ func (c *Client) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Cer
 		return nil, err
 	}
 
-	if err := cosign.VerifyTLogEntryOffline(ctx, tlog, c.PublicKeys()); err != nil {
+	tm, err := cosign.TrustedRoot()
+	if err != nil {
+		return nil, err
+	}
+	if err := cosign.VerifyTLogEntryOffline(ctx, tlog, c.PublicKeys(), tm); err != nil {
 		return nil, err
 	}
 
