@@ -3,7 +3,7 @@ module github.com/sigstore/gitsign
 go 1.24.3
 
 require (
-	github.com/coreos/go-oidc/v3 v3.14.1
+	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-billy/v5 v5.6.2
