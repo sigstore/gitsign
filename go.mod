@@ -23,8 +23,8 @@ require (
 	github.com/sigstore/protobuf-specs v0.5.0
 	github.com/sigstore/rekor v1.4.0
 	github.com/sigstore/sigstore v1.9.5
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/cobra v1.10.1
+	github.com/spf13/pflag v1.0.9
 	golang.org/x/crypto v0.41.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9
