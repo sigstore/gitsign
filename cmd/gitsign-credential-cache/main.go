@@ -81,7 +81,7 @@ func main() {
 
 		path := filepath.Join(dir, "cache.sock")
 		if _, err := os.Stat(path); err == nil {
-			os.Remove(path)
+			_ = os.Remove(path)
 		}
 		fmt.Println(path)
 
