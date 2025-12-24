@@ -28,7 +28,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/sigstore/cosign/v2/pkg/providers"
+	"github.com/sigstore/cosign/v3/pkg/providers"
 	"github.com/sigstore/gitsign/internal/git/gittest"
 	"github.com/sigstore/gitsign/pkg/fulcio"
 	gsgit "github.com/sigstore/gitsign/pkg/git"
@@ -38,7 +38,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 
 	// Enable OIDC providers
-	_ "github.com/sigstore/cosign/v2/pkg/providers/all"
+	_ "github.com/sigstore/cosign/v3/pkg/providers/all"
 )
 
 func TestSign(t *testing.T) {

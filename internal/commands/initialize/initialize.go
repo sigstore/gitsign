@@ -18,7 +18,7 @@
 package initialize
 
 import (
-	"github.com/sigstore/cosign/v2/cmd/cosign/cli/initialize"
+	"github.com/sigstore/cosign/v3/cmd/cosign/cli/initialize"
 	"github.com/sigstore/sigstore/pkg/tuf"
 	"github.com/spf13/cobra"
 )
