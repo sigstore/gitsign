@@ -22,6 +22,7 @@ import (
 )
 
 // NewClient returns a new Rekor client with common client options set.
+//
 // Deprecated: Use NewClientContext instead.
 func NewClient(url string) (*gitrekor.Client, error) {
 	return NewClientContext(context.TODO(), url)

@@ -25,7 +25,7 @@ import (
 
 	"github.com/github/smimesign/ietf-cms/protocol"
 	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/swag/conv"
 	rekorpb "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/rekor/pkg/types"
@@ -63,8 +63,8 @@ func ToLogEntry(ctx context.Context, message []byte, sig []byte, cert *x509.Cert
 		HashedRekordObj: models.HashedrekordV001Schema{
 			Data: &models.HashedrekordV001SchemaData{
 				Hash: &models.HashedrekordV001SchemaDataHash{
-					Algorithm: swag.String("sha256"),
-					Value:     swag.String(hex.EncodeToString(hash[:])),
+					Algorithm: conv.Pointer("sha256"),
+					Value:     conv.Pointer(hex.EncodeToString(hash[:])),
 				},
 			},
 			Signature: &models.HashedrekordV001SchemaSignature{
