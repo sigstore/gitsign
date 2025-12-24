@@ -54,4 +54,4 @@ unit-test:
 # These tests use live dependencies, and may otherwise modify state.
 .PHONY: e2e-test
 e2e-test:
-	go test -tags e2e -v ./...
+	go test -tags e2e -v ./e2e
