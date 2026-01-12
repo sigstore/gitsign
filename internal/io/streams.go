@@ -47,7 +47,7 @@ func New(logPath string) *Streams {
 		// getting error information back from clients if things go wrong.
 		// As a janky way to preserve error message, tee stderr to
 		// a temp file.
-		if f, err := os.Create(logPath); err == nil {
+		if f, err := os.Create(logPath); err == nil { // nolint:gosec
 			s.close = append(s.close, f.Close)
 			s.Err = io.MultiWriter(s.Err, f)
 		}
@@ -72,12 +72,12 @@ func (s *Streams) Wrap(fn func() error) error {
 	// Log any panics to ttyout, since otherwise they will be lost to os.Stderr.
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Fprintln(s.TTYOut, r, string(debug.Stack()))
+			fmt.Fprintln(s.TTYOut, r, string(debug.Stack())) // nolint:errcheck
 		}
 	}()
 
 	if err := fn(); err != nil {
-		fmt.Fprintln(s.TTYOut, err)
+		fmt.Fprintln(s.TTYOut, err) // nolint:errcheck
 		return err
 	}
 	return nil

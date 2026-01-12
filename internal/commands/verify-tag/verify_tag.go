@@ -81,7 +81,7 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer r.Close() // nolint:errcheck
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return err

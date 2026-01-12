@@ -81,7 +81,7 @@ func main() {
 
 		path := filepath.Join(dir, "cache.sock")
 		if _, err := os.Stat(path); err == nil {
-			_ = os.Remove(path)
+			_ = os.Remove(path) // nolint:errcheck
 		}
 		fmt.Println(path)
 
@@ -95,7 +95,7 @@ func main() {
 		// syscall, so we're switching over to an explicit Chmod on the socket
 		// path.
 		// Also see https://github.com/golang/go/issues/11822
-		if err := os.Chmod(path, 0700); err != nil {
+		if err := os.Chmod(path, 0700); err != nil { // nolint:gosec
 			log.Fatalf("error setting socket permissions: %v", err)
 		}
 

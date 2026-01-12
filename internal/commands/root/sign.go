@@ -59,7 +59,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		if err != nil {
 			return fmt.Errorf("failed to open message file (%s): %w", args[0], err)
 		}
-		defer f2.Close()
+		defer f2.Close() // nolint:errcheck
 		f = f2
 	} else {
 		f = s.In
@@ -96,7 +96,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 	}
 
 	if tlog := resp.LogEntry; tlog != nil && tlog.LogIndex != nil {
-		fmt.Fprintf(s.TTYOut, "tlog entry created with index: %d\n", *tlog.LogIndex)
+		fmt.Fprintf(s.TTYOut, "tlog entry created with index: %d\n", *tlog.LogIndex) // nolint:errcheck
 	}
 
 	gpgout.EmitSigCreated(resp.Cert, o.FlagDetachedSignature)
