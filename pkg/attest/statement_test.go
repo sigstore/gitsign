@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package show
+package attest
 
 import (
 	"fmt"
@@ -25,12 +25,11 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/google/go-cmp/cmp"
 	intoto "github.com/in-toto/attestation/go/v1"
-	"github.com/sigstore/gitsign/pkg/attest"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
-func TestShow(t *testing.T) {
+func TestCommitStatement(t *testing.T) {
 	storage := memory.NewStorage()
 	repo := &git.Repository{
 		Storer: storage,
@@ -74,7 +73,7 @@ func TestShow(t *testing.T) {
 				t.Fatalf("error storing git commit: %v", err)
 			}
 
-			got, err := attest.CommitStatement(repo, "origin", h.String())
+			got, err := CommitStatement(repo, "origin", h.String())
 			if err != nil {
 				t.Fatalf("statement(): %v", err)
 			}
