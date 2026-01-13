@@ -15,26 +15,14 @@
 package show
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
-	"errors"
 	"io"
 	"os"
 
-	"github.com/github/smimesign/ietf-cms/protocol"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/in-toto/in-toto-golang/in_toto"
-	"github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/common"
 	"github.com/sigstore/gitsign/internal/config"
-	"github.com/sigstore/gitsign/pkg/predicate"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/gitsign/pkg/attest"
 	"github.com/spf13/cobra"
-)
-
-const (
-	predicateType = "https://gitsign.sigstore.dev/predicate/git/v0.1"
 )
 
 type options struct {
@@ -57,7 +45,7 @@ func (o *options) Run(w io.Writer, args []string) error {
 		revision = args[0]
 	}
 
-	out, err := statement(repo, o.FlagRemote, revision)
+	out, err := attest.CommitStatement(repo, o.FlagRemote, revision)
 	if err != nil {
 		return err
 	}
@@ -66,126 +54,6 @@ func (o *options) Run(w io.Writer, args []string) error {
 	enc.SetIndent("", "  ")
 
 	return enc.Encode(out)
-}
-
-func statement(repo *git.Repository, remote, revision string) (*in_toto.Statement, error) {
-	hash, err := repo.ResolveRevision(plumbing.Revision(revision))
-	if err != nil {
-		return nil, err
-	}
-	commit, err := repo.CommitObject(*hash)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract parent hashes
-	parents := make([]string, 0, len(commit.ParentHashes))
-	for _, p := range commit.ParentHashes {
-		if !p.IsZero() {
-			parents = append(parents, p.String())
-		}
-	}
-
-	// Build initial predicate from the commit.
-	predicate := &predicate.GitCommit{
-		Commit: &predicate.Commit{
-			Tree:    commit.TreeHash.String(),
-			Parents: parents,
-			Author: &predicate.Author{
-				Name:  commit.Author.Name,
-				Email: commit.Author.Email,
-				Date:  commit.Author.When,
-			},
-			Committer: &predicate.Author{
-				Name:  commit.Committer.Name,
-				Email: commit.Committer.Email,
-				Date:  commit.Committer.When,
-			},
-			Message: commit.Message,
-		},
-		Signature: commit.PGPSignature,
-	}
-
-	// We have a PEM encoded signature, try and extract certificate details.
-	pem, _ := pem.Decode([]byte(commit.PGPSignature))
-	if pem != nil {
-		sigs, err := parseSignature(pem.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		predicate.SignerInfo = sigs
-	}
-
-	// Try and resolve the remote name to use as the subject name.
-	// If the repo does not have a remote configured then this will be left
-	// blank.
-	resolvedRemote, err := repo.Remote(remote)
-	if err != nil && !errors.Is(err, git.ErrRemoteNotFound) {
-		return nil, err
-	}
-	remoteName := ""
-	if resolvedRemote != nil && resolvedRemote.Config() != nil && len(resolvedRemote.Config().URLs) > 0 {
-		remoteName = resolvedRemote.Config().URLs[0]
-	}
-
-	// Wrap predicate in in-toto Statement.
-	return &in_toto.Statement{
-		StatementHeader: in_toto.StatementHeader{
-			Type: in_toto.StatementInTotoV01,
-			Subject: []in_toto.Subject{{
-				Name: remoteName,
-				Digest: common.DigestSet{
-					// TODO?: Figure out if/how to support git sha256 - this
-					// will likely depend on upstream support in go-git.
-					// See https://github.com/go-git/go-git/issues/229.
-					"sha1": hash.String(),
-				},
-			}},
-			PredicateType: predicateType,
-		},
-		Predicate: predicate,
-	}, nil
-}
-
-func parseSignature(raw []byte) ([]*predicate.SignerInfo, error) {
-	ci, err := protocol.ParseContentInfo(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	sd, err := ci.SignedDataContent()
-	if err != nil {
-		return nil, err
-	}
-
-	certs, err := sd.X509Certificates()
-	if err != nil {
-		return nil, err
-	}
-
-	// A signature may have multiple signers associated to it -
-	// extract each SignerInfo separately.
-	out := make([]*predicate.SignerInfo, 0, len(sd.SignerInfos))
-	for _, si := range sd.SignerInfos {
-		cert, err := si.FindCertificate(certs)
-		if err != nil {
-			continue
-		}
-		b, err := cryptoutils.MarshalCertificateToPEM(cert)
-		if err != nil {
-			return nil, err
-		}
-		sa, err := si.SignedAttrs.MarshaledForVerification()
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, &predicate.SignerInfo{
-			Certificate: string(b),
-			Attributes:  base64.StdEncoding.EncodeToString(sa),
-		})
-	}
-
-	return out, nil
 }
 
 func New(_ *config.Config) *cobra.Command {
