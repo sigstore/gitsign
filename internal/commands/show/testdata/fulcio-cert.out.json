@@ -1,5 +1,5 @@
 {
-  "_type": "https://in-toto.io/Statement/v0.1",
+  "type": "https://in-toto.io/Statement/v1",
   "predicateType": "https://gitsign.sigstore.dev/predicate/git/v0.1",
   "subject": [
     {
@@ -18,12 +18,12 @@
       "author": {
         "name": "Billy Lynch",
         "email": "billy@chainguard.dev",
-        "date": "2022-11-14T16:13:19-05:00"
+        "date": "2022-11-14T21:13:19Z"
       },
       "committer": {
         "name": "Billy Lynch",
         "email": "billy@chainguard.dev",
-        "date": "2022-11-14T16:13:19-05:00"
+        "date": "2022-11-14T21:13:19Z"
       },
       "message": "add sample\n"
     },
