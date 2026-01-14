@@ -55,9 +55,29 @@ jobs:
         run: |
           set -e
 
-          # Setup repo + tool
-          make install-gitsign
-          export PATH="$PATH:$GOPATH/bin"
+          # Detect platform and architecture
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m)
+          case $ARCH in
+            x86_64) ARCH="amd64" ;;
+            aarch64|arm64) ARCH="arm64" ;;
+          esac
+
+          # Get latest release download URL from GitHub API
+          ASSET_NAME_PATTERN="gitsign_.*_${OS}_${ARCH}$"
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/sigstore/gitsign/releases/latest | \
+            jq -r ".assets[] | select(.name | test(\"${ASSET_NAME_PATTERN}\")) | .browser_download_url" | head -1)
+
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "Error: Could not find gitsign binary for ${OS}_${ARCH}"
+            exit 1
+          fi
+
+          echo "Downloading gitsign from: ${DOWNLOAD_URL}"
+          curl -fsSL "${DOWNLOAD_URL}" -o /tmp/gitsign
+          chmod +x /tmp/gitsign
+          sudo mv /tmp/gitsign /usr/local/bin/gitsign
+
           echo "PATH=${PATH}"
           whereis gitsign
           mkdir /tmp/git
@@ -74,6 +94,7 @@ jobs:
       - name: Test Sign and Verify commit
         run: |
           set -e
+          cd /tmp/git
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"
@@ -95,6 +116,7 @@ jobs:
           GITSIGN_REKOR_MODE: "offline"
         run: |
           set -e
+          cd /tmp/git
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"
