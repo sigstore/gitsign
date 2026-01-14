@@ -36,20 +36,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           check-latest: true
-
-      - name: Get test OIDC token
-        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@main
-
-      - name: export OIDC token
-        run: |
-          echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
-
-      - name: e2e unit tests
-        run: |
-          set -e
-          make e2e-test
 
       - name: Install Gitsign
         run: |
@@ -91,6 +79,19 @@ jobs:
 
           # Verify tool is on our path
           gitsign -h
+
+      - name: Get test OIDC token
+        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@main
+
+      - name: export OIDC token
+        run: |
+          echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
+
+      - name: e2e unit tests
+        run: |
+          set -e
+          make e2e-test
+
       - name: Test Sign and Verify commit
         run: |
           set -e

@@ -19,9 +19,9 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
-	cosignopts "github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
-	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
+	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
+	"github.com/sigstore/cosign/v3/cmd/cosign/cli/signcommon"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/gitsign/internal/attest"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/spf13/cobra"
@@ -75,7 +75,7 @@ func (o *options) Run(ctx context.Context) error {
 		digestType = attest.DigestTypeTree
 	}
 
-	sv, err := sign.SignerFromKeyOpts(ctx, "", "", cosignopts.KeyOpts{
+	sv, closerFunc, err := signcommon.GetSignerVerifier(ctx, "", "", cosignopts.KeyOpts{
 		FulcioURL:    o.Config.Fulcio,
 		RekorURL:     o.Config.Rekor,
 		OIDCIssuer:   o.Config.Issuer,
@@ -84,7 +84,7 @@ func (o *options) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("getting signer: %w", err)
 	}
-	defer sv.Close()
+	defer closerFunc()
 
 	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config, digestType)
 

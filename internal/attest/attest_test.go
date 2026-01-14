@@ -36,7 +36,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/jonboulle/clockwork"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"github.com/sigstore/cosign/v2/cmd/cosign/cli/sign"
+	"github.com/sigstore/cosign/v3/cmd/cosign/cli/signcommon"
 	gitsignconfig "github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestAttestCommitRef(t *testing.T) {
-	sv := &sign.SignerVerifier{SignerVerifier: fakeSV{}}
+	sv := &signcommon.SignerVerifier{SignerVerifier: fakeSV{}}
 	ctx := context.Background()
 
 	storer := memory.NewStorage()
@@ -132,7 +132,7 @@ func TestAttestCommitRef(t *testing.T) {
 }
 
 func TestAttestTreeRef(t *testing.T) {
-	sv := &sign.SignerVerifier{SignerVerifier: fakeSV{}}
+	sv := &signcommon.SignerVerifier{SignerVerifier: fakeSV{}}
 	ctx := context.Background()
 
 	storer := memory.NewStorage()

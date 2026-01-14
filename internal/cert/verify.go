@@ -17,7 +17,7 @@ package cert
 import (
 	"crypto/x509"
 
-	"github.com/sigstore/cosign/v2/pkg/cosign"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 )
 
 // Verifier verifies a given cert for a set of claims.
