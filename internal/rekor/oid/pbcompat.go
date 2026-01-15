@@ -18,7 +18,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/swag/conv"
 	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorpb "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
@@ -83,16 +83,16 @@ func logEntryAnonToProto(le *models.LogEntryAnon, kind *rekorpb.KindVersion) (*r
 
 func logEntryAnonFromProto(in *rekorpb.TransparencyLogEntry) *models.LogEntryAnon {
 	out := &models.LogEntryAnon{
-		LogID:          swag.String(hex.EncodeToString(in.GetLogId().GetKeyId())),
-		LogIndex:       swag.Int64(in.GetLogIndex()),
-		IntegratedTime: swag.Int64(in.GetIntegratedTime()),
+		LogID:          conv.Pointer(hex.EncodeToString(in.GetLogId().GetKeyId())),
+		LogIndex:       conv.Pointer(in.GetLogIndex()),
+		IntegratedTime: conv.Pointer(in.GetIntegratedTime()),
 		Verification: &models.LogEntryAnonVerification{
 			SignedEntryTimestamp: in.GetInclusionPromise().GetSignedEntryTimestamp(),
 			InclusionProof: &models.InclusionProof{
-				LogIndex:   swag.Int64(in.GetInclusionProof().GetLogIndex()),
-				Checkpoint: swag.String(in.GetInclusionProof().GetCheckpoint().GetEnvelope()),
-				TreeSize:   swag.Int64(in.GetInclusionProof().GetTreeSize()),
-				RootHash:   swag.String(hex.EncodeToString(in.GetInclusionProof().GetRootHash())),
+				LogIndex:   conv.Pointer(in.GetInclusionProof().GetLogIndex()),
+				Checkpoint: conv.Pointer(in.GetInclusionProof().GetCheckpoint().GetEnvelope()),
+				TreeSize:   conv.Pointer(in.GetInclusionProof().GetTreeSize()),
+				RootHash:   conv.Pointer(hex.EncodeToString(in.GetInclusionProof().GetRootHash())),
 				Hashes:     make([]string, 0, len(in.GetInclusionProof().GetHashes())),
 			},
 		},

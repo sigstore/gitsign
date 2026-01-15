@@ -34,30 +34,38 @@ jobs:
           persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           check-latest: true
-
-      - name: Get test OIDC token
-        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@main
-
-      - name: export OIDC token
-        run: |
-          echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
-
-      - name: e2e unit tests
-        run: |
-          set -e
-          make e2e-test
 
       - name: Install Gitsign
         run: |
           set -e
 
-          # Setup repo + tool
-          make install-gitsign
-          export PATH="$PATH:$GOPATH/bin"
+          # Detect platform and architecture
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m)
+          case $ARCH in
+            x86_64) ARCH="amd64" ;;
+            aarch64|arm64) ARCH="arm64" ;;
+          esac
+
+          # Get latest release download URL from GitHub API
+          ASSET_NAME_PATTERN="gitsign_.*_${OS}_${ARCH}$"
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/sigstore/gitsign/releases/latest | \
+            jq -r ".assets[] | select(.name | test(\"${ASSET_NAME_PATTERN}\")) | .browser_download_url" | head -1)
+
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "Error: Could not find gitsign binary for ${OS}_${ARCH}"
+            exit 1
+          fi
+
+          echo "Downloading gitsign from: ${DOWNLOAD_URL}"
+          curl -fsSL "${DOWNLOAD_URL}" -o /tmp/gitsign
+          chmod +x /tmp/gitsign
+          sudo mv /tmp/gitsign /usr/local/bin/gitsign
+
           echo "PATH=${PATH}"
           whereis gitsign
           mkdir /tmp/git
@@ -71,9 +79,23 @@ jobs:
 
           # Verify tool is on our path
           gitsign -h
+
+      - name: Get test OIDC token
+        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@main
+
+      - name: export OIDC token
+        run: |
+          echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
+
+      - name: e2e unit tests
+        run: |
+          set -e
+          make e2e-test
+
       - name: Test Sign and Verify commit
         run: |
           set -e
+          cd /tmp/git
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"
@@ -95,6 +117,7 @@ jobs:
           GITSIGN_REKOR_MODE: "offline"
         run: |
           set -e
+          cd /tmp/git
 
           # Sign commit
           git commit --allow-empty -S --message="Signed commit"

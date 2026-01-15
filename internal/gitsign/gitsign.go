@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	cosignopts "github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
+	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/gitsign/internal/cert"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
