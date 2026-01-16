@@ -1,0 +1,46 @@
+// Copyright 2026 The Sigstore Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package sigstore.gitsign.predicate.v01;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sigstore/gitsign/pkg/predicate";
+
+message GitCommit {
+  Commit source = 1 [json_name = "source"];
+  string signature = 2 [json_name = "signature"];
+  repeated SignerInfo signer_info = 3 [json_name = "signer_info"];
+}
+
+message Commit {
+  string tree = 1 [json_name = "tree"];
+  repeated string parents = 2 [json_name = "parents"];
+  Author author = 3 [json_name = "author"];
+  Author committer = 4 [json_name = "committer"];
+  string message = 5 [json_name = "message"];
+}
+
+message Author {
+  string name = 1 [json_name = "name"];
+  string email = 2 [json_name = "email"];
+  google.protobuf.Timestamp date = 3 [json_name = "date"];
+}
+
+message SignerInfo {
+  string attributes = 1 [json_name = "attributes"];
+  string certificate = 2 [json_name = "certificate"];
+}
