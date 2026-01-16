@@ -6,24 +6,28 @@ on:
     tags:
       - 'v*'
 
+permissions: {}
+
 jobs:
   release:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write # needed to write releases
       id-token: write # needed for keyless signing
       packages: write # needed for push images
       attestations: write
+
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
-          persist-credentials: false
 
       - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: 'go.mod'
           check-latest: true
+          cache: 'false'
 
       - uses: imjasonh/setup-crane@31b88efe9de28ae0ffa220711af4b60be9435f6e # v0.4
 

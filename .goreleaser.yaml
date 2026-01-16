@@ -54,7 +54,7 @@ nfpms:
     homepage: https://github.com/sigstore/gitsign
     maintainer: Billy Lynch <info@sigstore.dev>
     description: Keyless git commit signing using OIDC identity
-    builds:
+    ids:
       - gitsign
       - gitsign-credential-cache
     formats:
