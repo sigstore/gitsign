@@ -85,7 +85,7 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 		}
 		// Only print error on failure - if there's a problem fetching
 		// from the cache just fall through to normal OIDC.
-		fmt.Fprintf(out, "error getting cached creds: %v\n", err)
+		fmt.Fprintf(out, "error getting cached creds: %v\n", err) // nolint:errcheck
 	}
 
 	idf := &IdentityFactory{
@@ -99,7 +99,7 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 
 	if cacheClient != nil {
 		if err := id.CacheCert(ctx, cacheClient); err != nil {
-			fmt.Fprintf(out, "error storing identity in cache: %v\n", err)
+			fmt.Fprintf(out, "error storing identity in cache: %v\n", err) // nolint:errcheck
 		}
 	}
 
@@ -227,7 +227,7 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 		// If no token provider is set, look for any available provider to use.
 		provider = defaultFlowProvider{}
 	} else if cfg.TokenProvider != "" && cfg.TokenProvider != "interactive" {
-		fmt.Fprintln(f.out, "using token provider", cfg.TokenProvider)
+		fmt.Fprintln(f.out, "using token provider", cfg.TokenProvider) // nolint:errcheck
 
 		// If a token provider is explicitly set always use it, unless it's "interactive",
 		// which means always use the default interactive flow.
@@ -240,7 +240,7 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 	if provider != nil {
 		idToken, err := provider.Provide(ctx, clientID)
 		if err != nil {
-			fmt.Fprintln(f.out, "error getting id token:", err)
+			fmt.Fprintln(f.out, "error getting id token:", err) // nolint:errcheck
 			return nil, fmt.Errorf("error getting id token: %w", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
@@ -265,7 +265,7 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 
 	cert, err := client.GetCert(priv)
 	if err != nil {
-		fmt.Fprintln(f.out, "error getting signer:", err)
+		fmt.Fprintln(f.out, "error getting signer:", err) // nolint:errcheck
 		return nil, err
 	}
 

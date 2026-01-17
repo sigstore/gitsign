@@ -99,7 +99,7 @@ func (req Request) Do(url string) (Response, error) {
 		return nilResp, err
 	}
 	if ct := httpResp.Header.Get("Content-Type"); ct != contentTypeTSReply {
-		return nilResp, fmt.Errorf("Bad content-type: %s", ct)
+		return nilResp, fmt.Errorf("bad content-type: %s", ct)
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, httpResp.ContentLength))

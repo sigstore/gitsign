@@ -83,7 +83,7 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 	}
 
 	verify.PrintSummary(s.Err, summary)
-	fmt.Fprintln(s.Err, "WARNING: git verify-commit does not verify cert claims. Prefer using `gitsign verify` instead.")
+	fmt.Fprintln(s.Err, "WARNING: git verify-commit does not verify cert claims. Prefer using `gitsign verify` instead.") // nolint:errcheck
 
 	gpgout.EmitGoodSig(summary.Cert)
 	gpgout.EmitTrustFully()
@@ -103,7 +103,7 @@ func readAttached(s *gsio.Streams, args ...string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to open signature file (%s): %w", args[0], err)
 		}
-		defer f2.Close()
+		defer f2.Close() // nolint:errcheck
 		f = f2
 	} else {
 		f = s.In
@@ -123,7 +123,7 @@ func readDetached(s *gsio.Streams, args ...string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open signature file (%s): %w", args[0], err)
 	}
-	defer sigFile.Close()
+	defer sigFile.Close() // nolint:errcheck
 	sig := new(bytes.Buffer)
 	if _, err = io.Copy(sig, sigFile); err != nil {
 		return nil, nil, fmt.Errorf("failed to read signature file: %w", err)
@@ -138,7 +138,7 @@ func readDetached(s *gsio.Streams, args ...string) ([]byte, []byte, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to open message file (%s): %w", args[1], err)
 		}
-		defer f2.Close()
+		defer f2.Close() // nolint:errcheck
 		dataFile = f2
 	}
 	buf := new(bytes.Buffer)
