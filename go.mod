@@ -17,7 +17,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-tty v0.0.7
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/secure-systems-lab/go-securesystemslib v0.9.1
+	github.com/secure-systems-lab/go-securesystemslib v0.10.0
 	github.com/sigstore/cosign/v3 v3.0.4
 	github.com/sigstore/fulcio v1.8.5
 	github.com/sigstore/protobuf-specs v0.5.0
@@ -231,7 +231,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/theupdateframework/go-tuf v0.7.0 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.3.0 // indirect
+	github.com/theupdateframework/go-tuf/v2 v2.3.1 // indirect
 	github.com/tink-crypto/tink-go-awskms/v2 v2.1.0 // indirect
 	github.com/tink-crypto/tink-go-gcpkms/v2 v2.2.0 // indirect
 	github.com/tink-crypto/tink-go/v2 v2.6.0 // indirect
