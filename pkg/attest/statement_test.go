@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package show
+package attest
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -25,11 +24,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/google/go-cmp/cmp"
-	"github.com/in-toto/in-toto-golang/in_toto"
-	"github.com/sigstore/gitsign/pkg/predicate"
+	intoto "github.com/in-toto/attestation/go/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
-func TestShow(t *testing.T) {
+func TestCommitStatement(t *testing.T) {
 	storage := memory.NewStorage()
 	repo := &git.Repository{
 		Storer: storage,
@@ -73,7 +73,7 @@ func TestShow(t *testing.T) {
 				t.Fatalf("error storing git commit: %v", err)
 			}
 
-			got, err := statement(repo, "origin", h.String())
+			got, err := CommitStatement(repo, "origin", h.String())
 			if err != nil {
 				t.Fatalf("statement(): %v", err)
 			}
@@ -82,14 +82,13 @@ func TestShow(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error reading want json: %v", err)
 			}
-			want := &in_toto.Statement{
-				Predicate: &predicate.GitCommit{},
-			}
-			if err := json.Unmarshal(wantRaw, want); err != nil {
+
+			want := &intoto.Statement{}
+			if err := protojson.Unmarshal(wantRaw, want); err != nil {
 				t.Fatalf("error decoding want json: %v", err)
 			}
 
-			if diff := cmp.Diff(want, got); diff != "" {
+			if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
 				t.Error(diff)
 			}
 		})

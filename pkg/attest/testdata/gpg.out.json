@@ -1,5 +1,5 @@
 {
-  "_type": "https://in-toto.io/Statement/v0.1",
+  "type": "https://in-toto.io/Statement/v1",
   "predicateType": "https://gitsign.sigstore.dev/predicate/git/v0.1",
   "subject": [
     {
@@ -18,12 +18,12 @@
       "author": {
         "name": "Billy Lynch",
         "email": "billy@chainguard.dev",
-        "date": "2022-11-09T08:35:29-05:00"
+        "date": "2022-11-09T13:35:29Z"
       },
       "committer": {
         "name": "GitHub",
         "email": "noreply@github.com",
-        "date": "2022-11-09T08:35:29-05:00"
+        "date": "2022-11-09T13:35:29Z"
       },
       "message": "Refactor commands with Cobra. (#185)\n\nThis PR rewrites the commands using Cobra so that it can be easier to\r\nadd additional subcommands (i.e. gitsign cache, gitsign attest, etc.)\r\n\r\nThis change doesn't add any new functionality, though it does refactor a\r\ngood chunk of the config, flags, status printing, and other global state\r\nto make it more easily consumable by packages.\r\n\r\nCo-authored-by: Eddie Zaneski \u003ceddiezane@chainguard.dev\u003e\r\nSigned-off-by: Billy Lynch \u003cbilly@chainguard.dev\u003e\r\n\r\nSigned-off-by: Billy Lynch \u003cbilly@chainguard.dev\u003e\r\nCo-authored-by: Eddie Zaneski \u003ceddiezane@chainguard.dev\u003e"
     },

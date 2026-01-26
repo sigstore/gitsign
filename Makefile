@@ -51,6 +51,10 @@ install-all: install-gitsign install-credential-cache
 unit-test:
 	go test -v ./...
 
+.PHONY: proto
+proto:
+	@hack/generate-proto.sh
+
 # These tests use live dependencies, and may otherwise modify state.
 .PHONY: e2e-test
 e2e-test:
