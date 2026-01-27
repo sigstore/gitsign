@@ -16,6 +16,7 @@
 package root
 
 import (
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
 	"github.com/sigstore/gitsign/internal/commands/attest"
@@ -68,6 +69,11 @@ func New(cfg *config.Config) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s := io.New(o.Config.LogPath)
 			defer s.Close()
+
+			// Configure browser global stdout/stderr to make sure we don't pollute regular streams
+			browser.Stdout = s.TTYOut
+			browser.Stderr = s.TTYOut
+
 			return s.Wrap(func() error {
 				switch {
 				case o.FlagVersion:
