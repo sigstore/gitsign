@@ -165,13 +165,13 @@ func NewStatusWriterFromFD(fd uintptr) *StatusWriter {
 }
 
 func (w *StatusWriter) Emit(s Status) {
-	fmt.Fprintln(w.w, prefix+string(s))
+	fmt.Fprintln(w.w, prefix+string(s)) // nolint:errcheck
 }
 
 func (w *StatusWriter) Emitf(s Status, format string, args ...interface{}) {
-	fmt.Fprint(w.w, prefix)
-	fmt.Fprint(w.w, string(s))
-	fmt.Fprintf(w.w, " "+format+"\n", args...)
+	fmt.Fprint(w.w, prefix)                    // nolint:errcheck
+	fmt.Fprint(w.w, string(s))                 // nolint:errcheck
+	fmt.Fprintf(w.w, " "+format+"\n", args...) // nolint:errcheck
 }
 
 func (w *StatusWriter) EmitSigCreated(cert *x509.Certificate, isDetached bool) {

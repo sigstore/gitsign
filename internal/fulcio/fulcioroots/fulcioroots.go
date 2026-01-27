@@ -110,7 +110,7 @@ func FromTUF(ctx context.Context) CertificateSource {
 // FromFile loads certs from a PEM file.
 func FromFile(path string) CertificateSource {
 	return func() ([]*x509.Certificate, error) {
-		b, err := os.ReadFile(path)
+		b, err := os.ReadFile(path) // nolint:gosec
 		if err != nil {
 			return nil, err
 		}

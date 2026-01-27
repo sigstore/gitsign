@@ -24,7 +24,7 @@ import (
 )
 
 func ParseCommit(t *testing.T, path string) *object.Commit {
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) // nolint:gosec
 	if err != nil {
 		t.Fatalf("error reading input: %v", err)
 	}

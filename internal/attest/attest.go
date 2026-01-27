@@ -80,11 +80,11 @@ func NewAttestor(repo *git.Repository, sv *signcommon.SignerVerifier, rekorFn re
 
 // WriteFile is a convenience wrapper around WriteAttestation that takes in a filepath rather than an io.Reader.
 func (a *Attestor) WriteFile(ctx context.Context, refName string, sha plumbing.Hash, path, attType string) (plumbing.Hash, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // nolint:gosec
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
-	defer f.Close()
+	defer f.Close() // nolint:errcheck
 
 	return a.WriteAttestation(ctx, refName, sha, f, attType)
 }

@@ -99,7 +99,7 @@ func getTimestamp(si protocol.SignerInfo, opts x509.VerifyOptions) (timestamp.In
 
 	// verify timestamp signature and certificate chain..
 	if _, err = tst.Verify(opts, opts); err != nil {
-		return timestamp.Info{}, err
+		return timestamp.Info{}, err // nolint:staticcheck
 	}
 
 	// verify timestamp token matches SignerInfo.
