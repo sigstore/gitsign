@@ -19,13 +19,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/sigstore/gitsign/internal/config"
+	"github.com/sigstore/gitsign/internal/sigstoreroot"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 type CertificateSource func() ([]*x509.Certificate, error)
@@ -67,41 +67,27 @@ func NewFromConfig(ctx context.Context, cfg *config.Config) (*x509.CertPool, *x5
 	return New(x509.NewCertPool(), src...)
 }
 
-const (
-	// This is the root in the fulcio project.
-	fulcioTargetStr = "fulcio.crt.pem"
-
-	// This is the v1 migrated root.
-	fulcioV1TargetStr = "fulcio_v1.crt.pem"
-
-	// This is the untrusted v1 intermediate CA certificate, used or chain building.
-	fulcioV1IntermediateTargetStr = "fulcio_intermediate_v1.crt.pem"
-)
-
-// FromTUF loads certs from the TUF client.
-func FromTUF(ctx context.Context) CertificateSource {
+// FromTUF loads Fulcio certificates from the sigstore-go TUF cache.
+func FromTUF(_ context.Context) CertificateSource {
 	return func() ([]*x509.Certificate, error) {
-		tufClient, err := tuf.NewFromEnv(ctx)
+		trustedRoot, err := sigstoreroot.FetchTrustedRoot()
 		if err != nil {
 			return nil, fmt.Errorf("initializing tuf: %w", err)
 		}
-		// Retrieve from the embedded or cached TUF root. If expired, a network
-		// call is made to update the root.
-		targets, err := tufClient.GetTargetsByMeta(tuf.Fulcio, []string{fulcioTargetStr, fulcioV1TargetStr, fulcioV1IntermediateTargetStr})
+		certs, err := sigstoreroot.FulcioCertificates(trustedRoot)
 		if err != nil {
-			return nil, fmt.Errorf("error getting targets: %w", err)
+			return nil, fmt.Errorf("initializing tuf: %w", err)
 		}
-		if len(targets) == 0 {
-			return nil, errors.New("none of the Fulcio roots have been found")
-		}
+		return certs, nil
+	}
+}
 
-		certs := []*x509.Certificate{}
-		for _, t := range targets {
-			c, err := cryptoutils.UnmarshalCertificatesFromPEM(t.Target)
-			if err != nil {
-				return nil, fmt.Errorf("error unmarshalling certificates: %w", err)
-			}
-			certs = append(certs, c...)
+// FromTrustedRoot loads Fulcio certificates from a pre-fetched TrustedRoot.
+func FromTrustedRoot(trustedRoot *root.TrustedRoot) CertificateSource {
+	return func() ([]*x509.Certificate, error) {
+		certs, err := sigstoreroot.FulcioCertificates(trustedRoot)
+		if err != nil {
+			return nil, fmt.Errorf("getting fulcio certificates from trusted root: %w", err)
 		}
 		return certs, nil
 	}
