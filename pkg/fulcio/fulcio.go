@@ -42,7 +42,7 @@ type ClientImpl struct {
 type OIDCOptions struct {
 	Issuer       string
 	ClientID     string
-	ClientSecret string
+	ClientSecret string //nolint:gosec
 	RedirectURL  string
 	TokenGetter  oauthflow.TokenGetter
 }

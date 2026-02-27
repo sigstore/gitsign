@@ -17,7 +17,7 @@ package api // nolint:revive
 import "github.com/sigstore/gitsign/internal/config"
 
 type Credential struct {
-	PrivateKey []byte
+	PrivateKey []byte //nolint:gosec
 	Cert       []byte
 	Chain      []byte
 }

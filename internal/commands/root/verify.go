@@ -69,10 +69,6 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 	}
 	summary, err := v.Verify(ctx, data, sig, true)
 	if err != nil {
-		return err
-	}
-
-	if err != nil {
 		if summary != nil && summary.Cert != nil {
 			gpgout.EmitBadSig(summary.Cert)
 		} else {
