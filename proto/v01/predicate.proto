@@ -26,6 +26,20 @@ message GitCommit {
   repeated SignerInfo signer_info = 3 [json_name = "signer_info"];
 }
 
+message GitTag {
+  Tag source = 4 [json_name = "source"];
+  string signature = 2 [json_name = "signature"];
+  repeated SignerInfo signer_info = 3 [json_name = "signer_info"];
+}
+
+message Tag {
+  string object = 1 [json_name = "object"];
+  string object_type = 2 [json_name = "object_type"]; // object type (eg 'commit')
+  string tag = 3 [json_name = "tag"];
+  Author tagger = 4 [json_name = "tagger"];
+  string message = 5 [json_name = "message"];
+}
+
 message Commit {
   string tree = 1 [json_name = "tree"];
   repeated string parents = 2 [json_name = "parents"];
