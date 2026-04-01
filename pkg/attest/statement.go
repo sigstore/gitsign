@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"fmt"
 
 	"github.com/github/smimesign/ietf-cms/protocol"
 	"github.com/go-git/go-git/v5"
@@ -137,18 +138,10 @@ func TagStatement(repo *git.Repository, remote, tagName string) (*intoto.Stateme
 		return nil, err
 	}
 
-	// Try to get the tag object. If this fails, the tag is not annotated
+	// Try to get the tag object. If this fails, the tag is not annotated.
 	tagObj, err := repo.TagObject(ref.Hash())
 	if err != nil {
-		// Build a minimal predicate with no signature.
-		pred := &predicate.GitTag{
-			Source: &predicate.Tag{
-				Object:     ref.Hash().String(),
-				ObjectType: "commit",
-				Tag:        tagName,
-			},
-		}
-		return buildTagStatement(repo, remote, ref.Hash(), pred, predicate.TagTypeV01)
+		return nil, fmt.Errorf("tag %q is not an annotated tag", tagName)
 	}
 
 	// We've got the annotated tag. Create the full predicate

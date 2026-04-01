@@ -16,6 +16,7 @@ package show
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -59,21 +60,24 @@ func (o *options) Run(w io.Writer, args []string) error {
 }
 
 // statement resolves the revision and returns a tag or commit attestation
-// depending on the object type it points to.
+// depending on the object type it points to. Lightweight tags are rejected
+// since all their data comes from the commit — use the commit ref directly
+// instead.
 func statement(repo *git.Repository, remote, revision string) (*intoto.Statement, error) {
-	// First, try to resolve the revision as a tag reference and check if it
-	// points to an annotated tag object.
 	ref, err := repo.Reference(plumbing.NewTagReferenceName(revision), false)
 	if err == nil {
-		// The ref exists under refs/tags/. Check the object type.
-		if obj, err := repo.Object(plumbing.AnyObject, ref.Hash()); err == nil {
-			if obj.Type() == plumbing.TagObject {
-				return attest.TagStatement(repo, remote, revision)
-			}
+		obj, err := repo.Object(plumbing.AnyObject, ref.Hash())
+		if err != nil {
+			return nil, err
 		}
+		if obj.Type() == plumbing.TagObject {
+			return attest.TagStatement(repo, remote, revision)
+		}
+		// Lightweight tag — reject it.
+		return nil, fmt.Errorf("%s is not an annotated tag", revision)
 	}
 
-	// Not an annotated tag — resolve as a commit.
+	// Not a tag ref at all — resolve as a commit.
 	return attest.CommitStatement(repo, remote, revision)
 }
 
