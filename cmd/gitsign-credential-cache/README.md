@@ -114,10 +114,11 @@ also updated to match).
 
 ## Running it as a launchctl service on macOS
 
-If you are a macOS user, you can run `gitsign-credential-cache` as a launchctl service by running the following commands in your terminal:
+If you are a macOS user, you can run `gitsign-credential-cache` as a launchctl service using the following instructions:
+
+Create the file `/tmp/gitsign-credential-cache.sh` with the following contents:
 
 ```sh
-cat <<EOF > /tmp/gitsign-credential-cache.sh
 #!/bin/bash
 set -euo pipefail
 
@@ -204,7 +205,11 @@ if ! grep -qF -- "${export_line}" "${shell_config_file}"; then
 else
     echo "GITSIGN_CREDENTIAL_CACHE already exists in ${shell_config_file}!"
 fi
-EOF
+```
+
+Then run the following commands in your terminal:
+
+```sh
 chmod +x /tmp/gitsign-credential-cache.sh
 echo "Running the script to create the launchctl service..."
 /tmp/gitsign-credential-cache.sh
