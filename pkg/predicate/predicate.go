@@ -15,5 +15,6 @@
 package predicate
 
 const (
-	TypeV01 = "https://gitsign.sigstore.dev/predicate/git/v0.1"
+	TypeV01    = "https://gitsign.sigstore.dev/predicate/git/v0.1"
+	TagTypeV01 = "https://gitsign.sigstore.dev/predicate/tag/v0.1"
 )

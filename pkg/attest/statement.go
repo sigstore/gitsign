@@ -124,6 +124,98 @@ func CommitStatement(repo *git.Repository, remote, revision string) (*intoto.Sta
 	}, nil
 }
 
+// TagStatement creates an intoto statement representing a git tag signature.
+//
+// The statement subject is the tag object itself (not the underlying commit).
+// For lightweight (non-annotated) tags or unsigned annotated tags the statement
+// will still be produced but without signature or signer information, mirroring
+// how CommitStatement handles unsigned commits.
+func TagStatement(repo *git.Repository, remote, tagName string) (*intoto.Statement, error) {
+	// Resolve the tag reference.
+	ref, err := repo.Tag(tagName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to get the tag object. If this fails, the tag is not annotated
+	tagObj, err := repo.TagObject(ref.Hash())
+	if err != nil {
+		// Build a minimal predicate with no signature.
+		pred := &predicate.GitTag{
+			Source: &predicate.Tag{
+				Object:     ref.Hash().String(),
+				ObjectType: "commit",
+				Tag:        tagName,
+			},
+		}
+		return buildTagStatement(repo, remote, ref.Hash(), pred, predicate.TagTypeV01)
+	}
+
+	// We've got the annotated tag. Create the full predicate
+	pred := &predicate.GitTag{
+		Source: &predicate.Tag{
+			Object:     tagObj.Target.String(),
+			ObjectType: tagObj.TargetType.String(),
+			Tag:        tagObj.Name,
+			Tagger: &predicate.Author{
+				Name:  tagObj.Tagger.Name,
+				Email: tagObj.Tagger.Email,
+				Date:  timestamppb.New(tagObj.Tagger.When),
+			},
+			Message: tagObj.Message,
+		},
+		Signature: tagObj.PGPSignature,
+	}
+
+	// Extract signer info from the signature.
+	if pemBlock, _ := pem.Decode([]byte(tagObj.PGPSignature)); pemBlock != nil {
+		sigs, err := parseSignature(pemBlock.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		pred.SignerInfo = sigs
+	}
+
+	return buildTagStatement(repo, remote, ref.Hash(), pred, predicate.TagTypeV01)
+}
+
+func buildTagStatement(repo *git.Repository, remote string, tagHash plumbing.Hash, pred *predicate.GitTag, predicateType string) (*intoto.Statement, error) {
+	// Try to resolve the remote name for the subject.
+	resolvedRemote, err := repo.Remote(remote)
+	if err != nil && !errors.Is(err, git.ErrRemoteNotFound) {
+		return nil, err
+	}
+	remoteName := ""
+	if resolvedRemote != nil && resolvedRemote.Config() != nil && len(resolvedRemote.Config().URLs) > 0 {
+		remoteName = resolvedRemote.Config().URLs[0]
+	}
+
+	// Convert predicate to structpb.Struct for in-toto Statement.
+	jsonBytes, err := protojson.Marshal(pred)
+	if err != nil {
+		return nil, err
+	}
+	predicateStruct := &structpb.Struct{}
+	if err := protojson.Unmarshal(jsonBytes, predicateStruct); err != nil {
+		return nil, err
+	}
+
+	return &intoto.Statement{
+		Type: intoto.StatementTypeUri,
+		Subject: []*intoto.ResourceDescriptor{
+			{
+				Digest: map[string]string{
+					"sha1":   tagHash.String(),
+					"gitTag": tagHash.String(),
+				},
+				Name: remoteName,
+			},
+		},
+		Predicate:     predicateStruct,
+		PredicateType: predicateType,
+	}, nil
+}
+
 func parseSignature(raw []byte) ([]*predicate.SignerInfo, error) {
 	ci, err := protocol.ParseContentInfo(raw)
 	if err != nil {
