@@ -96,6 +96,142 @@ func (x *GitCommit) GetSignerInfo() []*SignerInfo {
 	return nil
 }
 
+type GitTag struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Source        *Tag                   `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	Signature     string                 `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+	SignerInfo    []*SignerInfo          `protobuf:"bytes,3,rep,name=signer_info,proto3" json:"signer_info,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GitTag) Reset() {
+	*x = GitTag{}
+	mi := &file_predicate_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GitTag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitTag) ProtoMessage() {}
+
+func (x *GitTag) ProtoReflect() protoreflect.Message {
+	mi := &file_predicate_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitTag.ProtoReflect.Descriptor instead.
+func (*GitTag) Descriptor() ([]byte, []int) {
+	return file_predicate_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GitTag) GetSource() *Tag {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *GitTag) GetSignature() string {
+	if x != nil {
+		return x.Signature
+	}
+	return ""
+}
+
+func (x *GitTag) GetSignerInfo() []*SignerInfo {
+	if x != nil {
+		return x.SignerInfo
+	}
+	return nil
+}
+
+type Tag struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Object        string                 `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
+	ObjectType    string                 `protobuf:"bytes,2,opt,name=object_type,proto3" json:"object_type,omitempty"` // object type (eg 'commit')
+	Tag           string                 `protobuf:"bytes,3,opt,name=tag,proto3" json:"tag,omitempty"`
+	Tagger        *Author                `protobuf:"bytes,4,opt,name=tagger,proto3" json:"tagger,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Tag) Reset() {
+	*x = Tag{}
+	mi := &file_predicate_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Tag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Tag) ProtoMessage() {}
+
+func (x *Tag) ProtoReflect() protoreflect.Message {
+	mi := &file_predicate_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Tag.ProtoReflect.Descriptor instead.
+func (*Tag) Descriptor() ([]byte, []int) {
+	return file_predicate_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Tag) GetObject() string {
+	if x != nil {
+		return x.Object
+	}
+	return ""
+}
+
+func (x *Tag) GetObjectType() string {
+	if x != nil {
+		return x.ObjectType
+	}
+	return ""
+}
+
+func (x *Tag) GetTag() string {
+	if x != nil {
+		return x.Tag
+	}
+	return ""
+}
+
+func (x *Tag) GetTagger() *Author {
+	if x != nil {
+		return x.Tagger
+	}
+	return nil
+}
+
+func (x *Tag) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type Commit struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tree          string                 `protobuf:"bytes,1,opt,name=tree,proto3" json:"tree,omitempty"`
@@ -109,7 +245,7 @@ type Commit struct {
 
 func (x *Commit) Reset() {
 	*x = Commit{}
-	mi := &file_predicate_proto_msgTypes[1]
+	mi := &file_predicate_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -121,7 +257,7 @@ func (x *Commit) String() string {
 func (*Commit) ProtoMessage() {}
 
 func (x *Commit) ProtoReflect() protoreflect.Message {
-	mi := &file_predicate_proto_msgTypes[1]
+	mi := &file_predicate_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,7 +270,7 @@ func (x *Commit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Commit.ProtoReflect.Descriptor instead.
 func (*Commit) Descriptor() ([]byte, []int) {
-	return file_predicate_proto_rawDescGZIP(), []int{1}
+	return file_predicate_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Commit) GetTree() string {
@@ -183,7 +319,7 @@ type Author struct {
 
 func (x *Author) Reset() {
 	*x = Author{}
-	mi := &file_predicate_proto_msgTypes[2]
+	mi := &file_predicate_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +331,7 @@ func (x *Author) String() string {
 func (*Author) ProtoMessage() {}
 
 func (x *Author) ProtoReflect() protoreflect.Message {
-	mi := &file_predicate_proto_msgTypes[2]
+	mi := &file_predicate_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +344,7 @@ func (x *Author) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Author.ProtoReflect.Descriptor instead.
 func (*Author) Descriptor() ([]byte, []int) {
-	return file_predicate_proto_rawDescGZIP(), []int{2}
+	return file_predicate_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Author) GetName() string {
@@ -242,7 +378,7 @@ type SignerInfo struct {
 
 func (x *SignerInfo) Reset() {
 	*x = SignerInfo{}
-	mi := &file_predicate_proto_msgTypes[3]
+	mi := &file_predicate_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -254,7 +390,7 @@ func (x *SignerInfo) String() string {
 func (*SignerInfo) ProtoMessage() {}
 
 func (x *SignerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_predicate_proto_msgTypes[3]
+	mi := &file_predicate_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -267,7 +403,7 @@ func (x *SignerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignerInfo.ProtoReflect.Descriptor instead.
 func (*SignerInfo) Descriptor() ([]byte, []int) {
-	return file_predicate_proto_rawDescGZIP(), []int{3}
+	return file_predicate_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SignerInfo) GetAttributes() string {
@@ -292,7 +428,17 @@ const file_predicate_proto_rawDesc = "" +
 	"\tGitCommit\x12>\n" +
 	"\x06source\x18\x01 \x01(\v2&.sigstore.gitsign.predicate.v01.CommitR\x06source\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\tR\tsignature\x12L\n" +
-	"\vsigner_info\x18\x03 \x03(\v2*.sigstore.gitsign.predicate.v01.SignerInfoR\vsigner_info\"\xd6\x01\n" +
+	"\vsigner_info\x18\x03 \x03(\v2*.sigstore.gitsign.predicate.v01.SignerInfoR\vsigner_info\"\xb1\x01\n" +
+	"\x06GitTag\x12;\n" +
+	"\x06source\x18\x04 \x01(\v2#.sigstore.gitsign.predicate.v01.TagR\x06source\x12\x1c\n" +
+	"\tsignature\x18\x02 \x01(\tR\tsignature\x12L\n" +
+	"\vsigner_info\x18\x03 \x03(\v2*.sigstore.gitsign.predicate.v01.SignerInfoR\vsigner_info\"\xab\x01\n" +
+	"\x03Tag\x12\x16\n" +
+	"\x06object\x18\x01 \x01(\tR\x06object\x12 \n" +
+	"\vobject_type\x18\x02 \x01(\tR\vobject_type\x12\x10\n" +
+	"\x03tag\x18\x03 \x01(\tR\x03tag\x12>\n" +
+	"\x06tagger\x18\x04 \x01(\v2&.sigstore.gitsign.predicate.v01.AuthorR\x06tagger\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\"\xd6\x01\n" +
 	"\x06Commit\x12\x12\n" +
 	"\x04tree\x18\x01 \x01(\tR\x04tree\x12\x18\n" +
 	"\aparents\x18\x02 \x03(\tR\aparents\x12>\n" +
@@ -322,25 +468,30 @@ func file_predicate_proto_rawDescGZIP() []byte {
 	return file_predicate_proto_rawDescData
 }
 
-var file_predicate_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_predicate_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_predicate_proto_goTypes = []any{
 	(*GitCommit)(nil),             // 0: sigstore.gitsign.predicate.v01.GitCommit
-	(*Commit)(nil),                // 1: sigstore.gitsign.predicate.v01.Commit
-	(*Author)(nil),                // 2: sigstore.gitsign.predicate.v01.Author
-	(*SignerInfo)(nil),            // 3: sigstore.gitsign.predicate.v01.SignerInfo
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
+	(*GitTag)(nil),                // 1: sigstore.gitsign.predicate.v01.GitTag
+	(*Tag)(nil),                   // 2: sigstore.gitsign.predicate.v01.Tag
+	(*Commit)(nil),                // 3: sigstore.gitsign.predicate.v01.Commit
+	(*Author)(nil),                // 4: sigstore.gitsign.predicate.v01.Author
+	(*SignerInfo)(nil),            // 5: sigstore.gitsign.predicate.v01.SignerInfo
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
 }
 var file_predicate_proto_depIdxs = []int32{
-	1, // 0: sigstore.gitsign.predicate.v01.GitCommit.source:type_name -> sigstore.gitsign.predicate.v01.Commit
-	3, // 1: sigstore.gitsign.predicate.v01.GitCommit.signer_info:type_name -> sigstore.gitsign.predicate.v01.SignerInfo
-	2, // 2: sigstore.gitsign.predicate.v01.Commit.author:type_name -> sigstore.gitsign.predicate.v01.Author
-	2, // 3: sigstore.gitsign.predicate.v01.Commit.committer:type_name -> sigstore.gitsign.predicate.v01.Author
-	4, // 4: sigstore.gitsign.predicate.v01.Author.date:type_name -> google.protobuf.Timestamp
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	3, // 0: sigstore.gitsign.predicate.v01.GitCommit.source:type_name -> sigstore.gitsign.predicate.v01.Commit
+	5, // 1: sigstore.gitsign.predicate.v01.GitCommit.signer_info:type_name -> sigstore.gitsign.predicate.v01.SignerInfo
+	2, // 2: sigstore.gitsign.predicate.v01.GitTag.source:type_name -> sigstore.gitsign.predicate.v01.Tag
+	5, // 3: sigstore.gitsign.predicate.v01.GitTag.signer_info:type_name -> sigstore.gitsign.predicate.v01.SignerInfo
+	4, // 4: sigstore.gitsign.predicate.v01.Tag.tagger:type_name -> sigstore.gitsign.predicate.v01.Author
+	4, // 5: sigstore.gitsign.predicate.v01.Commit.author:type_name -> sigstore.gitsign.predicate.v01.Author
+	4, // 6: sigstore.gitsign.predicate.v01.Commit.committer:type_name -> sigstore.gitsign.predicate.v01.Author
+	6, // 7: sigstore.gitsign.predicate.v01.Author.date:type_name -> google.protobuf.Timestamp
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_predicate_proto_init() }
@@ -354,7 +505,7 @@ func file_predicate_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_predicate_proto_rawDesc), len(file_predicate_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
