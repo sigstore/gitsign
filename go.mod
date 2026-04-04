@@ -6,8 +6,8 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/github/smimesign v0.2.0
-	github.com/go-git/go-billy/v5 v5.7.0
-	github.com/go-git/go-git/v5 v5.16.5
+	github.com/go-git/go-billy/v5 v5.8.0
+	github.com/go-git/go-git/v5 v5.17.1
 	github.com/go-openapi/runtime v0.29.2
 	github.com/go-openapi/strfmt v0.25.0
 	github.com/go-openapi/swag/conv v0.25.4
@@ -104,7 +104,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
-	github.com/cloudflare/circl v1.6.2 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20251210132809-ee656c7534f5 // indirect
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.1 // indirect
