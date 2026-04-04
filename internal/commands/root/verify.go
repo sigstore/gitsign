@@ -46,7 +46,7 @@ func commandVerify(o *options, s *gsio.Streams, args ...string) error {
 		return errors.New("armor cannot be specified for verification")
 	}
 
-	gpgout := gpg.NewStatusWriterFromFD(uintptr(o.FlagStatusFD))
+	gpgout := gpg.NewStatusWriterFromFD(o.FlagStatusFD)
 	gpgout.Emit(gpg.StatusNewSig)
 
 	var (

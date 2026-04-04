@@ -50,7 +50,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 	// Git is looking for "\n[GNUPG:] SIG_CREATED ", meaning we need to print a
 	// line before SIG_CREATED. BEGIN_SIGNING seems appropriate. GPG emits this,
 	// though GPGSM does not.
-	gpgout := gpg.NewStatusWriterFromFD(uintptr(o.FlagStatusFD))
+	gpgout := gpg.NewStatusWriterFromFD(o.FlagStatusFD)
 	gpgout.Emit(gpg.StatusBeginSigning)
 
 	var f io.Reader
