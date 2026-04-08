@@ -24,17 +24,20 @@ import (
 
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/git/gittest"
+	"github.com/sigstore/gitsign/internal/sigstoreroot"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 func TestVerifyOffline(t *testing.T) {
 	ctx := context.Background()
 
-	// Initialize to prod root.
-	tuf.Initialize(ctx, tuf.DefaultRemoteRoot, nil)
-	root, intermediate, err := fulcioroots.New(x509.NewCertPool(), fulcioroots.FromTUF(ctx))
+	trustedRoot, err := sigstoreroot.FetchTrustedRoot()
+	if err != nil {
+		t.Fatalf("error fetching trusted root: %v", err)
+	}
+
+	root, intermediate, err := fulcioroots.New(x509.NewCertPool(), fulcioroots.FromTrustedRoot(trustedRoot))
 	if err != nil {
 		t.Fatalf("error getting certificate root: %v", err)
 	}

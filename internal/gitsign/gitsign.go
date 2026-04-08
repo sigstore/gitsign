@@ -26,6 +26,7 @@ import (
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	rekorinternal "github.com/sigstore/gitsign/internal/rekor"
+	"github.com/sigstore/gitsign/internal/sigstoreroot"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
@@ -86,9 +87,17 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 	// and warn if missing.
 	var certverifier cert.Verifier
 	if opts != nil {
-		ctpub, err := cosign.GetCTLogPubs(ctx)
+		trustedRoot, err := sigstoreroot.FetchTrustedRoot()
+		if err != nil {
+			return nil, fmt.Errorf("error fetching trusted root: %w", err)
+		}
+		ctpub, err := sigstoreroot.GetCTLogPubs(trustedRoot)
 		if err != nil {
 			return nil, fmt.Errorf("error getting CT log public key: %w", err)
+		}
+		rekorPubs, err := sigstoreroot.GetRekorPubs(trustedRoot)
+		if err != nil {
+			return nil, fmt.Errorf("error getting Rekor public key: %w", err)
 		}
 		identities, err := opts.Identities()
 		if err != nil {
@@ -99,7 +108,7 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 			RootCerts:                    root,
 			IntermediateCerts:            intermediate,
 			CTLogPubKeys:                 ctpub,
-			RekorPubKeys:                 rekor.PublicKeys(),
+			RekorPubKeys:                 rekorPubs,
 			CertGithubWorkflowTrigger:    opts.CertGithubWorkflowTrigger,
 			CertGithubWorkflowSha:        opts.CertGithubWorkflowSha,
 			CertGithubWorkflowName:       opts.CertGithubWorkflowName,

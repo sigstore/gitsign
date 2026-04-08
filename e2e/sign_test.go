@@ -30,6 +30,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/sigstore/cosign/v3/pkg/providers"
 	"github.com/sigstore/gitsign/internal/git/gittest"
+	"github.com/sigstore/gitsign/internal/sigstoreroot"
 	"github.com/sigstore/gitsign/pkg/fulcio"
 	gsgit "github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/gitsign"
@@ -104,7 +105,11 @@ func TestSign(t *testing.T) {
 	sig := []byte(commit.PGPSignature)
 
 	// Verify the commit
-	verifier, err := gsgit.NewDefaultVerifier(ctx)
+	trustedRoot, err := sigstoreroot.FetchTrustedRoot()
+	if err != nil {
+		t.Fatalf("error fetching trusted root: %v", err)
+	}
+	verifier, err := gsgit.NewVerifierFromTrustedRoot(trustedRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
