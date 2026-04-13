@@ -12,7 +12,7 @@ require (
 	github.com/go-openapi/strfmt v0.26.0
 	github.com/go-openapi/swag/conv v0.25.5
 	github.com/google/go-cmp v0.7.0
-	github.com/in-toto/attestation v1.1.2
+	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-tty v0.0.7
 	github.com/patrickmn/go-cache v2.1.0+incompatible
