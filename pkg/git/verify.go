@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
@@ -118,76 +117,34 @@ func VerifySignature(data, sig []byte, detached bool, rootCerts, intermediates *
 	return v.Verify(context.Background(), data, sig, detached)
 }
 
-type encoder interface {
-	Encode(o plumbing.EncodedObject) error
-}
-
-// ObjectHash is a string representation of an encoded Git object
+// ObjectHash is a string representation of an encoded Git object. data is the
+// signed payload (the bytes fed to the verifier); sig is the PEM-encoded
+// signature that was embedded in the object. The returned hash matches what
+// git-core computes for the reassembled raw object.
 func ObjectHash(data, sig []byte) (string, error) {
-	// Precompute commit hash to store in tlog
-	obj := &plumbing.MemoryObject{}
-	if _, err := obj.Write(data); err != nil {
-		return "", err
-	}
-
 	var (
-		encoder encoder
+		raw     []byte
+		objType plumbing.ObjectType
 		err     error
 	)
-	// We're making big assumptions here about the ordering of fields
-	// in Git objects. Unfortunately go-git does loose parsing of objects,
-	// so it will happily decode objects that don't match the unmarshal type.
-	// We should see if there's a better way to detect object types.
 	switch {
 	case bytes.HasPrefix(data, []byte("tree ")):
-		encoder, err = commit(obj, sig)
+		raw, err = JoinCommit(data, sig)
+		if err != nil {
+			return "", err
+		}
+		objType = plumbing.CommitObject
 	case bytes.HasPrefix(data, []byte("object ")):
-		encoder, err = tag(obj, sig)
+		raw = JoinTag(data, sig)
+		objType = plumbing.TagObject
 	default:
 		return "", errors.New("could not determine Git object type")
 	}
-	if err != nil {
+
+	obj := &plumbing.MemoryObject{}
+	obj.SetType(objType)
+	if _, err := obj.Write(raw); err != nil {
 		return "", err
 	}
-
-	// go-git will compute a hash on decode and preserve even if we alter the
-	// object data. To work around this, re-encode the object into a new object
-	// to force a new hash to be computed.
-	out := &plumbing.MemoryObject{}
-	err = encoder.Encode(out)
-	return out.Hash().String(), err
-}
-
-func commit(obj *plumbing.MemoryObject, sig []byte) (*object.Commit, error) {
-	obj.SetType(plumbing.CommitObject)
-
-	base := object.Commit{}
-	if err := base.Decode(obj); err != nil {
-		return nil, err
-	}
-	return &object.Commit{
-		Author:       base.Author,
-		Committer:    base.Committer,
-		PGPSignature: string(sig),
-		Message:      base.Message,
-		TreeHash:     base.TreeHash,
-		ParentHashes: base.ParentHashes,
-	}, nil
-}
-
-func tag(obj *plumbing.MemoryObject, sig []byte) (*object.Tag, error) {
-	obj.SetType(plumbing.TagObject)
-
-	base := object.Tag{}
-	if err := base.Decode(obj); err != nil {
-		return nil, err
-	}
-	return &object.Tag{
-		Tagger:       base.Tagger,
-		Name:         base.Name,
-		TargetType:   base.TargetType,
-		Target:       base.Target,
-		Message:      base.Message,
-		PGPSignature: string(sig),
-	}, nil
+	return obj.Hash().String(), nil
 }

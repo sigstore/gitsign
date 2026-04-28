@@ -60,29 +60,28 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error resolving commit object: %w", err)
 	}
-	c, err := repo.CommitObject(*h)
+
+	obj, err := repo.Storer.EncodedObject(plumbing.CommitObject, *h)
 	if err != nil {
 		return fmt.Errorf("error reading commit object: %w", err)
 	}
-
-	sig := []byte(c.PGPSignature)
-	p, _ := pem.Decode(sig)
-	if p == nil || p.Type != "SIGNED MESSAGE" {
-		return fmt.Errorf("unsupported signature type")
-	}
-
-	c2 := new(plumbing.MemoryObject)
-	if err := c.EncodeWithoutSignature(c2); err != nil {
-		return err
-	}
-	r, err := c2.Reader()
+	r, err := obj.Reader()
 	if err != nil {
 		return err
 	}
 	defer r.Close() // nolint:errcheck
-	data, err := io.ReadAll(r)
+
+	data, sig, err := git.SplitCommit(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("error extracting commit signature: %w", err)
+	}
+
+	p, _ := pem.Decode(sig)
+	if p == nil {
+		return fmt.Errorf("%w: not a PEM block", git.ErrUnsupportedSignatureType)
+	}
+	if p.Type != "SIGNED MESSAGE" {
+		return fmt.Errorf("%w: %q", git.ErrUnsupportedSignatureType, p.Type)
 	}
 
 	v, err := gitsign.NewVerifierWithCosignOpts(ctx, o.Config, &o.CertVerifyOptions)

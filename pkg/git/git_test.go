@@ -14,104 +14,60 @@
 
 package git
 
-import "testing"
+import (
+	"bytes"
+	"os"
+	"testing"
+)
 
+// loadObject reads a raw object from testdata. The bytes are exactly what
+// git's object store holds (i.e. the output of `git cat-file -p <ref>`),
+// without the "<type> <size>\0" prefix that git prepends before hashing.
+func loadObject(t *testing.T, name string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatalf("read testdata/%s: %v", name, err)
+	}
+	return raw
+}
+
+// SHAs of the objects in testdata, verified against git's stored hash:
+//
+//	printf 'commit %d\0' $(wc -c < testdata/commit.txt) | cat - testdata/commit.txt | shasum
+//	printf 'tag %d\0'    $(wc -c < testdata/tag.txt)    | cat - testdata/tag.txt    | shasum
 const (
-	// These are real commit values generated in a test repo that were manually verified.
-
-	// Rekor index: 2802961
-	tagBody = `object 040b9af339e69d18848b7bbe05cb27ee42bb0161
-type commit
-tag signed-tag2
-tagger Billy Lynch <billy@chainguard.dev> 1656531453 -0400
-
-asdf
-`
-	tagSig = `-----BEGIN SIGNED MESSAGE-----
-MIIEBQYJKoZIhvcNAQcCoIID9jCCA/ICAQExDTALBglghkgBZQMEAgEwCwYJKoZI
-hvcNAQcBoIICpjCCAqIwggIooAMCAQICFGc8V7+B2VlJeFLpglonkbyb2kVeMAoG
-CCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln
-c3RvcmUtaW50ZXJtZWRpYXRlMB4XDTIyMDYyOTE5MzczOVoXDTIyMDYyOTE5NDcz
-OVowADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABP8JBFjhGqQsQCBmZqyuSHcG
-KZpDDRdpq7cl8Bhwuvu9A2bDz0gcuA/Nv18fKtikguBw6YBmEPi8S/YMYgMctVyj
-ggFHMIIBQzAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYD
-VR0OBBYEFMhi60DZPBYkwhDEuiltjyvxYYTDMB8GA1UdIwQYMBaAFN/T6c9WJBGW
-+ajY6ShVosYuGGQ/MCIGA1UdEQEB/wQYMBaBFGJpbGx5QGNoYWluZ3VhcmQuZGV2
-MCwGCisGAQQBg78wAQEEHmh0dHBzOi8vZ2l0aHViLmNvbS9sb2dpbi9vYXV0aDCB
-iQYKKwYBBAHWeQIEAgR7BHkAdwB1AAhgkvAoUv9oRdHRayeEnEVnGKwWPcM40m3m
-vCIGNm9yAAABgbD4HlAAAAQDAEYwRAIgON4g6BzdFgOIcCFk+8EXKpEw1XD0/DZ2
-7gcb9Q/Jeg0CIGozxLGJS71uA2OU3JD6pGWCdnpYVsiG44/Em5w34SHmMAoGCCqG
-SM49BAMDA2gAMGUCMQDjLNl6Zaj5HbfLqqUvWNgz/R1VoQ3QG88kzu3GY0PodO8K
-QDcgt8bcGXzEdKkSFg4CMHIkGGLrG3bOYsjyIqZxiO6ess1jJxsFnM+GzvjwNRJk
-eWF9g96u/pNN8KA5VhveljGCASUwggEhAgEBME8wNzEVMBMGA1UEChMMc2lnc3Rv
-cmUuZGV2MR4wHAYDVQQDExVzaWdzdG9yZS1pbnRlcm1lZGlhdGUCFGc8V7+B2VlJ
-eFLpglonkbyb2kVeMAsGCWCGSAFlAwQCAaBpMBgGCSqGSIb3DQEJAzELBgkqhkiG
-9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTIyMDYyOTE5MzczOVowLwYJKoZIhvcNAQkE
-MSIEINZzCK5apWIVIKK26tVflr6zNoFkJm8SXQC5T65qwF1BMAoGCCqGSM49BAMC
-BEcwRQIgfAl7Elc0DB8UEMOXo3ZxKmN7zTrMO/tvhu1Himgc9IYCIQCxf06wWHVw
-YKHxU2tY8MNGomLVk0LyA/QaHQnoo34t8A==
------END SIGNED MESSAGE-----
-`
-	tagSHA = "ed092bb8688d6e37185bcdb58900940703c1a292"
-
-	// Rekor index: 2801760
-	commitBody = `tree b333504b8cf3d9c314fed2cc242c5c38e89534a5
-parent 2dc0ab59d7f0a7a62423bd181d9e2ab3adb7b56d
-author Billy Lynch <billy@chainguard.dev> 1656524971 -0400
-committer Billy Lynch <billy@chainguard.dev> 1656524971 -0400
-
-foo
-`
-	commitSig = `-----BEGIN SIGNED MESSAGE-----
-MIIEBwYJKoZIhvcNAQcCoIID+DCCA/QCAQExDTALBglghkgBZQMEAgEwCwYJKoZI
-hvcNAQcBoIICqDCCAqQwggIqoAMCAQICFHtMvZZL50P5bLkgDxwMf2MN4jdAMAoG
-CCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln
-c3RvcmUtaW50ZXJtZWRpYXRlMB4XDTIyMDYyOTE3NDkzNFoXDTIyMDYyOTE3NTkz
-NFowADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNf9io+JonCZhwe/dSkSoJ/Y
-eRun8C7xhPVF3FhoPnPVWdywaAEIkniA2WSHXLHt5aQN/08bV65haMZA/Luhmhaj
-ggFJMIIBRTAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYD
-VR0OBBYEFGzhjCzFUI0caspJJfD4bToYxfDhMB8GA1UdIwQYMBaAFN/T6c9WJBGW
-+ajY6ShVosYuGGQ/MCIGA1UdEQEB/wQYMBaBFGJpbGx5QGNoYWluZ3VhcmQuZGV2
-MCwGCisGAQQBg78wAQEEHmh0dHBzOi8vZ2l0aHViLmNvbS9sb2dpbi9vYXV0aDCB
-iwYKKwYBBAHWeQIEAgR9BHsAeQB3AAhgkvAoUv9oRdHRayeEnEVnGKwWPcM40m3m
-vCIGNm9yAAABgbCVKBkAAAQDAEgwRgIhAJHJalxdErw5icNqfgWtyrv75XGXxAZz
-F/J4b7B8ikQAAiEAj8g8ZiSIGmePmES19Y/yFeGj6Fz0NGE2Rk5uJdKyAGEwCgYI
-KoZIzj0EAwMDaAAwZQIxAKpQFL9D5s1YVEmNWBoEQ1oo6gBESGhd5L1Kcdq52Ltt
-KWXKKB7tpVRwC0lfof2ILgIwU1LTaKeKWb0vToMY9InoS2+hAVljbEh3oxKm/JoX
-hiRx2GiDe2OyLCs76/kbH6C/MYIBJTCCASECAQEwTzA3MRUwEwYDVQQKEwxzaWdz
-dG9yZS5kZXYxHjAcBgNVBAMTFXNpZ3N0b3JlLWludGVybWVkaWF0ZQIUe0y9lkvn
-Q/lsuSAPHAx/Yw3iN0AwCwYJYIZIAWUDBAIBoGkwGAYJKoZIhvcNAQkDMQsGCSqG
-SIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjIwNjI5MTc0OTM0WjAvBgkqhkiG9w0B
-CQQxIgQgSbThfvXoc6INDxPzRtlUu0TTBjFLm4XmwuxXAzfsZmkwCgYIKoZIzj0E
-AwIERzBFAiBeNZewVOFI5aa7bPUXa05HDgz5yevQ9aPclDX6U+koTAIhAMbyysil
-7I/UWLzhwM+9iusn3JXy71akUTcrqi2MNPaO
------END SIGNED MESSAGE-----
-`
-	commitSHA = "040b9af339e69d18848b7bbe05cb27ee42bb0161"
+	commitSHA = "4954440f9953588782896a1a473d8968765db82b"
+	tagSHA    = "a7c0f87e7d8f475cfe66d9c848b77cf3b85d860b"
 )
 
 func TestObjectHash(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		body string
-		sig  string
-		sha  string
+		name  string
+		file  string
+		split func([]byte) ([]byte, []byte, error)
+		sha   string
 	}{
 		{
-			name: "tag",
-			body: tagBody,
-			sig:  tagSig,
-			sha:  tagSHA,
+			name:  "commit",
+			file:  "commit.txt",
+			split: func(raw []byte) ([]byte, []byte, error) { return SplitCommit(bytes.NewReader(raw)) },
+			sha:   commitSHA,
 		},
 		{
-			name: "commit",
-			body: commitBody,
-			sig:  commitSig,
-			sha:  commitSHA,
+			name:  "tag",
+			file:  "tag.txt",
+			split: func(raw []byte) ([]byte, []byte, error) { return SplitTag(bytes.NewReader(raw)) },
+			sha:   tagSHA,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ObjectHash([]byte(tc.body), []byte(tc.sig))
+			raw := loadObject(t, tc.file)
+			body, sig, err := tc.split(raw)
+			if err != nil {
+				t.Fatalf("split: %v", err)
+			}
+			got, err := ObjectHash(body, sig)
 			if err != nil {
 				t.Fatal(err)
 			}
