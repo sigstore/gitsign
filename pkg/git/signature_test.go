@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
+	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 	"github.com/sigstore/gitsign/internal/signature"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
@@ -98,6 +100,51 @@ func TestSignVerify(t *testing.T) {
 					t.Fatalf("Verify() = %v", err)
 				}
 			})
+		})
+	}
+}
+
+// TestVerifyNoCerts ensures that Verify returns an error (rather than panicking
+// on an out-of-bounds index) when the parsed signature contains no
+// certificates.
+func TestVerifyNoCerts(t *testing.T) {
+	ctx := context.Background()
+	data := []byte("tacocat")
+
+	ca := fakeca.New()
+	sd, err := cms.NewSignedData(data)
+	if err != nil {
+		t.Fatalf("NewSignedData() = %v", err)
+	}
+	if err := sd.Sign([]*x509.Certificate{ca.Certificate}, ca.PrivateKey); err != nil {
+		t.Fatalf("Sign() = %v", err)
+	}
+	// Strip the certificates so GetCertificates returns an empty slice.
+	if err := sd.SetCertificates(nil); err != nil {
+		t.Fatalf("SetCertificates() = %v", err)
+	}
+	der, err := sd.ToDER()
+	if err != nil {
+		t.Fatalf("ToDER() = %v", err)
+	}
+
+	cv, err := NewCertVerifier(WithRootPool(x509.NewCertPool()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, detached := range []bool{true, false} {
+		t.Run(fmt.Sprintf("detached(%t)", detached), func(t *testing.T) {
+			cert, err := cv.Verify(ctx, data, der, detached)
+			if err == nil {
+				t.Fatalf("Verify() expected error, got cert %v", cert)
+			}
+			if !strings.Contains(err.Error(), "no certificates") {
+				t.Errorf("Verify() error = %v, want error containing %q", err, "no certificates")
+			}
+			if cert != nil {
+				t.Errorf("Verify() cert = %v, want nil", cert)
+			}
 		})
 	}
 }

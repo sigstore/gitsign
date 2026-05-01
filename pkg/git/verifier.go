@@ -111,6 +111,9 @@ func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool
 	if err != nil {
 		return nil, fmt.Errorf("error getting signature certs: %w", err)
 	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates found in signature")
+	}
 	cert := certs[0]
 
 	opts := x509.VerifyOptions{
