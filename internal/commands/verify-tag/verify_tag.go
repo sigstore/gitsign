@@ -74,9 +74,18 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	}
 	defer r.Close() // nolint:errcheck
 
-	data, sig, err := git.SplitTag(r)
+	t, err := git.SplitTag(r)
 	if err != nil {
 		return fmt.Errorf("error extracting tag signature: %w", err)
+	}
+
+	// Per the SHA-256 transition spec, the in-body PEM block is the
+	// signature in the tag's current hash algorithm; gpgsig /
+	// gpgsig-sha256 headers carry signatures over the alternate-algorithm
+	// form. We verify the local-form signature.
+	sig := t.InBody
+	if sig == nil {
+		return fmt.Errorf("tag has no in-body signature")
 	}
 
 	p, _ := pem.Decode(sig)
@@ -92,7 +101,7 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	summary, err := v.Verify(ctx, data, sig, true)
+	summary, err := v.Verify(ctx, t.Payload, sig, true)
 	if err != nil {
 		return err
 	}

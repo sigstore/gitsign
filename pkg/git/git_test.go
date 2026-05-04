@@ -15,7 +15,6 @@
 package git
 
 import (
-	"bytes"
 	"os"
 	"testing"
 )
@@ -43,31 +42,16 @@ const (
 
 func TestObjectHash(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		file  string
-		split func([]byte) ([]byte, []byte, error)
-		sha   string
+		name string
+		file string
+		sha  string
 	}{
-		{
-			name:  "commit",
-			file:  "commit.txt",
-			split: func(raw []byte) ([]byte, []byte, error) { return SplitCommit(bytes.NewReader(raw)) },
-			sha:   commitSHA,
-		},
-		{
-			name:  "tag",
-			file:  "tag.txt",
-			split: func(raw []byte) ([]byte, []byte, error) { return SplitTag(bytes.NewReader(raw)) },
-			sha:   tagSHA,
-		},
+		{name: "commit", file: "commit.txt", sha: commitSHA},
+		{name: "tag", file: "tag.txt", sha: tagSHA},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := loadObject(t, tc.file)
-			body, sig, err := tc.split(raw)
-			if err != nil {
-				t.Fatalf("split: %v", err)
-			}
-			got, err := ObjectHash(body, sig)
+			got, err := ObjectHash(raw)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -26,8 +26,10 @@ import (
 
 var (
 	// ErrMalformedObject is returned for structural ambiguities the
-	// downstream signature check can't catch on its own — currently just
-	// multiple gpgsig headers, where it's unclear which signature to extract.
+	// downstream signature check can't catch on its own — currently a
+	// duplicate gpgsig or gpgsig-sha256 header (where it's unclear which
+	// signature to extract) or, on the join side, a payload with no
+	// header/body separator.
 	ErrMalformedObject = errors.New("malformed git object")
 	// ErrUnsupportedSignatureType is returned when the embedded signature is
 	// not a format gitsign can verify. gitsign only accepts PEM blocks of type
@@ -35,13 +37,67 @@ var (
 	ErrUnsupportedSignatureType = errors.New("unsupported signature type")
 )
 
+// gpgsigPrefix is the SHA-1 signature header. The trailing space distinguishes
+// it from gpgsig-sha256 and any future "gpgsig-*" extension headers, which
+// are independently valid header fields.
 const gpgsigPrefix = "gpgsig "
 
-// SplitCommit splits the raw bytes of a commit object (in object-database form,
-// without the "commit <len>\0" prefix) into the payload that was signed and
-// the PEM-encoded signature. It operates purely on the raw bytes, mirroring
-// what git-core feeds to its signature verifier, and does not go through
-// go-git's object parser.
+// gpgsigSha256Prefix is the SHA-256 transition compat header introduced by
+// the hash-function-transition spec. When compatObjectFormat is set, git
+// emits this alongside gpgsig — see
+// https://git-scm.com/docs/hash-function-transition#_signed_commits.
+const gpgsigSha256Prefix = "gpgsig-sha256 "
+
+// CommitSig holds signature material extracted from a commit's raw bytes.
+//
+// Per the SHA-256 transition spec, the signed payload for either gpgsig or
+// gpgsig-sha256 is the commit content with BOTH header fields removed (in
+// the commit's own hash algorithm). The two signatures sign different bytes
+// — the SHA-1 form vs the SHA-256 form of the same logical commit — but
+// they share the same removal rule. Payload here is whatever form the
+// caller's input bytes are in, with both header fields stripped, so it
+// matches whichever of Gpgsig / GpgsigSha256 corresponds to that form.
+type CommitSig struct {
+	// Payload is the commit content with gpgsig and gpgsig-sha256 fields
+	// (and their continuation lines) removed.
+	Payload []byte
+	// Gpgsig is the PEM signature from the gpgsig header. It signs the
+	// SHA-1 form of the commit. Nil if the header is absent.
+	Gpgsig []byte
+	// GpgsigSha256 is the PEM signature from the gpgsig-sha256 header. It
+	// signs the SHA-256 form of the commit. Nil if the header is absent.
+	GpgsigSha256 []byte
+}
+
+// TagSig holds signature material extracted from a tag's raw bytes.
+//
+// Per the SHA-256 transition spec, the in-body PEM block is the signature
+// over the tag in its current hash algorithm; the gpgsig and gpgsig-sha256
+// headers are signatures over the alternate-algorithm form. All three sign
+// the same shape: tag content with both header fields and the in-body PEM
+// block removed.
+type TagSig struct {
+	// Payload is the tag content with both header signature fields and the
+	// in-body PEM block removed.
+	Payload []byte
+	// InBody is the PEM signature appended after the tag message body. It
+	// signs the tag in its own (current) hash algorithm. Nil if absent.
+	InBody []byte
+	// Gpgsig is the PEM signature from the gpgsig header — the
+	// alternate-algorithm signature when the tag's stored form is SHA-256,
+	// or unused for a SHA-1 tag. Nil if absent.
+	Gpgsig []byte
+	// GpgsigSha256 is the PEM signature from the gpgsig-sha256 header —
+	// the alternate-algorithm signature when the tag's stored form is
+	// SHA-1. Nil if absent.
+	GpgsigSha256 []byte
+}
+
+// SplitCommit parses the raw bytes of a commit object (object-database form,
+// without the "commit <len>\0" prefix) into payload + signatures.
+//
+// It operates purely on the raw bytes, mirroring what git-core feeds to its
+// signature verifier, and does not go through go-git's object parser.
 //
 // The trust-confusion class of attack (GHSA-7rmh-48mx-2vwc) relied on gitsign
 // re-encoding through go-git before verification — which normalized away
@@ -51,16 +107,21 @@ const gpgsigPrefix = "gpgsig "
 // what's stored makes the signature fail to verify cryptographically.
 // Consequently, SplitCommit doesn't reject merely "weird but git-valid"
 // objects (e.g. duplicate tree headers); the signature check below is what
-// catches them. The one structural thing we do reject is multiple gpgsig
-// headers, since that's ambiguous about which signature to extract.
-func SplitCommit(r io.Reader) (payload, sig []byte, err error) {
+// catches them. The structural things we *do* reject are duplicate gpgsig
+// or gpgsig-sha256 headers, because either is ambiguous about which
+// signature to extract.
+func SplitCommit(r io.Reader) (*CommitSig, error) {
 	scanner := bufio.NewScanner(r)
 
 	var (
 		payloadBuf bytes.Buffer
-		sigBuf     bytes.Buffer
-		inGpgsig   bool
-		inBody     bool
+		gpgsigBuf  bytes.Buffer
+		sha256Buf  bytes.Buffer
+		// activeSig points at whichever signature buffer is currently
+		// accepting continuation lines, or nil if we're in regular-header
+		// territory.
+		activeSig *bytes.Buffer
+		inBody    bool
 	)
 
 	for scanner.Scan() {
@@ -76,12 +137,12 @@ func SplitCommit(r io.Reader) (payload, sig []byte, err error) {
 			// Blank line terminates the header section.
 			payloadBuf.WriteByte('\n')
 			inBody = true
-			inGpgsig = false
+			activeSig = nil
 			continue
 		}
 
-		if inGpgsig {
-			// git-core requires exactly one leading space on a gpgsig
+		if activeSig != nil {
+			// git-core requires exactly one leading space on a signature
 			// continuation (see git/commit.c parse_buffer_signed_by_header).
 			// We accept any leading whitespace and strip it: the signature
 			// is cryptographically verified downstream, so leniency here
@@ -89,128 +150,242 @@ func SplitCommit(r io.Reader) (payload, sig []byte, err error) {
 			// rejecting signatures produced by tooling that wraps with
 			// slightly different indentation.
 			if trimmed := bytes.TrimLeftFunc(line, unicode.IsSpace); len(trimmed) < len(line) {
-				sigBuf.Write(trimmed)
-				sigBuf.WriteByte('\n')
+				activeSig.Write(trimmed)
+				activeSig.WriteByte('\n')
 				continue
 			}
-			// Non-continuation line -> gpgsig block ended; fall through and
-			// process this line as a fresh header.
-			inGpgsig = false
+			// Non-continuation line -> signature block ended; fall through
+			// and process this line as a fresh header.
+			activeSig = nil
 		}
 
-		if bytes.HasPrefix(line, []byte(gpgsigPrefix)) {
-			if sigBuf.Len() > 0 {
-				return nil, nil, fmt.Errorf("%w: duplicate gpgsig header", ErrMalformedObject)
-			}
-			inGpgsig = true
-			sigBuf.Write(line[len(gpgsigPrefix):])
-			sigBuf.WriteByte('\n')
-			continue
-		}
-
-		payloadBuf.Write(line)
-		payloadBuf.WriteByte('\n')
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, nil, err
-	}
-
-	return payloadBuf.Bytes(), sigBuf.Bytes(), nil
-}
-
-// JoinCommit is the inverse of SplitCommit. It inserts a gpgsig header
-// containing sig into payload, immediately before the blank line separating
-// headers from message body. Continuation lines are indented with a single
-// space to match git-core's wire format.
-//
-// sig is the PEM-encoded signature with lines separated by "\n". A trailing
-// newline on sig is ignored.
-func JoinCommit(payload, sig []byte) ([]byte, error) {
-	hdrEnd := bytes.Index(payload, []byte("\n\n"))
-	if hdrEnd < 0 {
-		return nil, fmt.Errorf("%w: payload has no header terminator", ErrMalformedObject)
-	}
-	// Split signature into lines, drop a single trailing newline if any.
-	s := sig
-	if len(s) > 0 && s[len(s)-1] == '\n' {
-		s = s[:len(s)-1]
-	}
-	lines := bytes.Split(s, []byte{'\n'})
-
-	var hdr bytes.Buffer
-	hdr.WriteString(gpgsigPrefix)
-	hdr.Write(lines[0])
-	hdr.WriteByte('\n')
-	for _, l := range lines[1:] {
-		hdr.WriteByte(' ')
-		hdr.Write(l)
-		hdr.WriteByte('\n')
-	}
-
-	out := make([]byte, 0, len(payload)+hdr.Len())
-	out = append(out, payload[:hdrEnd+1]...) // include the \n terminating the last header
-	out = append(out, hdr.Bytes()...)
-	out = append(out, payload[hdrEnd+1:]...) // the remaining \n + message body
-	return out, nil
-}
-
-// SplitTag splits the raw bytes of a tag object into the payload that was
-// signed and the trailing PEM signature block. Like SplitCommit, it works on
-// raw bytes and does not invoke go-git's parser, so any divergence between
-// what was signed and what's stored is caught by the cryptographic check
-// downstream rather than by structural validation here. The signature is
-// taken to start at the last line-anchored "-----BEGIN " marker, matching
-// git-core's tag verification path.
-func SplitTag(r io.Reader) (payload, sig []byte, err error) {
-	scanner := bufio.NewScanner(r)
-
-	var (
-		payloadBuf bytes.Buffer
-		sigBuf     bytes.Buffer
-		inBody     bool
-	)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-
-		if !inBody {
-			payloadBuf.Write(line)
-			payloadBuf.WriteByte('\n')
-			if len(line) == 0 {
-				inBody = true
-			}
-			continue
-		}
-
-		// In body. Track only the last "-----BEGIN " block as the signature
-		// — anything before it (including any earlier PEM-looking lines in
-		// the message body) belongs in payload.
+		// Note: check the longer prefix first so "gpgsig-sha256 " doesn't
+		// get misclassified by the "gpgsig " branch. (In practice the two
+		// don't overlap because the 7th byte differs, but ordering this way
+		// is robust against accidental future widenings of gpgsigPrefix.)
 		switch {
-		case bytes.HasPrefix(line, []byte("-----BEGIN ")):
-			payloadBuf.Write(sigBuf.Bytes())
-			sigBuf.Reset()
-			sigBuf.Write(line)
-			sigBuf.WriteByte('\n')
-		case sigBuf.Len() > 0:
-			sigBuf.Write(line)
-			sigBuf.WriteByte('\n')
+		case bytes.HasPrefix(line, []byte(gpgsigSha256Prefix)):
+			if sha256Buf.Len() > 0 {
+				return nil, fmt.Errorf("%w: duplicate gpgsig-sha256 header", ErrMalformedObject)
+			}
+			activeSig = &sha256Buf
+			activeSig.Write(line[len(gpgsigSha256Prefix):])
+			activeSig.WriteByte('\n')
+		case bytes.HasPrefix(line, []byte(gpgsigPrefix)):
+			if gpgsigBuf.Len() > 0 {
+				return nil, fmt.Errorf("%w: duplicate gpgsig header", ErrMalformedObject)
+			}
+			activeSig = &gpgsigBuf
+			activeSig.Write(line[len(gpgsigPrefix):])
+			activeSig.WriteByte('\n')
 		default:
 			payloadBuf.Write(line)
 			payloadBuf.WriteByte('\n')
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return payloadBuf.Bytes(), sigBuf.Bytes(), nil
+	return &CommitSig{
+		Payload:      payloadBuf.Bytes(),
+		Gpgsig:       sigOrNil(&gpgsigBuf),
+		GpgsigSha256: sigOrNil(&sha256Buf),
+	}, nil
 }
 
-// JoinTag is the inverse of SplitTag. The signature is appended verbatim to
-// the payload.
-func JoinTag(payload, sig []byte) []byte {
-	out := make([]byte, 0, len(payload)+len(sig))
+// JoinCommit is the inverse of SplitCommit. It re-inserts the gpgsig and
+// gpgsig-sha256 headers (those that are non-nil) into c.Payload immediately
+// before the blank line separating headers from the message body.
+// Continuation lines are indented with a single space, matching git-core's
+// wire format.
+//
+// When both headers are present they are emitted in a fixed order: gpgsig
+// first, then gpgsig-sha256. This matches git-core's emission order, so
+// objects produced by git-core round-trip byte-for-byte through Split/Join.
+func JoinCommit(c *CommitSig) ([]byte, error) {
+	if len(c.Gpgsig) == 0 && len(c.GpgsigSha256) == 0 {
+		// No signatures to insert; passthrough.
+		return c.Payload, nil
+	}
+
+	hdrEnd := bytes.Index(c.Payload, []byte("\n\n"))
+	if hdrEnd < 0 {
+		return nil, fmt.Errorf("%w: payload has no header terminator", ErrMalformedObject)
+	}
+
+	var hdr bytes.Buffer
+	if len(c.Gpgsig) > 0 {
+		writeSigHeader(&hdr, gpgsigPrefix, c.Gpgsig)
+	}
+	if len(c.GpgsigSha256) > 0 {
+		writeSigHeader(&hdr, gpgsigSha256Prefix, c.GpgsigSha256)
+	}
+
+	out := make([]byte, 0, len(c.Payload)+hdr.Len())
+	out = append(out, c.Payload[:hdrEnd+1]...) // include the \n terminating the last header
+	out = append(out, hdr.Bytes()...)
+	out = append(out, c.Payload[hdrEnd+1:]...) // the remaining \n + message body
+	return out, nil
+}
+
+// SplitTag parses the raw bytes of a tag object into payload + signatures.
+// Like SplitCommit, it works on raw bytes and does not invoke go-git's
+// parser, so any divergence between what was signed and what's stored is
+// caught by the cryptographic check downstream rather than by structural
+// validation here.
+//
+// The tag's in-body PEM block (current-algorithm signature) is taken to
+// start at the *last* line-anchored "-----BEGIN " marker, matching
+// git-core's tag verification path. Anything before it stays in the
+// payload, including any earlier PEM-looking lines an attacker might have
+// embedded in the message body. Header-style alternate-algorithm
+// signatures (gpgsig, gpgsig-sha256) are stripped from the header section
+// the same way SplitCommit does.
+func SplitTag(r io.Reader) (*TagSig, error) {
+	scanner := bufio.NewScanner(r)
+
+	var (
+		payloadBuf   bytes.Buffer
+		inBodySigBuf bytes.Buffer
+		gpgsigBuf    bytes.Buffer
+		sha256Buf    bytes.Buffer
+		activeSig    *bytes.Buffer
+		inBody       bool
+	)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+
+		if inBody {
+			switch {
+			case bytes.HasPrefix(line, []byte("-----BEGIN ")):
+				// New PEM block opens — flush any earlier candidate to
+				// payload (it wasn't the trailing block) and start fresh.
+				payloadBuf.Write(inBodySigBuf.Bytes())
+				inBodySigBuf.Reset()
+				inBodySigBuf.Write(line)
+				inBodySigBuf.WriteByte('\n')
+			case inBodySigBuf.Len() > 0:
+				inBodySigBuf.Write(line)
+				inBodySigBuf.WriteByte('\n')
+			default:
+				payloadBuf.Write(line)
+				payloadBuf.WriteByte('\n')
+			}
+			continue
+		}
+
+		if len(line) == 0 {
+			payloadBuf.WriteByte('\n')
+			inBody = true
+			activeSig = nil
+			continue
+		}
+
+		if activeSig != nil {
+			if trimmed := bytes.TrimLeftFunc(line, unicode.IsSpace); len(trimmed) < len(line) {
+				activeSig.Write(trimmed)
+				activeSig.WriteByte('\n')
+				continue
+			}
+			activeSig = nil
+		}
+
+		switch {
+		case bytes.HasPrefix(line, []byte(gpgsigSha256Prefix)):
+			if sha256Buf.Len() > 0 {
+				return nil, fmt.Errorf("%w: duplicate gpgsig-sha256 header", ErrMalformedObject)
+			}
+			activeSig = &sha256Buf
+			activeSig.Write(line[len(gpgsigSha256Prefix):])
+			activeSig.WriteByte('\n')
+		case bytes.HasPrefix(line, []byte(gpgsigPrefix)):
+			if gpgsigBuf.Len() > 0 {
+				return nil, fmt.Errorf("%w: duplicate gpgsig header", ErrMalformedObject)
+			}
+			activeSig = &gpgsigBuf
+			activeSig.Write(line[len(gpgsigPrefix):])
+			activeSig.WriteByte('\n')
+		default:
+			payloadBuf.Write(line)
+			payloadBuf.WriteByte('\n')
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return &TagSig{
+		Payload:      payloadBuf.Bytes(),
+		InBody:       sigOrNil(&inBodySigBuf),
+		Gpgsig:       sigOrNil(&gpgsigBuf),
+		GpgsigSha256: sigOrNil(&sha256Buf),
+	}, nil
+}
+
+// JoinTag is the inverse of SplitTag. It re-inserts gpgsig / gpgsig-sha256
+// headers into the header section (in fixed order: gpgsig, then
+// gpgsig-sha256) and appends the in-body PEM block after the message body.
+func JoinTag(t *TagSig) ([]byte, error) {
+	payload := t.Payload
+
+	if len(t.Gpgsig) > 0 || len(t.GpgsigSha256) > 0 {
+		hdrEnd := bytes.Index(payload, []byte("\n\n"))
+		if hdrEnd < 0 {
+			return nil, fmt.Errorf("%w: payload has no header terminator", ErrMalformedObject)
+		}
+
+		var hdr bytes.Buffer
+		if len(t.Gpgsig) > 0 {
+			writeSigHeader(&hdr, gpgsigPrefix, t.Gpgsig)
+		}
+		if len(t.GpgsigSha256) > 0 {
+			writeSigHeader(&hdr, gpgsigSha256Prefix, t.GpgsigSha256)
+		}
+
+		out := make([]byte, 0, len(payload)+hdr.Len()+len(t.InBody))
+		out = append(out, payload[:hdrEnd+1]...)
+		out = append(out, hdr.Bytes()...)
+		out = append(out, payload[hdrEnd+1:]...)
+		out = append(out, t.InBody...)
+		return out, nil
+	}
+
+	out := make([]byte, 0, len(payload)+len(t.InBody))
 	out = append(out, payload...)
-	out = append(out, sig...)
-	return out
+	out = append(out, t.InBody...)
+	return out, nil
+}
+
+// writeSigHeader emits a single header field of the form
+//
+//	prefix line1\n line2\n line3\n...
+//
+// matching git-core's wire format. sig is a PEM-encoded signature with
+// lines separated by "\n"; a trailing newline is ignored.
+func writeSigHeader(w *bytes.Buffer, prefix string, sig []byte) {
+	s := sig
+	if len(s) > 0 && s[len(s)-1] == '\n' {
+		s = s[:len(s)-1]
+	}
+	lines := bytes.Split(s, []byte{'\n'})
+
+	w.WriteString(prefix)
+	w.Write(lines[0])
+	w.WriteByte('\n')
+	for _, l := range lines[1:] {
+		w.WriteByte(' ')
+		w.Write(l)
+		w.WriteByte('\n')
+	}
+}
+
+// sigOrNil returns nil for an empty buffer (so absent signatures surface as
+// nil rather than zero-length slices).
+func sigOrNil(b *bytes.Buffer) []byte {
+	if b.Len() == 0 {
+		return nil
+	}
+	return b.Bytes()
 }

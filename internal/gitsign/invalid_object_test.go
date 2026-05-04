@@ -112,11 +112,11 @@ func TestDuplicateTreeTrustConfusion(t *testing.T) {
 		// tree headers intact) instead of the go-git-normalized form. The
 		// signature was made over the canonical (single-tree) bytes, so the
 		// cryptographic check rejects this.
-		body, sig, err := git.SplitCommit(bytes.NewReader(malformedRaw))
+		c, err := git.SplitCommit(bytes.NewReader(malformedRaw))
 		if err != nil {
 			t.Fatalf("SplitCommit: %v", err)
 		}
-		if _, err := gv.Verify(context.Background(), body, sig, true); err == nil {
+		if _, err := gv.Verify(context.Background(), c.Payload, c.Gpgsig, true); err == nil {
 			t.Fatalf("expected signature verification to fail against malformed raw bytes, got nil error")
 		}
 	})
@@ -133,11 +133,11 @@ func TestDuplicateTreeTrustConfusion(t *testing.T) {
 			message,
 		))
 
-		data, sig, err := git.SplitCommit(bytes.NewReader(wellFormed))
+		c, err := git.SplitCommit(bytes.NewReader(wellFormed))
 		if err != nil {
 			t.Fatalf("SplitCommit: %v", err)
 		}
-		if _, err := gv.Verify(context.Background(), data, sig, true); err != nil {
+		if _, err := gv.Verify(context.Background(), c.Payload, c.Gpgsig, true); err != nil {
 			t.Errorf("signature verify over well-formed bytes: %v", err)
 		}
 	})
