@@ -1,6 +1,6 @@
 module github.com/sigstore/gitsign
 
-go 1.25.7
+go 1.26
 
 require (
 	github.com/coreos/go-oidc/v3 v3.18.0
