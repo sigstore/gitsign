@@ -60,36 +60,48 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error resolving commit object: %w", err)
 	}
-	c, err := repo.CommitObject(*h)
+
+	obj, err := repo.Storer.EncodedObject(plumbing.CommitObject, *h)
 	if err != nil {
 		return fmt.Errorf("error reading commit object: %w", err)
 	}
-
-	sig := []byte(c.PGPSignature)
-	p, _ := pem.Decode(sig)
-	if p == nil || p.Type != "SIGNED MESSAGE" {
-		return fmt.Errorf("unsupported signature type")
-	}
-
-	c2 := new(plumbing.MemoryObject)
-	if err := c.EncodeWithoutSignature(c2); err != nil {
-		return err
-	}
-	r, err := c2.Reader()
+	r, err := obj.Reader()
 	if err != nil {
 		return err
 	}
 	defer r.Close() // nolint:errcheck
-	data, err := io.ReadAll(r)
+
+	c, err := git.SplitCommit(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("error extracting commit signature: %w", err)
+	}
+
+	// Per the SHA-256 transition spec a commit can carry gpgsig (SHA-1
+	// form), gpgsig-sha256 (SHA-256 form), or both. Prefer gpgsig — every
+	// repo go-git can read today is SHA-1 form, so its gpgsig matches the
+	// stripped Payload. gpgsig-sha256 is the fallback for SHA-256-only
+	// signed commits.
+	sig := c.Gpgsig
+	if sig == nil {
+		sig = c.GpgsigSha256
+	}
+	if sig == nil {
+		return fmt.Errorf("commit has no gpgsig or gpgsig-sha256 signature")
+	}
+
+	p, _ := pem.Decode(sig)
+	if p == nil {
+		return fmt.Errorf("%w: not a PEM block", git.ErrUnsupportedSignatureType)
+	}
+	if p.Type != "SIGNED MESSAGE" {
+		return fmt.Errorf("%w: %q", git.ErrUnsupportedSignatureType, p.Type)
 	}
 
 	v, err := gitsign.NewVerifierWithCosignOpts(ctx, o.Config, &o.CertVerifyOptions)
 	if err != nil {
 		return err
 	}
-	summary, err := v.Verify(ctx, data, sig, true)
+	summary, err := v.Verify(ctx, c.Payload, sig, true)
 	if err != nil {
 		return err
 	}

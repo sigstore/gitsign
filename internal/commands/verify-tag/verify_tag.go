@@ -27,6 +27,7 @@ import (
 	"github.com/sigstore/gitsign/internal/commands/verify"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/gitsign"
+	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/spf13/cobra"
 )
 
@@ -59,32 +60,40 @@ func (o *options) Run(_ io.Writer, args []string) error {
 		return fmt.Errorf("error resolving tag reference: %w", err)
 	}
 
-	// Get the tag object
-	tagObj, err := repo.TagObject(ref.Hash())
+	// Read the raw tag object bytes directly from the object store.
+	// Verifying against the raw bytes (rather than bytes re-encoded through
+	// go-git) is what git-core does and avoids trust-confusion attacks where
+	// go-git's loose parser resolves a malformed tag differently than git-core.
+	obj, err := repo.Storer.EncodedObject(plumbing.TagObject, ref.Hash())
 	if err != nil {
 		return fmt.Errorf("error reading tag object: %w", err)
 	}
-
-	// Extract the signature
-	sig := []byte(tagObj.PGPSignature)
-	p, _ := pem.Decode(sig)
-	if p == nil || p.Type != "SIGNED MESSAGE" {
-		return fmt.Errorf("unsupported signature type")
-	}
-
-	// Get the tag data without the signature
-	tagData := new(plumbing.MemoryObject)
-	if err := tagObj.EncodeWithoutSignature(tagData); err != nil {
-		return err
-	}
-	r, err := tagData.Reader()
+	r, err := obj.Reader()
 	if err != nil {
 		return err
 	}
 	defer r.Close() // nolint:errcheck
-	data, err := io.ReadAll(r)
+
+	t, err := git.SplitTag(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("error extracting tag signature: %w", err)
+	}
+
+	// Per the SHA-256 transition spec, the in-body PEM block is the
+	// signature in the tag's current hash algorithm; gpgsig /
+	// gpgsig-sha256 headers carry signatures over the alternate-algorithm
+	// form. We verify the local-form signature.
+	sig := t.InBody
+	if sig == nil {
+		return fmt.Errorf("tag has no in-body signature")
+	}
+
+	p, _ := pem.Decode(sig)
+	if p == nil {
+		return fmt.Errorf("%w: not a PEM block", git.ErrUnsupportedSignatureType)
+	}
+	if p.Type != "SIGNED MESSAGE" {
+		return fmt.Errorf("%w: %q", git.ErrUnsupportedSignatureType, p.Type)
 	}
 
 	// Verify the signature
@@ -92,7 +101,7 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	summary, err := v.Verify(ctx, data, sig, true)
+	summary, err := v.Verify(ctx, t.Payload, sig, true)
 	if err != nil {
 		return err
 	}

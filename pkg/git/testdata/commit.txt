@@ -1,0 +1,45 @@
+tree 3cced1b431769cf16b530b25162e23bb7545d79c
+parent 4638d83b00e1119b9aab39ff747802a8ff63f530
+author Billy Lynch <billy@chainguard.dev> 1777409421 -0400
+committer Billy Lynch <billy@chainguard.dev> 1777414757 -0400
+gpgsig -----BEGIN SIGNED MESSAGE-----
+ MIIEMQYJKoZIhvcNAQcCoIIEIjCCBB4CAQExDTALBglghkgBZQMEAgEwCwYJKoZI
+ hvcNAQcBoIIC0TCCAs0wggJToAMCAQICFFXZxLeN2TVVA+zJekvjaHqjkE8sMAoG
+ CCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln
+ c3RvcmUtaW50ZXJtZWRpYXRlMB4XDTI2MDQyODIyMTkxOVoXDTI2MDQyODIyMjkx
+ OVowADBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLSqaKRhP2YdGaAny/Q06etl
+ lnRenHZ3V/dd/Qrs+dFBql61ykcJxMkBIGVdlwNFBsq/bVdnT4SmLh4phchc5MOj
+ ggFyMIIBbjAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYD
+ VR0OBBYEFH8O61w2Zecmc+V/maJiTyqSSK0wMB8GA1UdIwQYMBaAFN/T6c9WJBGW
+ +ajY6ShVosYuGGQ/MCIGA1UdEQEB/wQYMBaBFGJpbGx5QGNoYWluZ3VhcmQuZGV2
+ MCkGCisGAQQBg78wAQEEG2h0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbTArBgor
+ BgEEAYO/MAEIBB0MG2h0dHBzOi8vYWNjb3VudHMuZ29vZ2xlLmNvbTCBigYKKwYB
+ BAHWeQIEAgR8BHoAeAB2AN09MGrGxxEyYxkeHJlnNwKiSl643jyt/4eKcoAvKe6O
+ AAABndYs5ecAAAQDAEcwRQIgVr9D9jTvN6V/OHTju7uZ3ozQYzh42nvp1snRT6k9
+ hRACIQD3cTr0I32kPAadwtikj8uYZpkqzOPvEAd4/HEy7HLe6zAKBggqhkjOPQQD
+ AwNoADBlAjAE+izbGwhBz67CE0Z+li7g/CMLfj+vvQHov+r759DHMxFAAZ0Fyz8d
+ VUhx3uGDwYYCMQDKRy/yLx4F5+TrvEXISSCXOEGi36eR7zwGeyX8iEh3HhuipnOt
+ 934wxIYdjzc+qxExggEmMIIBIgIBATBPMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRl
+ djEeMBwGA1UEAxMVc2lnc3RvcmUtaW50ZXJtZWRpYXRlAhRV2cS3jdk1VQPsyXpL
+ 42h6o5BPLDALBglghkgBZQMEAgGgaTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcB
+ MBwGCSqGSIb3DQEJBTEPFw0yNjA0MjgyMjE5MTlaMC8GCSqGSIb3DQEJBDEiBCCF
+ Ehl2z0/PP3PtI7l3rt+50IjOaduv6YSaac3A1bNbmDAKBggqhkjOPQQDAgRIMEYC
+ IQDvpk8hV5WbBr/MbdDlSV58HrlV28ByANAboL82/KkK+AIhAJZ6CCS13PQS500u
+ AndjllmzU6kBCqWygwascQ73CZ9f
+ -----END SIGNED MESSAGE-----
+
+Verify against raw git object bytes to prevent parser trust-confusion
+
+go-git's loose object parser uses last-wins semantics for duplicate
+singleton headers (tree, author, committer, etc.), while git-core uses
+first-wins. An attacker can craft a commit or tag whose raw bytes hash
+to one set of contents under git-core but re-encode through go-git to a
+different signed payload, letting a legitimate signature verify against
+attacker-controlled bytes.
+
+Replace the go-git decode + EncodeWithoutSignature path with SplitCommit
+and SplitTag, which operate directly on the object-database bytes (the
+same bytes git-core feeds its verifier) and reject objects with
+structural ambiguities — duplicate singleton headers, duplicate gpgsig,
+malformed gpgsig continuations. ObjectHash now reassembles via
+JoinCommit/JoinTag so the recorded hash matches git-core.

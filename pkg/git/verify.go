@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
@@ -82,8 +81,25 @@ func Verify(ctx context.Context, git Verifier, rekor rekor.Verifier, data, sig [
 		}, nil
 	}
 
-	// Legacy commit based lookup.
-	commit, err := ObjectHash(data, sig)
+	// Legacy rekor lookup: reconstruct the raw object bytes so their hash
+	// matches what git-core (and the legacy rekor entries) recorded. We
+	// assume sig is the SHA-1-form signature (gpgsig for commits, in-body
+	// PEM for tags) — which matches how legacy rekor entries were
+	// generated. For new gpgsig-sha256 signatures there are no legacy
+	// entries to look up, so this reconstruction is best-effort.
+	var raw []byte
+	switch {
+	case bytes.HasPrefix(data, []byte("tree ")):
+		raw, err = JoinCommit(&CommitSig{Payload: data, Gpgsig: sig})
+	case bytes.HasPrefix(data, []byte("object ")):
+		raw, err = JoinTag(&TagSig{Payload: data, InBody: sig})
+	default:
+		return nil, errors.New("could not determine Git object type")
+	}
+	if err != nil {
+		return nil, err
+	}
+	commit, err := ObjectHash(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -118,76 +134,25 @@ func VerifySignature(data, sig []byte, detached bool, rootCerts, intermediates *
 	return v.Verify(context.Background(), data, sig, detached)
 }
 
-type encoder interface {
-	Encode(o plumbing.EncodedObject) error
-}
-
-// ObjectHash is a string representation of an encoded Git object
-func ObjectHash(data, sig []byte) (string, error) {
-	// Precompute commit hash to store in tlog
-	obj := &plumbing.MemoryObject{}
-	if _, err := obj.Write(data); err != nil {
-		return "", err
-	}
-
-	var (
-		encoder encoder
-		err     error
-	)
-	// We're making big assumptions here about the ordering of fields
-	// in Git objects. Unfortunately go-git does loose parsing of objects,
-	// so it will happily decode objects that don't match the unmarshal type.
-	// We should see if there's a better way to detect object types.
+// ObjectHash returns the git-core hash of an object given its raw bytes
+// (the same bytes git stores in the object database, without the
+// "<type> <size>\0" prefix). The object type is inferred from the first
+// header line: "tree " for commits, "object " for tags.
+func ObjectHash(raw []byte) (string, error) {
+	var objType plumbing.ObjectType
 	switch {
-	case bytes.HasPrefix(data, []byte("tree ")):
-		encoder, err = commit(obj, sig)
-	case bytes.HasPrefix(data, []byte("object ")):
-		encoder, err = tag(obj, sig)
+	case bytes.HasPrefix(raw, []byte("tree ")):
+		objType = plumbing.CommitObject
+	case bytes.HasPrefix(raw, []byte("object ")):
+		objType = plumbing.TagObject
 	default:
 		return "", errors.New("could not determine Git object type")
 	}
-	if err != nil {
+
+	obj := &plumbing.MemoryObject{}
+	obj.SetType(objType)
+	if _, err := obj.Write(raw); err != nil {
 		return "", err
 	}
-
-	// go-git will compute a hash on decode and preserve even if we alter the
-	// object data. To work around this, re-encode the object into a new object
-	// to force a new hash to be computed.
-	out := &plumbing.MemoryObject{}
-	err = encoder.Encode(out)
-	return out.Hash().String(), err
-}
-
-func commit(obj *plumbing.MemoryObject, sig []byte) (*object.Commit, error) {
-	obj.SetType(plumbing.CommitObject)
-
-	base := object.Commit{}
-	if err := base.Decode(obj); err != nil {
-		return nil, err
-	}
-	return &object.Commit{
-		Author:       base.Author,
-		Committer:    base.Committer,
-		PGPSignature: string(sig),
-		Message:      base.Message,
-		TreeHash:     base.TreeHash,
-		ParentHashes: base.ParentHashes,
-	}, nil
-}
-
-func tag(obj *plumbing.MemoryObject, sig []byte) (*object.Tag, error) {
-	obj.SetType(plumbing.TagObject)
-
-	base := object.Tag{}
-	if err := base.Decode(obj); err != nil {
-		return nil, err
-	}
-	return &object.Tag{
-		Tagger:       base.Tagger,
-		Name:         base.Name,
-		TargetType:   base.TargetType,
-		Target:       base.Target,
-		Message:      base.Message,
-		PGPSignature: string(sig),
-	}, nil
+	return obj.Hash().String(), nil
 }
