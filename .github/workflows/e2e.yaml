@@ -59,6 +59,11 @@ jobs:
         run: |
           echo "SIGSTORE_ID_TOKEN=$(cat ./oidc-token.txt)" >> $GITHUB_ENV
 
+      - name: Debug OIDC token claims
+        run: |
+          echo "===== OIDC Token Claims ====="
+          cat ./oidc-token.txt | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+
       - name: e2e unit tests
         run: |
           set -e
