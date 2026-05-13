@@ -15,6 +15,7 @@
 package attest
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -25,12 +26,13 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/google/go-cmp/cmp"
 	intoto "github.com/in-toto/attestation/go/v1"
+	gitraw "github.com/sigstore/gitsign/pkg/git"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/testing/protocmp"
 )
 
 // newTestRepo creates an in-memory repo with the given remote configuration.
-func newTestRepo(t *testing.T, remoteURL string) (*git.Repository, *memory.Storage) {
+func newTestRepo(t *testing.T) (*git.Repository, *memory.Storage) {
 	t.Helper()
 	storage := memory.NewStorage()
 	repo := &git.Repository{
@@ -40,7 +42,7 @@ func newTestRepo(t *testing.T, remoteURL string) (*git.Repository, *memory.Stora
 		Remotes: map[string]*config.RemoteConfig{
 			"origin": {
 				Name: "origin",
-				URLs: []string{remoteURL},
+				URLs: []string{"https://github.com/sigstore/gitsign.git"},
 			},
 		},
 	}); err != nil {
@@ -69,7 +71,7 @@ func storeObject(t *testing.T, storage *memory.Storage, objType plumbing.ObjectT
 }
 
 func TestCommitStatement(t *testing.T) {
-	repo, storage := newTestRepo(t, "git@github.com:wlynch/gitsign.git")
+	repo, storage := newTestRepo(t)
 
 	// Expect files in testdata directory:
 	//  foo.in.txt -> foo.out.json
@@ -109,7 +111,7 @@ func TestCommitStatement(t *testing.T) {
 }
 
 func TestTagStatement(t *testing.T) {
-	repo, storage := newTestRepo(t, "git@github.com:wlynch/gitsign.git")
+	repo, storage := newTestRepo(t)
 
 	// IMPORTANT: When generating new test files, use `git cat-file tag <tagname> > foo.in.txt`.
 	for _, tc := range []string{
@@ -150,8 +152,53 @@ func TestTagStatement(t *testing.T) {
 	}
 }
 
+// TestCommitStatement_DuplicateAuthor confirms the attest path refuses
+// to produce a predicate for a commit with duplicate singleton headers.
+// `git hash-object --literally` (and an adversary's direct object write)
+// can produce these; go-git ≥ v5.19.0 would silently take the first
+// header, but the attestation use case prefers an outright refusal over
+// a predicate that obscures the ambiguity.
+func TestCommitStatement_DuplicateAuthor(t *testing.T) {
+	repo, storage := newTestRepo(t)
+
+	raw := []byte("tree 4cf9f177c4c015836fca6a31f9c3917e89ae29ec\n" +
+		"author Alice <alice@example.com> 1700000000 +0000\n" +
+		"author Mallory <mallory@evil.example.com> 1700000001 +0000\n" +
+		"committer Alice <alice@example.com> 1700000000 +0000\n" +
+		"\n" +
+		"hello\n")
+	h := storeObject(t, storage, plumbing.CommitObject, raw)
+
+	_, err := CommitStatement(repo, "origin", h.String())
+	if !errors.Is(err, gitraw.ErrMalformedObject) {
+		t.Fatalf("CommitStatement: got err=%v, want ErrMalformedObject", err)
+	}
+}
+
+func TestTagStatement_DuplicateTagger(t *testing.T) {
+	repo, storage := newTestRepo(t)
+
+	raw := []byte("object 2d9cff2bad7132c586e128bcc23322dbb5297e8e\n" +
+		"type commit\n" +
+		"tag v1\n" +
+		"tagger Alice <alice@example.com> 1700000000 +0000\n" +
+		"tagger Mallory <mallory@evil.example.com> 1700000001 +0000\n" +
+		"\n" +
+		"release\n")
+	h := storeObject(t, storage, plumbing.TagObject, raw)
+	tagRef := plumbing.NewHashReference(plumbing.NewTagReferenceName("v1"), h)
+	if err := storage.SetReference(tagRef); err != nil {
+		t.Fatalf("error setting tag reference: %v", err)
+	}
+
+	_, err := TagStatement(repo, "origin", "v1")
+	if !errors.Is(err, gitraw.ErrMalformedObject) {
+		t.Fatalf("TagStatement: got err=%v, want ErrMalformedObject", err)
+	}
+}
+
 func TestTagStatementLightweight(t *testing.T) {
-	repo, storage := newTestRepo(t, "git@github.com:wlynch/gitsign.git")
+	repo, storage := newTestRepo(t)
 
 	// Store a commit object so the lightweight tag has something to point to.
 	raw, err := os.ReadFile("testdata/fulcio-cert.in.txt")

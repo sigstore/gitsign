@@ -22,8 +22,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/go-cmp/cmp"
 )
+
+// makeObject wraps raw bytes in a plumbing.MemoryObject of the given
+// type, for tests that need to feed Validate{Commit,Tag} something that
+// implements plumbing.EncodedObject without spinning up a full storer.
+func makeObject(t *testing.T, ot plumbing.ObjectType, raw []byte) plumbing.EncodedObject {
+	t.Helper()
+	o := &plumbing.MemoryObject{}
+	o.SetType(ot)
+	if _, err := o.Write(raw); err != nil {
+		t.Fatalf("MemoryObject.Write: %v", err)
+	}
+	return o
+}
 
 // fakeSig is a syntactically-valid PEM block used for tests that exercise
 // the parser/joiner shape but don't need a real cryptographic signature.
@@ -628,4 +642,84 @@ func TestJoinTag_RoundTrip(t *testing.T) {
 func firstLine(b []byte) []byte {
 	first, _, _ := bytes.Cut(b, []byte{'\n'})
 	return first
+}
+
+func TestValidateCommit(t *testing.T) {
+	authorLine := "author Alice <alice@example.com> 1700000000 +0000\n"
+	commLine := "committer Alice <alice@example.com> 1700000000 +0000\n"
+	base := "tree b333504b8cf3d9c314fed2cc242c5c38e89534a5\n" + authorLine + commLine
+
+	tcs := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{"well-formed", base + "\nmsg\n", false},
+		{"merge commit with multiple parents", "tree aaaa\nparent bbbb\nparent cccc\n" + authorLine + commLine + "\nmsg\n", false},
+		{"duplicate tree", "tree aaaa\ntree bbbb\n" + authorLine + commLine + "\nmsg\n", true},
+		{"duplicate author", "tree aaaa\n" + authorLine + authorLine + commLine + "\nmsg\n", true},
+		{"duplicate committer", "tree aaaa\n" + authorLine + commLine + commLine + "\nmsg\n", true},
+		{"duplicate gpgsig", base + "gpgsig sig1\ngpgsig sig2\n\nmsg\n", true},
+		{"duplicate gpgsig-sha256", base + "gpgsig-sha256 sig1\ngpgsig-sha256 sig2\n\nmsg\n", true},
+		{"gpgsig with continuation lines does not count as duplicate", base + "gpgsig line1\n line2\n line3\n\nmsg\n", false},
+		{"duplicate headers in message body are ignored", base + "\ntree fake\ntree alsofake\n", false},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateCommit(makeObject(t, plumbing.CommitObject, []byte(tc.raw)))
+			gotErr := err != nil
+			if gotErr != tc.wantErr {
+				t.Fatalf("err: got %v, want error=%v", err, tc.wantErr)
+			}
+			if tc.wantErr && !errors.Is(err, ErrMalformedObject) {
+				t.Errorf("err: got %v, want ErrMalformedObject", err)
+			}
+		})
+	}
+}
+
+func TestValidateTag(t *testing.T) {
+	taggerLine := "tagger Alice <alice@example.com> 1700000000 +0000\n"
+	base := "object 2d9cff2bad7132c586e128bcc23322dbb5297e8e\ntype commit\ntag v1\n" + taggerLine
+
+	tcs := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{"well-formed", base + "\nmsg\n", false},
+		{"duplicate object", "object aaaa\nobject bbbb\ntype commit\ntag v1\n" + taggerLine + "\nmsg\n", true},
+		{"duplicate type", "object aaaa\ntype commit\ntype tag\ntag v1\n" + taggerLine + "\nmsg\n", true},
+		{"duplicate tag", "object aaaa\ntype commit\ntag v1\ntag v2\n" + taggerLine + "\nmsg\n", true},
+		{"duplicate tagger", "object aaaa\ntype commit\ntag v1\n" + taggerLine + taggerLine + "\nmsg\n", true},
+		{"duplicate headers in message body are ignored", base + "\nobject fake\nobject alsofake\n", false},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateTag(makeObject(t, plumbing.TagObject, []byte(tc.raw)))
+			gotErr := err != nil
+			if gotErr != tc.wantErr {
+				t.Fatalf("err: got %v, want error=%v", err, tc.wantErr)
+			}
+			if tc.wantErr && !errors.Is(err, ErrMalformedObject) {
+				t.Errorf("err: got %v, want ErrMalformedObject", err)
+			}
+		})
+	}
+}
+
+// TestValidateCommit_RealCommit confirms the validator accepts a real signed
+// commit with gpgsig continuation lines.
+func TestValidateCommit_RealCommit(t *testing.T) {
+	raw := loadObject(t, "commit.txt")
+	if err := ValidateCommit(makeObject(t, plumbing.CommitObject, raw)); err != nil {
+		t.Errorf("ValidateCommit on real commit: %v", err)
+	}
+}
+
+func TestValidateTag_RealTag(t *testing.T) {
+	raw := loadObject(t, "tag.txt")
+	if err := ValidateTag(makeObject(t, plumbing.TagObject, raw)); err != nil {
+		t.Errorf("ValidateTag on real tag: %v", err)
+	}
 }

@@ -23,7 +23,9 @@ import (
 	"github.com/github/smimesign/ietf-cms/protocol"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	intoto "github.com/in-toto/attestation/go/v1"
+	gitraw "github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/predicate"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -41,7 +43,14 @@ func CommitStatement(repo *git.Repository, remote, revision string) (*intoto.Sta
 	if err != nil {
 		return nil, err
 	}
-	commit, err := repo.CommitObject(*hash)
+	obj, err := repo.Storer.EncodedObject(plumbing.CommitObject, *hash)
+	if err != nil {
+		return nil, err
+	}
+	if err := gitraw.ValidateCommit(obj); err != nil {
+		return nil, err
+	}
+	commit, err := object.DecodeCommit(repo.Storer, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -138,10 +147,18 @@ func TagStatement(repo *git.Repository, remote, tagName string) (*intoto.Stateme
 		return nil, err
 	}
 
-	// Try to get the tag object. If this fails, the tag is not annotated.
-	tagObj, err := repo.TagObject(ref.Hash())
+	// Load the tag object. If the storer doesn't have one (lightweight
+	// tag), surface the existing "not an annotated tag" error.
+	obj, err := repo.Storer.EncodedObject(plumbing.TagObject, ref.Hash())
 	if err != nil {
 		return nil, fmt.Errorf("tag %q is not an annotated tag", tagName)
+	}
+	if err := gitraw.ValidateTag(obj); err != nil {
+		return nil, err
+	}
+	tagObj, err := object.DecodeTag(repo.Storer, obj)
+	if err != nil {
+		return nil, err
 	}
 
 	// We've got the annotated tag. Create the full predicate

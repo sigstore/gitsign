@@ -3,7 +3,7 @@
   "predicateType": "https://gitsign.sigstore.dev/predicate/git/v0.1",
   "subject": [
     {
-      "name": "git@github.com:wlynch/gitsign.git",
+      "name": "https://github.com/sigstore/gitsign.git",
       "digest": {
         "sha1": "10a3086104c5331623be85a5e30d709f457b536b"
       }

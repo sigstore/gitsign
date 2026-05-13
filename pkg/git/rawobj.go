@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 	"unicode"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 var (
@@ -388,4 +390,108 @@ func sigOrNil(b *bytes.Buffer) []byte {
 		return nil
 	}
 	return b.Bytes()
+}
+
+// commitSingletons / tagSingletons name the headers a well-formed object
+// carries at most once. parent is intentionally absent from the commit set
+// (merge commits have several); mergetag and encoding are intentionally
+// absent because git accepts repetition of mergetag and we don't audit
+// encoding for uniqueness. gpgsig / gpgsig-sha256 are included so the
+// attest path matches SplitCommit's duplicate-signature rejection on the
+// verify path.
+var commitSingletons = map[string]bool{
+	"tree":          true,
+	"author":        true,
+	"committer":     true,
+	"gpgsig":        true,
+	"gpgsig-sha256": true,
+}
+
+var tagSingletons = map[string]bool{
+	"object":        true,
+	"type":          true,
+	"tag":           true,
+	"tagger":        true,
+	"gpgsig":        true,
+	"gpgsig-sha256": true,
+}
+
+// ValidateCommit returns ErrMalformedObject if the commit's header
+// section carries a duplicate singleton header (tree, author, committer,
+// gpgsig, gpgsig-sha256). Other ambiguities — missing required headers,
+// unparseable signatures, bad encodings — are out of scope and surface
+// later via go-git's decoder or the cryptographic check.
+//
+// go-git ≥ v5.19.0 silently drops duplicates and takes the first (matching
+// git-core's standard_header_field filter). That's safe but ambiguous —
+// `git hash-object --literally` and adversarial pushes are the only ways
+// such objects appear, and the attest path would rather refuse than emit
+// a predicate that obscures the underlying weirdness.
+func ValidateCommit(obj plumbing.EncodedObject) error {
+	return checkUniqueHeaders(obj, commitSingletons)
+}
+
+// ValidateTag is the tag-object counterpart to ValidateCommit, rejecting
+// duplicate object / type / tag / tagger / gpgsig / gpgsig-sha256 headers.
+func ValidateTag(obj plumbing.EncodedObject) error {
+	return checkUniqueHeaders(obj, tagSingletons)
+}
+
+// checkUniqueHeaders walks the header section (up to the first blank
+// line) and returns ErrMalformedObject on the second occurrence of any
+// key in singletons. Lines beginning with whitespace are treated as
+// continuations of the previous header and skipped. Lines without a
+// space are skipped (git-core ignores them; downstream parsers surface
+// the issue if it matters).
+func checkUniqueHeaders(obj plumbing.EncodedObject, singletons map[string]bool) error {
+	r, err := obj.Reader()
+	if err != nil {
+		// Storage-layer failure: surface as-is so callers can see the
+		// underlying go-git error rather than a generic malformed-object.
+		return err
+	}
+	defer r.Close() // nolint:errcheck
+
+	seen := make(map[string]bool, len(singletons))
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			// Blank line terminates the header section; anything after
+			// is the message body, which is opaque text that may
+			// legitimately contain "tree foo" etc. Stop here so body
+			// content doesn't produce false positives.
+			return nil
+		}
+		if line[0] == ' ' || line[0] == '\t' {
+			// Continuation of the previous header (git wraps long values
+			// like gpgsig PEM blocks across multiple lines, each prefixed
+			// with a leading space). Treat as part of the prior header,
+			// not a new one.
+			continue
+		}
+		key, _, ok := bytes.Cut(line, []byte{' '})
+		if !ok {
+			// Header line with no space separator — git-core's parser
+			// skips these silently. We do the same; if it actually
+			// matters, go-git's decoder will fail on it downstream.
+			continue
+		}
+		k := string(key)
+		if !singletons[k] {
+			// Header isn't one we track (parent, mergetag, encoding,
+			// arbitrary extra headers). Duplicates of these are allowed
+			// or out of scope for this validator.
+			continue
+		}
+		if seen[k] {
+			// Second occurrence of a singleton — this is the
+			// trust-confusion-adjacent ambiguity we're rejecting.
+			return fmt.Errorf("%w: duplicate %s header", ErrMalformedObject, k)
+		}
+		seen[k] = true
+	}
+	// Reached EOF without seeing a blank line. No duplicates found, so
+	// validation passes; return any scanner I/O error (nil on success).
+	return scanner.Err()
 }
