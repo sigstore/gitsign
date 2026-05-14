@@ -20,7 +20,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"time"
 
 	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
@@ -106,23 +105,24 @@ func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
 
-	// Generate verification options.
-	certs, err := sd.GetCertificates()
-	if err != nil {
+	// Fail fast with a clear error if the cert bag is empty — otherwise the
+	// internal verifier's per-SignerInfo FindCertificate error is what the
+	// caller sees, and the message is less obvious.
+	if certs, err := sd.GetCertificates(); err != nil {
 		return nil, fmt.Errorf("error getting signature certs: %w", err)
-	}
-	if len(certs) == 0 {
+	} else if len(certs) == 0 {
 		return nil, fmt.Errorf("no certificates found in signature")
 	}
-	cert := certs[0]
 
 	opts := x509.VerifyOptions{
 		Roots:         v.roots,
 		Intermediates: v.intermediates,
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-		// cosign hack: ignore the current time for now - we'll use the tlog to
-		// verify whether the commit was signed at a valid time.
-		CurrentTime: cert.NotBefore.Add(1 * time.Minute),
+		// Leave CurrentTime zero. The internal CMS verifier picks a per-cert
+		// time inside its SignerInfos loop (timestamp if present, else the
+		// cert's own NotBefore + 1min), so each SignerInfo is checked against
+		// a time that lies within its own validity window. Actual signing
+		// time is verified independently via Rekor.
 	}
 
 	tsaOpts := x509.VerifyOptions{
@@ -132,17 +132,26 @@ func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool
 		tsaOpts.Roots = v.tsa
 	}
 
+	var chains [][][]*x509.Certificate
 	if detached {
-		if _, err := sd.VerifyDetached(data, opts, tsaOpts); err != nil {
+		chains, err = sd.VerifyDetached(data, opts, tsaOpts)
+		if err != nil {
 			return nil, fmt.Errorf("failed to verify detached signature: %w", err)
 		}
 	} else {
-		if _, err := sd.Verify(opts, tsaOpts); err != nil {
+		chains, err = sd.Verify(opts, tsaOpts)
+		if err != nil {
 			return nil, fmt.Errorf("failed to verify attached signature: %w", err)
 		}
 	}
 
-	return cert, nil
+	// Return the leaf of the first verified chain — this is the certificate
+	// the internal CMS verifier actually authenticated the signature against,
+	// not whatever happens to sit at certs[0].
+	if len(chains) == 0 || len(chains[0]) == 0 || len(chains[0][0]) == 0 {
+		return nil, fmt.Errorf("no verified certificate chains returned")
+	}
+	return chains[0][0][0], nil
 }
 
 // NewDefaultVerifier returns a new CertVerifier with the default Fulcio roots loaded from the local TUF client.

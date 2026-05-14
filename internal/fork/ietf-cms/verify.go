@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
+	"time"
 
 	"github.com/github/smimesign/ietf-cms/protocol"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
@@ -178,6 +179,16 @@ func (sd *SignedData) verify(econtent []byte, opts x509.VerifyOptions, tsOpts x5
 			if optsCopy.CurrentTime.IsZero() {
 				optsCopy.CurrentTime = tsti.GenTime
 			}
+		}
+
+		// If neither the caller nor a timestamp pinned a verification time,
+		// fall back to this signer cert's NotBefore so the validity-window
+		// check passes. The caller is expected to verify the actual signing
+		// time independently (e.g. via Rekor). This is done per-cert so that
+		// multiple SignerInfos with different validity windows each get a
+		// time that lies within their own window.
+		if optsCopy.CurrentTime.IsZero() {
+			optsCopy.CurrentTime = cert.NotBefore.Add(1 * time.Minute)
 		}
 
 		if chain, err := cert.Verify(optsCopy); err != nil {
