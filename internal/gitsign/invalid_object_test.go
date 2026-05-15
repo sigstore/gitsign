@@ -33,19 +33,24 @@ import (
 	"github.com/sigstore/gitsign/pkg/git"
 )
 
-// TestDuplicateTreeTrustConfusion is an end-to-end reproduction of a parser
-// trust-confusion attack: an attacker replays a legitimate signature against
-// a malformed commit with two tree headers. go-git's loose parser keeps the
-// last tree (so a signature over that canonical form verifies) while git-core
-// and the on-disk hash reflect the first. The test:
+// TestDuplicateTreeTrustConfusion is an end-to-end regression test for the
+// parser trust-confusion class of attack: an attacker replays a legitimate
+// signature against a malformed commit with two tree headers. Historically,
+// go-git's loose parser was last-wins (keeping the second tree, which
+// happened to match the signed canonical form) while git-core was
+// first-wins, opening a re-encoding window that let the signature verify
+// against attacker-controlled raw bytes.
 //
-//  1. Confirms the crafted signature really does verify against the re-encoded
-//     (last-wins) bytes — proving the PoC is a working forgery, not a typo.
-//  2. Confirms the fix: when the verifier is fed the raw object bytes (the
-//     SplitCommit output), the signature fails to verify because the bytes
-//     differ from what was signed.
-//  3. Confirms a well-formed commit with the same signature still verifies —
-//     guards against an over-aggressive verifier path.
+// The defense lives in two layers now:
+//  1. Upstream go-git ≥ v5.19.0 switched to first-wins matching git-core, so
+//     re-encoding through go-git no longer produces canonical bytes.
+//  2. gitsign's verify path consumes raw object bytes via SplitCommit and
+//     skips go-git entirely, so any divergence between signed and stored
+//     bytes fails cryptographically regardless of parser fashion.
+//
+// The sub-tests assert all three properties: upstream is fixed, raw-byte
+// verification still rejects malformed input, and well-formed input still
+// passes (no over-aggressive rejection).
 func TestDuplicateTreeTrustConfusion(t *testing.T) {
 	cert, priv := generateCert(t, &x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -94,16 +99,20 @@ func TestDuplicateTreeTrustConfusion(t *testing.T) {
 		message,
 	))
 
-	t.Run("signature is a genuine forgery against the re-encoded form", func(t *testing.T) {
-		// Simulate the pre-fix behavior: load the malformed commit through
-		// go-git and re-encode it via EncodeWithoutSignature (which drops the
-		// first tree under last-wins), then verify. This MUST succeed,
-		// otherwise the PoC isn't actually demonstrating the attack and the
-		// rejection assertion below would pass vacuously.
+	t.Run("upstream go-git is no longer last-wins", func(t *testing.T) {
+		// go-git ≥ v5.19.0 rewrote its commit decoder as a state machine
+		// that takes the first tree (matching git-core). Re-encoding the
+		// malformed bytes therefore carries attackerTree, not legitTree,
+		// so the signature — made over a single-tree commit at legitTree —
+		// no longer verifies against the re-encoded form. If this ever
+		// starts passing, go-git has regressed to last-wins parsing and
+		// the re-encoding attack window is open at the upstream layer
+		// again (gitsign's own SplitCommit-based path still blocks it,
+		// per the next sub-test).
 		reencoded := reencodeViaGoGit(t, malformedRaw)
 
-		if _, err := gv.Verify(context.Background(), reencoded, resp.Signature, true); err != nil {
-			t.Fatalf("pre-fix behavior check: expected signature to verify over re-encoded bytes (proves the PoC is genuine), got: %v", err)
+		if _, err := gv.Verify(context.Background(), reencoded, resp.Signature, true); err == nil {
+			t.Fatalf("upstream regression: go-git re-encoded malformed bytes verified against the canonical signature")
 		}
 	})
 
