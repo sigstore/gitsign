@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/smimesign/fakeca"
 	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
@@ -101,6 +102,127 @@ func TestSignVerify(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+// TestVerifyReturnsSignerCert ensures that Verify returns the certificate that
+// actually authenticated the signature (resolved via SignerInfo) rather than
+// whatever certificate happens to be at position 0 in the PKCS7 cert bag. An
+// attacker who controls the SignedData can put a decoy cert at position 0
+// while signing with a different one; the caller must not be handed back the
+// decoy. See CVE-2026-39984 for the equivalent issue in timestamp-authority.
+func TestVerifyReturnsSignerCert(t *testing.T) {
+	ctx := context.Background()
+	ca := fakeca.New(fakeca.IsCA)
+	// Issue the decoy first so it gets the lower serial — the ASN.1 SET
+	// encoding of the PKCS7 cert bag sorts by canonical DER, and within this
+	// fake CA the lower-serial cert lands at position 0 after a roundtrip.
+	decoy := ca.Issue()
+	signer := ca.Issue()
+	roots := x509.NewCertPool()
+	roots.AddCert(ca.Certificate)
+	data := []byte("tacocat")
+
+	for _, detached := range []bool{true, false} {
+		t.Run(fmt.Sprintf("detached(%t)", detached), func(t *testing.T) {
+			sd, err := cms.NewSignedData(data)
+			if err != nil {
+				t.Fatalf("NewSignedData() = %v", err)
+			}
+			if err := sd.Sign([]*x509.Certificate{signer.Certificate}, signer.PrivateKey); err != nil {
+				t.Fatalf("Sign() = %v", err)
+			}
+			// Replace the cert bag with [decoy, signer] — the decoy is what an
+			// attacker would inject as certs[0] to confuse callers.
+			if err := sd.SetCertificates([]*x509.Certificate{decoy.Certificate, signer.Certificate}); err != nil {
+				t.Fatalf("SetCertificates() = %v", err)
+			}
+			if detached {
+				sd.Detached()
+			}
+			der, err := sd.ToDER()
+			if err != nil {
+				t.Fatalf("ToDER() = %v", err)
+			}
+
+			// Sanity check: confirm the attack setup landed the decoy at certs[0].
+			// If this ever stops being true (e.g. ASN.1 SET sorting changes), the
+			// test is no longer exercising the vulnerability and needs updating.
+			parsed, err := cms.ParseSignedData(der)
+			if err != nil {
+				t.Fatalf("ParseSignedData() = %v", err)
+			}
+			certs, err := parsed.GetCertificates()
+			if err != nil {
+				t.Fatalf("GetCertificates() = %v", err)
+			}
+			if !certs[0].Equal(decoy.Certificate) {
+				t.Fatalf("attack setup failed: certs[0] is not the decoy")
+			}
+
+			cv, err := NewCertVerifier(WithRootPool(roots))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := cv.Verify(ctx, data, der, detached)
+			if err != nil {
+				t.Fatalf("Verify() = %v", err)
+			}
+			if got.Equal(decoy.Certificate) {
+				t.Errorf("Verify() returned the decoy certificate; signer cert authentication was bypassed")
+			}
+			if !got.Equal(signer.Certificate) {
+				t.Errorf("Verify() returned cert with serial %v, want signer serial %v",
+					got.SerialNumber, signer.Certificate.SerialNumber)
+			}
+		})
+	}
+}
+
+// TestVerifyMultiSignerDifferentWindows ensures Verify succeeds for a PKCS7
+// containing multiple SignerInfos whose certs have non-overlapping validity
+// windows. With a single shared CurrentTime, one of the chain verifications
+// would always fail; the internal verifier must derive a per-cert time so
+// that each SignerInfo is checked against a time within its own window.
+func TestVerifyMultiSignerDifferentWindows(t *testing.T) {
+	ctx := context.Background()
+	ca := fakeca.New(fakeca.IsCA)
+
+	// Issue two signers with deliberately non-overlapping validity windows.
+	now := time.Now()
+	oldSigner := ca.Issue(
+		fakeca.NotBefore(now.Add(-48*time.Hour)),
+		fakeca.NotAfter(now.Add(-24*time.Hour)),
+	)
+	newSigner := ca.Issue(
+		fakeca.NotBefore(now.Add(24*time.Hour)),
+		fakeca.NotAfter(now.Add(48*time.Hour)),
+	)
+	roots := x509.NewCertPool()
+	roots.AddCert(ca.Certificate)
+	data := []byte("tacocat")
+
+	sd, err := cms.NewSignedData(data)
+	if err != nil {
+		t.Fatalf("NewSignedData() = %v", err)
+	}
+	if err := sd.Sign([]*x509.Certificate{oldSigner.Certificate}, oldSigner.PrivateKey); err != nil {
+		t.Fatalf("Sign() old = %v", err)
+	}
+	if err := sd.Sign([]*x509.Certificate{newSigner.Certificate}, newSigner.PrivateKey); err != nil {
+		t.Fatalf("Sign() new = %v", err)
+	}
+	der, err := sd.ToDER()
+	if err != nil {
+		t.Fatalf("ToDER() = %v", err)
+	}
+
+	cv, err := NewCertVerifier(WithRootPool(roots))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cv.Verify(ctx, data, der, false); err != nil {
+		t.Fatalf("Verify() = %v; want success despite non-overlapping cert windows", err)
 	}
 }
 
