@@ -6,7 +6,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/github/smimesign v0.2.0
-	github.com/go-git/go-billy/v5 v5.8.0
+	github.com/go-git/go-billy/v5 v5.9.0
 	github.com/go-git/go-git/v5 v5.18.0
 	github.com/go-openapi/runtime v0.29.4
 	github.com/go-openapi/strfmt v0.26.2
