@@ -15,6 +15,7 @@
 package oid
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 
@@ -101,5 +102,14 @@ func logEntryAnonFromProto(in *rekorpb.TransparencyLogEntry) *models.LogEntryAno
 	for _, h := range in.GetInclusionProof().GetHashes() {
 		out.Verification.InclusionProof.Hashes = append(out.Verification.InclusionProof.Hashes, hex.EncodeToString(h))
 	}
+	return out
+}
+
+// ProtoToLogEntryAnon converts a protobuf TransparencyLogEntry (as produced by sigstore-go,
+// whose CanonicalizedBody holds the raw canonical entry) into a Rekor models.LogEntryAnon.
+// The body is base64-encoded to match Rekor's representation of LogEntryAnon.Body.
+func ProtoToLogEntryAnon(in *rekorpb.TransparencyLogEntry) *models.LogEntryAnon {
+	out := logEntryAnonFromProto(in)
+	out.Body = base64.StdEncoding.EncodeToString(in.GetCanonicalizedBody())
 	return out
 }

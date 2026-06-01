@@ -43,6 +43,47 @@ var (
 
 // ToLogEntry reconstructs a Rekor HashedRekord from Git commit signature PKCS7 components.
 func ToLogEntry(ctx context.Context, message []byte, sig []byte, cert *x509.Certificate, attrs protocol.Attributes) (*models.LogEntryAnon, error) {
+	pb, err := unmarshalTlogProto(attrs)
+	if err != nil {
+		return nil, err
+	}
+	out := logEntryAnonFromProto(pb)
+
+	// Recompute HashedRekord body. models.LogEntryAnon.Body holds the base64-encoded
+	// canonical entry, matching Rekor's representation.
+	body, err := canonicalHashedRekordBody(ctx, message, sig, cert)
+	if err != nil {
+		return nil, err
+	}
+	out.Body = base64.StdEncoding.EncodeToString(body)
+
+	return out, nil
+}
+
+// ToLogEntryProto reconstructs the protobuf TransparencyLogEntry from Git commit signature
+// PKCS7 components, suitable for inclusion in a sigstore bundle. Unlike ToLogEntry, the
+// recomputed HashedRekord canonical body is stored raw (not base64-encoded) in
+// CanonicalizedBody, matching the sigstore bundle / protobuf-specs convention.
+func ToLogEntryProto(ctx context.Context, message []byte, sig []byte, cert *x509.Certificate, attrs protocol.Attributes) (*rekorpb.TransparencyLogEntry, error) {
+	pb, err := unmarshalTlogProto(attrs)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := canonicalHashedRekordBody(ctx, message, sig, cert)
+	if err != nil {
+		return nil, err
+	}
+	pb.CanonicalizedBody = body
+
+	return pb, nil
+}
+
+// unmarshalTlogProto reads the serialized Rekor TransparencyLogEntry from the signature's
+// unsigned attributes. The CanonicalizedBody is not populated here - it is cleared before
+// storage (see ToAttributes) and must be recomputed by the caller via
+// canonicalHashedRekordBody.
+func unmarshalTlogProto(attrs protocol.Attributes) (*rekorpb.TransparencyLogEntry, error) {
 	var b []byte
 	if err := unmarshalAttribute(attrs, OIDRekorTransparencyLogEntry, &b); err != nil {
 		return nil, fmt.Errorf("error unmarshalling attribute: %w", err)
@@ -51,9 +92,13 @@ func ToLogEntry(ctx context.Context, message []byte, sig []byte, cert *x509.Cert
 	if err := proto.Unmarshal(b, pb); err != nil {
 		return nil, fmt.Errorf("error unmarshalling TransparencyLogEntry attribute: %w", err)
 	}
-	out := logEntryAnonFromProto(pb)
+	return pb, nil
+}
 
-	// Recompute HashedRekord body.
+// canonicalHashedRekordBody recomputes the canonicalized Rekor HashedRekord entry body from
+// the signed message, signature, and certificate. The returned bytes are the raw canonical
+// entry (not base64-encoded).
+func canonicalHashedRekordBody(ctx context.Context, message, sig []byte, cert *x509.Certificate) ([]byte, error) {
 	hash := sha256.Sum256(message)
 	certPEM, err := cryptoutils.MarshalCertificateToPEM(cert)
 	if err != nil {
@@ -79,9 +124,7 @@ func ToLogEntry(ctx context.Context, message []byte, sig []byte, cert *x509.Cert
 	if err != nil {
 		return nil, fmt.Errorf("error canonicalizing entry: %w", err)
 	}
-	out.Body = base64.StdEncoding.EncodeToString(body)
-
-	return out, nil
+	return body, nil
 }
 
 func unmarshalAttribute(attrs protocol.Attributes, oid asn1.ObjectIdentifier, target any) error {
