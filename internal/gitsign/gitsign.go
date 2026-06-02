@@ -17,6 +17,7 @@ package gitsign
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 
@@ -164,9 +165,25 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 
 func (v *Verifier) Verify(ctx context.Context, data []byte, sig []byte, detached bool) (*git.VerificationSummary, error) {
 	if v.useBundle {
-		return v.verifyBundle(ctx, data, sig, detached)
+		summary, err := v.verifyBundle(ctx, data, sig, detached)
+		// Older "online" signatures embed no Rekor entry - their tlog entry lives
+		// in Rekor keyed on the commit SHA and is found via online search, which
+		// sigstore-go cannot do from the signature alone. Fall back to the legacy
+		// verification path so these signatures keep verifying.
+		if errors.Is(err, errNoEmbeddedRekorEntry) {
+			return v.verifyLegacy(ctx, data, sig, detached)
+		}
+		return summary, err
 	}
 
+	return v.verifyLegacy(ctx, data, sig, detached)
+}
+
+// verifyLegacy verifies a signature using the original (non-sigstore-go) path:
+// CMS signature + certificate chain via git.Verify, the Rekor entry via the
+// embedded entry or online search, and the optional cosign certificate identity
+// policy.
+func (v *Verifier) verifyLegacy(ctx context.Context, data []byte, sig []byte, detached bool) (*git.VerificationSummary, error) {
 	// TODO: we probably want to deprecate git.Verify in favor of this struct.
 	summary, err := git.Verify(ctx, v.git, v.rekor, data, sig, detached)
 	if err != nil {

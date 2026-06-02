@@ -36,6 +36,12 @@ import (
 	"github.com/sigstore/sigstore-go/pkg/verify"
 )
 
+// errNoEmbeddedRekorEntry indicates the signature carries no embedded Rekor
+// transparency log entry, so the bundle verification path cannot verify it.
+// Older "online" signatures store their entry in Rekor keyed on the commit SHA
+// instead; the caller falls back to the legacy verification path for these.
+var errNoEmbeddedRekorEntry = errors.New("signature has no embedded Rekor transparency log entry")
+
 // verifyBundle verifies a gitsign CMS signature by converting it to sigstore
 // bundles and verifying each signer with the sigstore-go verifier. It is the
 // bundle-based equivalent of git.Verify (CMS signature + cert chain + Rekor
@@ -88,6 +94,13 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 		break
 	}
 	if leafCert == nil {
+		// If every signer failed solely because it carries no embedded Rekor
+		// entry, this is a legacy "online" signature. Surface the sentinel so the
+		// caller can fall back to the legacy verification path rather than
+		// reporting a verification failure.
+		if allNoEmbeddedRekorEntry(errs) {
+			return nil, errNoEmbeddedRekorEntry
+		}
 		return nil, fmt.Errorf("no signer could be verified: %w", errors.Join(errs...))
 	}
 
@@ -103,6 +116,21 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 	}, nil
 }
 
+// allNoEmbeddedRekorEntry reports whether every error in errs is (or wraps)
+// errNoEmbeddedRekorEntry, i.e. no signer failed for any other reason. It is
+// false for an empty slice, since that means no signer was even attempted.
+func allNoEmbeddedRekorEntry(errs []error) bool {
+	if len(errs) == 0 {
+		return false
+	}
+	for _, err := range errs {
+		if !errors.Is(err, errNoEmbeddedRekorEntry) {
+			return false
+		}
+	}
+	return true
+}
+
 // verifySigner verifies a single CMS signer against the trust material using the
 // sigstore-go verifier, returning its leaf certificate and Rekor log entry. It
 // enforces content binding (the signature covers this git object) and requires
@@ -114,14 +142,17 @@ func (v *Verifier) verifySigner(ctx context.Context, sd *cms.SignedData, si prot
 		return nil, nil, nil, err
 	}
 
+	// Determine up front whether this signer is bundle-verifiable. Older "online"
+	// signatures embed no Rekor entry; signal the caller to fall back to the
+	// legacy path before doing any bundle-specific work.
+	if len(sb.Bundle.GetVerificationMaterial().GetTlogEntries()) == 0 {
+		return nil, nil, nil, errNoEmbeddedRekorEntry
+	}
+
 	// Content binding: prove the signature covers this git object. This is the
 	// one check sigstore-go cannot do from the bundle alone.
 	if err := verifyContentBinding(si, sd, data, detached); err != nil {
 		return nil, nil, nil, err
-	}
-
-	if len(sb.Bundle.GetVerificationMaterial().GetTlogEntries()) == 0 {
-		return nil, nil, nil, errors.New("no Rekor transparency log entry")
 	}
 
 	pb, err := sgbundle.NewBundle(sb.Bundle)
