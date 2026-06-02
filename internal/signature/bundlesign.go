@@ -51,8 +51,14 @@ func signBundle(ctx context.Context, body []byte, ident Identity, tlog sign.Tran
 	// Defend against an identity whose certificate and signing key disagree:
 	// otherwise we would sign + log with the key but embed a cert for a different
 	// key, producing an unverifiable signature with no error at signing time.
-	if err := samePublicKey(kp.GetPublicKey(), cert.PublicKey); err != nil {
-		return nil, fmt.Errorf("identity certificate does not match signing key: %w", err)
+	pub, ok := kp.GetPublicKey().(interface {
+		Equal(x crypto.PublicKey) bool
+	})
+	if !ok {
+		return nil, fmt.Errorf("signing key of type %T does not support equality comparison", kp.GetPublicKey())
+	}
+	if !pub.Equal(cert.PublicKey) {
+		return nil, errors.New("identity certificate does not match signing key")
 	}
 
 	attrs, sm, err := compat.BuildSignedAttributes(body)
@@ -135,19 +141,4 @@ func (c *validatingRekorClient) CreateLogEntry(params *entries.CreateLogEntryPar
 		return nil, errors.New("rekor log entry is missing an inclusion proof")
 	}
 	return resp, nil
-}
-
-// samePublicKey reports whether two public keys are equal, using the key's own
-// Equal method (implemented by all stdlib public key types).
-func samePublicKey(a, b crypto.PublicKey) error {
-	key, ok := a.(interface {
-		Equal(x crypto.PublicKey) bool
-	})
-	if !ok {
-		return fmt.Errorf("public key of type %T does not support equality comparison", a)
-	}
-	if !key.Equal(b) {
-		return errors.New("public keys differ")
-	}
-	return nil
 }
