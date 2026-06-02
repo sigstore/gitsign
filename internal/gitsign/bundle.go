@@ -104,9 +104,11 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 		return nil, fmt.Errorf("no signer could be verified: %w", errors.Join(errs...))
 	}
 
-	claims := []git.Claim{git.NewClaim(git.ClaimValidatedSignature, true)}
-	claims = append(claims, git.NewClaim(git.ClaimValidatedRekorEntry, logEntry != nil))
-	claims = append(claims, git.NewClaim(git.ClaimValidatedCerificate, len(v.identities) > 0))
+	claims := []git.Claim{
+		git.NewClaim(git.ClaimValidatedSignature, true),
+		git.NewClaim(git.ClaimValidatedRekorEntry, logEntry != nil),
+		git.NewClaim(git.ClaimValidatedCerificate, len(v.identities) > 0),
+	}
 
 	return &git.VerificationSummary{
 		Cert:     leafCert,

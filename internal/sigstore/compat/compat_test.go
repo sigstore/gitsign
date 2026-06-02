@@ -53,10 +53,10 @@ func stripTlogAttr(sd *cms.SignedData) {
 // loadSignedData parses the CMS SignedData from the gpgsig of the test commit
 // and injects the transparency log entry from tlog.json into its unsigned
 // attributes, mirroring how a real offline-mode gitsign signature looks.
-func loadSignedData(t *testing.T) (*cms.SignedData, *models.LogEntryAnon) {
+func loadSignedData(t *testing.T) *cms.SignedData {
 	t.Helper()
 
-	commit := parseCommit(t, "testdata/commit.txt")
+	commit := parseCommit(t)
 	blk, _ := pem.Decode([]byte(commit.PGPSignature))
 	if blk == nil {
 		t.Fatal("no PEM block in signature")
@@ -82,12 +82,12 @@ func loadSignedData(t *testing.T) (*cms.SignedData, *models.LogEntryAnon) {
 		sd.Raw().SignerInfos[0] = si
 	}
 
-	return sd, tlog
+	return sd
 }
 
 func TestSignerInfoToBundle(t *testing.T) {
 	ctx := context.Background()
-	sd, _ := loadSignedData(t)
+	sd := loadSignedData(t)
 
 	si := sd.Raw().SignerInfos[0]
 	wantMessage, err := si.SignedAttrs.MarshaledForVerification()
@@ -148,7 +148,7 @@ func TestSignerInfoToBundle(t *testing.T) {
 
 func TestBundleToAttributes(t *testing.T) {
 	ctx := context.Background()
-	sd, _ := loadSignedData(t)
+	sd := loadSignedData(t)
 
 	// Convert to a bundle, derive attributes from it, append them to a fresh CMS
 	// skeleton (one without the OID attr), and confirm we recover an equivalent
@@ -168,7 +168,7 @@ func TestBundleToAttributes(t *testing.T) {
 	}
 
 	// Fresh skeleton: re-parse the signature and strip the tlog attr.
-	commit := parseCommit(t, "testdata/commit.txt")
+	commit := parseCommit(t)
 	blk, _ := pem.Decode([]byte(commit.PGPSignature))
 	skeleton, err := cms.ParseSignedData(blk.Bytes)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestBundleToAttributesNoTlog(t *testing.T) {
 	ctx := context.Background()
 
 	// A bundle with no transparency log entry yields no attributes.
-	commit := parseCommit(t, "testdata/commit.txt")
+	commit := parseCommit(t)
 	blk, _ := pem.Decode([]byte(commit.PGPSignature))
 	sd, err := cms.ParseSignedData(blk.Bytes)
 	if err != nil {
@@ -231,7 +231,7 @@ func TestBundleToAttributesNoTlog(t *testing.T) {
 
 func TestSignedDataToBundle(t *testing.T) {
 	ctx := context.Background()
-	sd, _ := loadSignedData(t)
+	sd := loadSignedData(t)
 
 	bundles, err := SignedDataToBundle(ctx, sd)
 	if err != nil {
@@ -254,7 +254,7 @@ func TestSignerInfoToBundleNoTlog(t *testing.T) {
 	ctx := context.Background()
 
 	// Parse the signature and strip any tlog entry to exercise the no-tlog path.
-	commit := parseCommit(t, "testdata/commit.txt")
+	commit := parseCommit(t)
 	blk, _ := pem.Decode([]byte(commit.PGPSignature))
 	sd, err := cms.ParseSignedData(blk.Bytes)
 	if err != nil {
@@ -275,10 +275,10 @@ func TestSignerInfoToBundleNoTlog(t *testing.T) {
 	}
 }
 
-func parseCommit(t *testing.T, path string) *object.Commit {
+func parseCommit(t *testing.T) *object.Commit {
 	t.Helper()
 
-	raw := readfile(t, path)
+	raw := readfile(t, "testdata/commit.txt")
 	storage := memory.NewStorage()
 	obj := storage.NewEncodedObject()
 	obj.SetType(plumbing.CommitObject)
