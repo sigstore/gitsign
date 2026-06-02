@@ -16,9 +16,8 @@
 package signature
 
 import (
-	"bytes"
 	"context"
-	"crypto/x509"
+	"crypto"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -138,18 +137,16 @@ func (c *validatingRekorClient) CreateLogEntry(params *entries.CreateLogEntryPar
 	return resp, nil
 }
 
-// samePublicKey reports whether two public keys are identical by comparing their
-// PKIX encodings.
-func samePublicKey(a, b any) error {
-	ab, err := x509.MarshalPKIXPublicKey(a)
-	if err != nil {
-		return err
+// samePublicKey reports whether two public keys are equal, using the key's own
+// Equal method (implemented by all stdlib public key types).
+func samePublicKey(a, b crypto.PublicKey) error {
+	key, ok := a.(interface {
+		Equal(x crypto.PublicKey) bool
+	})
+	if !ok {
+		return fmt.Errorf("public key of type %T does not support equality comparison", a)
 	}
-	bb, err := x509.MarshalPKIXPublicKey(b)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(ab, bb) {
+	if !key.Equal(b) {
 		return errors.New("public keys differ")
 	}
 	return nil
