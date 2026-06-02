@@ -42,6 +42,10 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		return errors.New("specify --help, --sign, or --verify")
 	}
 
+	if o.Config.EnableSigstoreGo {
+		fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go signing enabled") // nolint:errcheck
+	}
+
 	userIdent, err := fulcio.NewIdentity(ctx, o.Config, s.TTYIn, s.TTYOut)
 	if err != nil {
 		return fmt.Errorf("failed to get identity: %w", err)
