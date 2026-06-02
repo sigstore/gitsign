@@ -28,6 +28,7 @@ import (
 	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
 	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	"github.com/sigstore/gitsign/pkg/git"
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	sgbundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
@@ -74,15 +75,16 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 	var (
 		leafCert *x509.Certificate
 		logEntry *models.LogEntryAnon
+		bundle   *protobundle.Bundle
 		errs     []error
 	)
 	for i, si := range raw.SignerInfos {
-		cert, le, err := v.verifySigner(ctx, sd, si, data, detached, policyOpts)
+		cert, le, b, err := v.verifySigner(ctx, sd, si, data, detached, policyOpts...)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("signer %d: %w", i, err))
 			continue
 		}
-		leafCert, logEntry = cert, le
+		leafCert, logEntry, bundle = cert, le, b
 		break
 	}
 	if leafCert == nil {
@@ -96,6 +98,7 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 	return &git.VerificationSummary{
 		Cert:     leafCert,
 		LogEntry: logEntry,
+		Bundle:   bundle,
 		Claims:   claims,
 	}, nil
 }
@@ -105,25 +108,25 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 // enforces content binding (the signature covers this git object) and requires
 // a Rekor transparency log entry, since the legacy path requires one and the
 // bundle path does not fall back to an unattested current-time verification.
-func (v *Verifier) verifySigner(ctx context.Context, sd *cms.SignedData, si protocol.SignerInfo, data []byte, detached bool, policyOpts []verify.PolicyOption) (*x509.Certificate, *models.LogEntryAnon, error) {
+func (v *Verifier) verifySigner(ctx context.Context, sd *cms.SignedData, si protocol.SignerInfo, data []byte, detached bool, policyOpts ...verify.PolicyOption) (*x509.Certificate, *models.LogEntryAnon, *protobundle.Bundle, error) {
 	sb, err := compat.SignerInfoToBundle(ctx, sd, si)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Content binding: prove the signature covers this git object. This is the
 	// one check sigstore-go cannot do from the bundle alone.
 	if err := verifyContentBinding(si, sd, data, detached); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if len(sb.Bundle.GetVerificationMaterial().GetTlogEntries()) == 0 {
-		return nil, nil, errors.New("no Rekor transparency log entry")
+		return nil, nil, nil, errors.New("no Rekor transparency log entry")
 	}
 
 	pb, err := sgbundle.NewBundle(sb.Bundle)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid bundle: %w", err)
+		return nil, nil, nil, fmt.Errorf("invalid bundle: %w", err)
 	}
 
 	// The verifier's time policy depends on whether this signer carries an
@@ -131,23 +134,23 @@ func (v *Verifier) verifySigner(ctx context.Context, sd *cms.SignedData, si prot
 	hasTimestamp := len(sb.Bundle.GetVerificationMaterial().GetTimestampVerificationData().GetRfc3161Timestamps()) > 0
 	sev, err := newSignedEntityVerifier(v.trustedMaterial, hasTimestamp, v.ignoreSCT)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	policy := verify.NewPolicy(verify.WithArtifact(bytes.NewReader(sb.Artifact)), policyOpts...)
 	if _, err := sev.Verify(pb, policy); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	leafCert, err := x509.ParseCertificate(sb.Bundle.GetVerificationMaterial().GetCertificate().GetRawBytes())
 	if err != nil {
-		return nil, nil, fmt.Errorf("parsing leaf certificate: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing leaf certificate: %w", err)
 	}
 	var logEntry *models.LogEntryAnon
 	if tles := sb.Bundle.GetVerificationMaterial().GetTlogEntries(); len(tles) > 0 {
 		logEntry = rekoroid.ProtoToLogEntryAnon(tles[0])
 	}
-	return leafCert, logEntry, nil
+	return leafCert, logEntry, sb.Bundle, nil
 }
 
 // verifyContentBinding checks that the git object content hashes to the
