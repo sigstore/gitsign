@@ -80,6 +80,10 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
+		// Experimental: sign via sigstore-go (offline mode only, gated by
+		// gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO).
+		Bundle:   o.Config.EnableSigstoreGo,
+		RekorURL: o.Config.Rekor,
 	}
 	if o.Config.MatchCommitter {
 		opts.UserName = o.Config.CommitterName

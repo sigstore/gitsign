@@ -29,7 +29,7 @@ import (
 
 // TestVerifyBundleParity verifies the same offline commit through both the
 // legacy verification path and the experimental sigstore-go bundle path
-// (GITSIGN_VERIFY_BUNDLE) and asserts they agree on the signing certificate and
+// (cfg.EnableSigstoreGo) and asserts they agree on the signing certificate and
 // Rekor log entry.
 func TestVerifyBundleParity(t *testing.T) {
 	ctx := context.Background()
@@ -59,8 +59,12 @@ func TestVerifyBundleParity(t *testing.T) {
 	}
 
 	// Bundle path.
-	t.Setenv("GITSIGN_VERIFY_BUNDLE", "1")
-	bundleVerifier, err := gitsign.NewVerifierWithCosignOpts(ctx, cfg, nil)
+	bundleCfg := &config.Config{
+		Fulcio:           "https://fulcio.sigstore.dev",
+		Rekor:            "https://rekor.sigstore.dev",
+		EnableSigstoreGo: true,
+	}
+	bundleVerifier, err := gitsign.NewVerifierWithCosignOpts(ctx, bundleCfg, nil)
 	if err != nil {
 		t.Fatalf("bundle NewVerifierWithCosignOpts: %v", err)
 	}

@@ -39,7 +39,7 @@ type Verifier struct {
 	rekor rekor.Verifier
 
 	// Experimental bundle-based verification path, gated by useBundle
-	// (GITSIGN_VERIFY_BUNDLE). When enabled, Verify converts the CMS signature to
+	// (cfg.EnableSigstoreGo). When enabled, Verify converts the CMS signature to
 	// sigstore bundles and verifies them with sigstore-go using the fields below.
 	useBundle       bool
 	trustedMaterial root.TrustedMaterial
@@ -128,10 +128,10 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 	}
 
 	// Experimental: build the trust material and identity policy for the
-	// bundle-based verification path. Gated by cfg.VerifyBundle
-	// (gitsign.verifyBundle / GITSIGN_VERIFY_BUNDLE) so the default behavior is
-	// unchanged.
-	if cfg.VerifyBundle {
+	// bundle-based verification path. Gated by cfg.EnableSigstoreGo
+	// (gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO) so the default
+	// behavior is unchanged.
+	if cfg.EnableSigstoreGo {
 		// SCT verification is on by default; only an explicit IgnoreSCT disables it.
 		ignoreSCT := opts != nil && opts.IgnoreSCT
 

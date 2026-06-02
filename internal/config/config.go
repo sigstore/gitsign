@@ -56,9 +56,11 @@ type Config struct {
 	// Note: online verification will be deprecated in favor of offline in the future.
 	RekorMode string
 
-	// VerifyBundle enables the experimental sigstore-go bundle-based verification
-	// path. When false (the default), the legacy CMS + Rekor verification is used.
-	VerifyBundle bool
+	// EnableSigstoreGo enables the experimental sigstore-go code paths for both
+	// signing and verification (via the CMS<->bundle compat layer). When false
+	// (the default), the legacy CMS + Rekor signing and verification are used.
+	// The on-disk CMS signature format is unchanged either way.
+	EnableSigstoreGo bool
 
 	// OIDC client ID for application
 	ClientID string
@@ -165,7 +167,14 @@ func Get() (*Config, error) {
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
-	out.VerifyBundle = envOrValue("GITSIGN_VERIFY_BUNDLE", fmt.Sprintf("%t", out.VerifyBundle)) == "true"
+	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
+
+	// The sigstore-go signing path embeds the Rekor entry in the signature, which
+	// only applies to offline Rekor mode. Fail loudly rather than silently
+	// ignoring the setting in online mode.
+	if out.EnableSigstoreGo && out.RekorMode != "offline" {
+		return nil, fmt.Errorf("gitsign.enableSigstoreGo requires gitsign.rekorMode=offline, got %q", out.RekorMode)
+	}
 
 	return out, nil
 }
@@ -223,8 +232,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.Rekor = v
 		case strings.EqualFold(k, "gitsign.rekorMode"):
 			out.RekorMode = v
-		case strings.EqualFold(k, "gitsign.verifyBundle"):
-			out.VerifyBundle = strings.EqualFold(v, "true")
+		case strings.EqualFold(k, "gitsign.enableSigstoreGo"):
+			out.EnableSigstoreGo = strings.EqualFold(v, "true")
 		case strings.EqualFold(k, "gitsign.clientID"):
 			out.ClientID = v
 		case strings.EqualFold(k, "gitsign.clientSecretFile"):

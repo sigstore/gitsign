@@ -29,6 +29,8 @@ import (
 	"github.com/github/smimesign/fakeca"
 	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 	"github.com/sigstore/gitsign/internal/signature"
+	"github.com/sigstore/gitsign/internal/sigstore/compat"
+	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
@@ -47,6 +49,10 @@ func (i *identity) CertificateChain() ([]*x509.Certificate, error) {
 
 func (i *identity) Signer() (crypto.Signer, error) {
 	return i.base.PrivateKey, nil
+}
+
+func (i *identity) Keypair() (sign.Keypair, error) {
+	return compat.NewKeypair(i.base.PrivateKey)
 }
 
 // TestSignVerify is a basic test to ensure that the Sign/Verify funcs can be
