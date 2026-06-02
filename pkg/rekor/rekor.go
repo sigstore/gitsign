@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/pem"
 	"errors"
 	"fmt"
 
@@ -31,8 +30,8 @@ import (
 	"github.com/go-openapi/swag/conv"
 
 	"github.com/sigstore/cosign/v3/pkg/cosign"
-	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
+	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	rekor "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/client/index"
@@ -264,15 +263,8 @@ func (c *Client) PublicKeys() *cosign.TrustedTransparencyLogPubKeys {
 // NOTE: This does **not** verify the correctness of the signature against the content.
 // Prefer using [git.Verify] instead for complete verification.
 func (c *Client) VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
-	// Try decoding as PEM
-	var der []byte
-	if blk, _ := pem.Decode(sig); blk != nil {
-		der = blk.Bytes
-	} else {
-		der = sig
-	}
-	// Parse signature
-	sd, err := cms.ParseSignedData(der)
+	// Parse signature (PEM-armored or raw DER).
+	sd, err := compat.ParseSignaturePEM(sig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}

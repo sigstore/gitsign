@@ -18,11 +18,10 @@ package git
 import (
 	"context"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 
-	cms "github.com/sigstore/gitsign/internal/fork/ietf-cms"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
+	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
@@ -92,15 +91,8 @@ func WithTimestampCertPool(pool *x509.CertPool) CertVerifierOption {
 //
 // Signatures should be CMS/PKCS7 formatted.
 func (v *CertVerifier) Verify(_ context.Context, data, sig []byte, detached bool) (*x509.Certificate, error) {
-	// Try decoding as PEM
-	var der []byte
-	if blk, _ := pem.Decode(sig); blk != nil {
-		der = blk.Bytes
-	} else {
-		der = sig
-	}
-	// Parse signature
-	sd, err := cms.ParseSignedData(der)
+	// Parse signature (PEM-armored or raw DER).
+	sd, err := compat.ParseSignaturePEM(sig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}

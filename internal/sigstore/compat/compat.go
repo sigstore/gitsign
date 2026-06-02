@@ -30,6 +30,7 @@ package compat
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/pem"
 	"fmt"
 
 	"github.com/github/smimesign/ietf-cms/protocol"
@@ -44,6 +45,18 @@ import (
 // functions. gitsign uses v0.3, which carries a single leaf certificate (rather
 // than a chain) and requires an inclusion proof for any transparency log entries.
 const MediaType = "application/vnd.dev.sigstore.bundle.v0.3+json"
+
+// ParseSignaturePEM parses a gitsign CMS SignedData from a signature that is
+// either PEM-armored (e.g. a "SIGNED MESSAGE" block) or raw DER/BER. Git
+// signatures may be stored in either form, so callers verifying a signature
+// should use this rather than deciding the encoding themselves.
+func ParseSignaturePEM(sig []byte) (*cms.SignedData, error) {
+	der := sig
+	if blk, _ := pem.Decode(sig); blk != nil {
+		der = blk.Bytes
+	}
+	return cms.ParseSignedData(der)
+}
 
 // SignerBundle is the result of converting one CMS SignerInfo to a sigstore
 // bundle. Artifact is the marshaled CMS SignedAttrs that Bundle's signature and
@@ -66,8 +79,8 @@ type SignerBundle struct {
 func SignedDataToBundle(ctx context.Context, sd *cms.SignedData) ([]*SignerBundle, error) {
 	raw := sd.Raw()
 	out := make([]*SignerBundle, 0, len(raw.SignerInfos))
-	for i := range raw.SignerInfos {
-		sb, err := SignerInfoToBundle(ctx, sd, i)
+	for _, si := range raw.SignerInfos {
+		sb, err := SignerInfoToBundle(ctx, sd, si)
 		if err != nil {
 			return nil, err
 		}
@@ -79,13 +92,7 @@ func SignedDataToBundle(ctx context.Context, sd *cms.SignedData) ([]*SignerBundl
 // SignerInfoToBundle converts a single signer (selected by signerIndex) of a
 // parsed gitsign CMS SignedData into a sigstore bundle suitable for verification
 // with sigstore-go.
-func SignerInfoToBundle(ctx context.Context, sd *cms.SignedData, signerIndex int) (*SignerBundle, error) {
-	raw := sd.Raw()
-	if signerIndex < 0 || signerIndex >= len(raw.SignerInfos) {
-		return nil, fmt.Errorf("signer index %d out of range (%d signers)", signerIndex, len(raw.SignerInfos))
-	}
-	si := raw.SignerInfos[signerIndex]
-
+func SignerInfoToBundle(ctx context.Context, sd *cms.SignedData, si protocol.SignerInfo) (*SignerBundle, error) {
 	// The signed artifact is the marshaled SignedAttrs, not the commit body.
 	message, err := si.SignedAttrs.MarshaledForVerification()
 	if err != nil {

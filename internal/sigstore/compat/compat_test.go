@@ -100,7 +100,7 @@ func TestSignerInfoToBundle(t *testing.T) {
 	}
 	wantCert := certs[0]
 
-	sb, err := SignerInfoToBundle(ctx, sd, 0)
+	sb, err := SignerInfoToBundle(ctx, sd, sd.Raw().SignerInfos[0])
 	if err != nil {
 		t.Fatalf("SignerInfoToBundle: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestBundleToAttributes(t *testing.T) {
 	// Convert to a bundle, derive attributes from it, append them to a fresh CMS
 	// skeleton (one without the OID attr), and confirm we recover an equivalent
 	// re-derived bundle.
-	sb, err := SignerInfoToBundle(ctx, sd, 0)
+	sb, err := SignerInfoToBundle(ctx, sd, sd.Raw().SignerInfos[0])
 	if err != nil {
 		t.Fatalf("SignerInfoToBundle: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestBundleToAttributes(t *testing.T) {
 
 	// Re-deriving a bundle from the updated skeleton must reproduce the same tlog
 	// entry, proving BundleToAttributes produced a valid OID attribute.
-	gotSB, err := SignerInfoToBundle(ctx, skeleton, 0)
+	gotSB, err := SignerInfoToBundle(ctx, skeleton, skeleton.Raw().SignerInfos[0])
 	if err != nil {
 		t.Fatalf("SignerInfoToBundle(updated): %v", err)
 	}
@@ -216,7 +216,7 @@ func TestBundleToAttributesNoTlog(t *testing.T) {
 	}
 	stripTlogAttr(sd)
 
-	sb, err := SignerInfoToBundle(ctx, sd, 0)
+	sb, err := SignerInfoToBundle(ctx, sd, sd.Raw().SignerInfos[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestSignerInfoToBundleNoTlog(t *testing.T) {
 	}
 	stripTlogAttr(sd)
 
-	sb, err := SignerInfoToBundle(ctx, sd, 0)
+	sb, err := SignerInfoToBundle(ctx, sd, sd.Raw().SignerInfos[0])
 	if err != nil {
 		t.Fatalf("SignerInfoToBundle: %v", err)
 	}
@@ -272,18 +272,6 @@ func TestSignerInfoToBundleNoTlog(t *testing.T) {
 	// A bundle with no tlog entries is still a valid v0.3 bundle.
 	if _, err := bundle.NewBundle(sb.Bundle); err != nil {
 		t.Fatalf("bundle.NewBundle: %v", err)
-	}
-}
-
-func TestSignerInfoToBundleBadSignerIndex(t *testing.T) {
-	ctx := context.Background()
-	sd, _ := loadSignedData(t)
-
-	if _, err := SignerInfoToBundle(ctx, sd, 5); err == nil {
-		t.Error("expected error for out-of-range signer index")
-	}
-	if _, err := SignerInfoToBundle(ctx, sd, -1); err == nil {
-		t.Error("expected error for negative signer index")
 	}
 }
 

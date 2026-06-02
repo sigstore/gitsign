@@ -56,6 +56,10 @@ type Config struct {
 	// Note: online verification will be deprecated in favor of offline in the future.
 	RekorMode string
 
+	// VerifyBundle enables the experimental sigstore-go bundle-based verification
+	// path. When false (the default), the legacy CMS + Rekor verification is used.
+	VerifyBundle bool
+
 	// OIDC client ID for application
 	ClientID string
 	// File containing the OIDC Client Secret
@@ -161,6 +165,7 @@ func Get() (*Config, error) {
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
+	out.VerifyBundle = envOrValue("GITSIGN_VERIFY_BUNDLE", fmt.Sprintf("%t", out.VerifyBundle)) == "true"
 
 	return out, nil
 }
@@ -218,6 +223,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.Rekor = v
 		case strings.EqualFold(k, "gitsign.rekorMode"):
 			out.RekorMode = v
+		case strings.EqualFold(k, "gitsign.verifyBundle"):
+			out.VerifyBundle = strings.EqualFold(v, "true")
 		case strings.EqualFold(k, "gitsign.clientID"):
 			out.ClientID = v
 		case strings.EqualFold(k, "gitsign.clientSecretFile"):

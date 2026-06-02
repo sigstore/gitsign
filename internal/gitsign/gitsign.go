@@ -28,6 +28,8 @@ import (
 	rekorinternal "github.com/sigstore/gitsign/internal/rekor"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
@@ -35,6 +37,15 @@ type Verifier struct {
 	git   git.Verifier
 	cert  cert.Verifier
 	rekor rekor.Verifier
+
+	// Experimental bundle-based verification path, gated by useBundle
+	// (GITSIGN_VERIFY_BUNDLE). When enabled, Verify converts the CMS signature to
+	// sigstore bundles and verifies them with sigstore-go using the fields below.
+	useBundle       bool
+	trustedMaterial root.TrustedMaterial
+	identities      []verify.CertificateIdentity
+	// ignoreSCT disables the embedded SCT check, which is performed by default.
+	ignoreSCT bool
 }
 
 // NewVerifierWithCosignOpts implements a Gitsign verifier using Cosign CertVerifyOptions.
@@ -110,14 +121,52 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 		})
 	}
 
-	return &Verifier{
+	verifier := &Verifier{
 		git:   gitverifier,
 		cert:  certverifier,
 		rekor: rekor,
-	}, nil
+	}
+
+	// Experimental: build the trust material and identity policy for the
+	// bundle-based verification path. Gated by cfg.VerifyBundle
+	// (gitsign.verifyBundle / GITSIGN_VERIFY_BUNDLE) so the default behavior is
+	// unchanged.
+	if cfg.VerifyBundle {
+		// SCT verification is on by default; only an explicit IgnoreSCT disables it.
+		ignoreSCT := opts != nil && opts.IgnoreSCT
+
+		// CT log keys are needed to verify embedded SCTs, so load them unless SCT
+		// verification is disabled.
+		var ctPubs *cosign.TrustedTransparencyLogPubKeys
+		if !ignoreSCT {
+			ctPubs, err = cosign.GetCTLogPubs(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("error getting CT log public keys: %w", err)
+			}
+		}
+
+		tm, err := buildTrustedMaterial(ctx, cfg, rekor.PublicKeys(), ctPubs)
+		if err != nil {
+			return nil, fmt.Errorf("error building trusted material: %w", err)
+		}
+		identities, err := mapIdentities(opts)
+		if err != nil {
+			return nil, fmt.Errorf("error mapping identities: %w", err)
+		}
+		verifier.useBundle = true
+		verifier.trustedMaterial = tm
+		verifier.identities = identities
+		verifier.ignoreSCT = ignoreSCT
+	}
+
+	return verifier, nil
 }
 
 func (v *Verifier) Verify(ctx context.Context, data []byte, sig []byte, detached bool) (*git.VerificationSummary, error) {
+	if v.useBundle {
+		return v.verifyBundle(ctx, data, sig, detached)
+	}
+
 	// TODO: we probably want to deprecate git.Verify in favor of this struct.
 	summary, err := git.Verify(ctx, v.git, v.rekor, data, sig, detached)
 	if err != nil {
