@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/sigstore/gitsign/internal"
 	"github.com/sigstore/gitsign/internal/fulcio"
 	"github.com/sigstore/gitsign/internal/git"
 	"github.com/sigstore/gitsign/internal/gpg"
@@ -100,6 +101,14 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 	}
 
 	gpgout.EmitSigCreated(resp.Cert, o.FlagDetachedSignature)
+
+	// Tell the user which identity and OIDC issuer the signature was made with
+	// so they know what to pass to `gitsign verify`. This is written to TTYOut
+	// (a TTY, or stderr when no TTY is present) and never to s.Out, so machine
+	// parsers consuming gitsign's stdout signature output are not affected.
+	if resp.Cert != nil {
+		fmt.Fprintln(s.TTYOut, internal.NewSigningIdentity(resp.Cert).String()) // nolint:errcheck
+	}
 
 	if _, err := s.Out.Write(resp.Signature); err != nil {
 		return errors.New("failed to write signature")
