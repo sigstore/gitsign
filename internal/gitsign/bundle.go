@@ -152,7 +152,7 @@ func (v *Verifier) verifyOnline(ctx context.Context, data, sig []byte, detached 
 
 	// The commit SHA the Rekor entry is keyed on is hash(object body + signature),
 	// so it is the same for every signer.
-	commitSHA, err := reconstructCommitSHA(data, sig)
+	commitSHA, err := git.ObjectHashFromSignature(data, sig)
 	if err != nil {
 		return nil, fmt.Errorf("reconstructing commit hash: %w", err)
 	}
@@ -251,28 +251,6 @@ func (v *Verifier) verifyOnlineSigner(ctx context.Context, sd *cms.SignedData, s
 	}
 
 	return cert, le, sb.Bundle, nil
-}
-
-// reconstructCommitSHA recomputes the git object hash (the commit SHA the legacy
-// online Rekor entry is keyed on) from the object body and signature, mirroring
-// the reconstruction in git.Verify and git.LegacySHASign.
-func reconstructCommitSHA(data, sig []byte) (string, error) {
-	var (
-		raw []byte
-		err error
-	)
-	switch {
-	case bytes.HasPrefix(data, []byte("tree ")):
-		raw, err = git.JoinCommit(&git.CommitSig{Payload: data, Gpgsig: sig})
-	case bytes.HasPrefix(data, []byte("object ")):
-		raw, err = git.JoinTag(&git.TagSig{Payload: data, InBody: sig})
-	default:
-		return "", errors.New("could not determine Git object type")
-	}
-	if err != nil {
-		return "", err
-	}
-	return git.ObjectHash(raw)
 }
 
 // allNoEmbeddedRekorEntry reports whether every error in errs is (or wraps)
