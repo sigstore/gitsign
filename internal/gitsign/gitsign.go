@@ -168,10 +168,10 @@ func (v *Verifier) Verify(ctx context.Context, data []byte, sig []byte, detached
 		summary, err := v.verifyBundle(ctx, data, sig, detached)
 		// Older "online" signatures embed no Rekor entry - their tlog entry lives
 		// in Rekor keyed on the commit SHA and is found via online search, which
-		// sigstore-go cannot do from the signature alone. Fall back to the legacy
-		// verification path so these signatures keep verifying.
+		// sigstore-go cannot do from the signature alone. Fetch that entry and
+		// verify the assembled commit-SHA bundle through sigstore-go instead.
 		if errors.Is(err, errNoEmbeddedRekorEntry) {
-			return v.verifyLegacy(ctx, data, sig, detached)
+			return v.verifyOnline(ctx, data, sig, detached)
 		}
 		return summary, err
 	}
