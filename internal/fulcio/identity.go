@@ -238,6 +238,15 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 	if cfg.TokenProvider == "" && providers.Enabled(ctx) {
 		// If no token provider is set, look for any available provider to use.
 		provider = defaultFlowProvider{}
+	} else if cfg.TokenProvider == "device" {
+		// Special-case: use the OAuth 2.0 device authorization grant (RFC 8628)
+		// directly via the sigstore oauthflow package. The user opens the
+		// printed verification URL on any browser (phone, laptop, anywhere) to
+		// complete OAuth consent; the SSH session itself never needs a browser,
+		// port forward, or localhost callback. Useful on remote/headless dev
+		// hosts where the interactive flow can't open a browser locally.
+		fmt.Fprintln(f.out, "using device authorization flow") // nolint:errcheck
+		authFlow = oauthflow.NewDeviceFlowTokenGetterForIssuer(cfg.Issuer)
 	} else if cfg.TokenProvider != "" && cfg.TokenProvider != "interactive" {
 		fmt.Fprintln(f.out, "using token provider", cfg.TokenProvider) // nolint:errcheck
 
