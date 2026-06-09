@@ -34,7 +34,9 @@ import (
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/signerverifier"
+	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	"github.com/sigstore/gitsign/pkg/fulcio"
+	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore/pkg/oauth"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
 	"github.com/sigstore/sigstore/pkg/signature"
@@ -140,6 +142,16 @@ func (i *Identity) Signer() (crypto.Signer, error) {
 		return nil, fmt.Errorf("could not use signer %T as crypto.Signer", sv)
 	}
 	return s, nil
+}
+
+// Keypair returns a sigstore-go sign.Keypair backed by the identity's signer,
+// for use with the bundle signing path.
+func (i *Identity) Keypair() (sign.Keypair, error) {
+	s, err := i.Signer()
+	if err != nil {
+		return nil, err
+	}
+	return compat.NewKeypair(s)
 }
 
 // Delete deletes this identity from the system.

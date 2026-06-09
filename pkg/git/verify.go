@@ -24,6 +24,7 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sigstore/gitsign/pkg/rekor"
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/rekor/pkg/generated/models"
 )
 
@@ -33,6 +34,10 @@ type VerificationSummary struct {
 	Cert *x509.Certificate
 	// Rekor log entry of the commit.
 	LogEntry *models.LogEntryAnon
+	// Bundle is the sigstore bundle the signature was verified as. It is only
+	// populated by the experimental bundle verification path (cfg.EnableSigstoreGo);
+	// the legacy path leaves it nil.
+	Bundle *protobundle.Bundle
 	// List of claims about what succeeded / failed during validation.
 	// This can be used to get details on what succeeded / failed during
 	// validation. This is not an exhaustive list - claims may be missing

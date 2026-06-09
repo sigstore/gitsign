@@ -42,6 +42,10 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		return errors.New("specify --help, --sign, or --verify")
 	}
 
+	if o.Config.EnableSigstoreGo {
+		fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go signing enabled") // nolint:errcheck
+	}
+
 	userIdent, err := fulcio.NewIdentity(ctx, o.Config, s.TTYIn, s.TTYOut)
 	if err != nil {
 		return fmt.Errorf("failed to get identity: %w", err)
@@ -80,6 +84,10 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
+		// Experimental: sign via sigstore-go (offline mode only, gated by
+		// gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO).
+		Bundle:   o.Config.EnableSigstoreGo,
+		RekorURL: o.Config.Rekor,
 	}
 	if o.Config.MatchCommitter {
 		opts.UserName = o.Config.CommitterName

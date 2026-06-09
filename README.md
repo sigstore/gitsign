@@ -85,6 +85,7 @@ The following config options are supported:
 | timestampCertChain |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                              |
 | autoclose          |    true                              | If true, autoclose the browser window after `autocloseTimeout`. In order for autoclose to work you must also set `connectorID`. |
 | autocloseTimeout   |   6                               | If `autoclose` is true, this is how long to wait until the window is closed. |
+| enableSigstoreGo   |   false                          | (Experimental) If true, use the sigstore-go libraries for signing and verification via the CMS↔bundle compatibility layer. Requires `rekorMode=offline`. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
 
 ### Environment Variables
 
@@ -106,6 +107,7 @@ The following config options are supported:
 | GITSIGN_REKOR_MODE           | ❌                 | online                           | Rekor storage mode to operate in. One of [online, offline] (default: online)<br>online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.<br>offline - Hashed commit content is stored in Rekor, with Rekor attributes necessary for offline verification being stored in the commit itself.<br>Note: online verification will be deprecated in favor of offline in the future. |
 | GITSIGN_AUTOCLOSE            | ❌                 | true                             | If true, autoclose the browser window after `GITSIGN_AUTOCLOSE_TIME`. |
 | GITSIGN_AUTOCLOSE_TIMEOUT    | ❌                 | 6                                | If `GITSIGN_AUTOCLOSE` is true, this is how long to wait until the window is closed. |
+| GITSIGN_ENABLE_SIGSTORE_GO   | ❌                 | false                            | (Experimental) If true, use the sigstore-go libraries for signing and verification via the CMS↔bundle compatibility layer. Requires `GITSIGN_REKOR_MODE=offline`. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
 
 For environment variables that support `Sigstore Prefix`, the values may be
 provided with either a `GITSIGN_` or `SIGSTORE_` prefix - e.g.

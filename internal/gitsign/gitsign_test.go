@@ -33,8 +33,10 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	certverifier "github.com/sigstore/gitsign/internal/cert"
 	"github.com/sigstore/gitsign/internal/signature"
+	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/rekor/pkg/generated/models"
+	"github.com/sigstore/sigstore-go/pkg/sign"
 )
 
 func TestVerify(t *testing.T) {
@@ -174,4 +176,8 @@ func (i *identity) CertificateChain() ([]*x509.Certificate, error) {
 
 func (i *identity) Signer() (crypto.Signer, error) {
 	return i.priv, nil
+}
+
+func (i *identity) Keypair() (sign.Keypair, error) {
+	return compat.NewKeypair(i.priv)
 }

@@ -17,6 +17,7 @@ package config
 import (
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -101,5 +102,25 @@ func TestGet(t *testing.T) {
 
 	if diff := cmp.Diff(want, got, cmp.AllowUnexported(Config{})); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func TestEnableSigstoreGoRequiresOffline(t *testing.T) {
+	t.Cleanup(func() { execFn = realExec })
+
+	// enableSigstoreGo with the default (online) Rekor mode must error.
+	execFn = func() (io.Reader, error) {
+		return strings.NewReader("gitsign.enableSigstoreGo true\n"), nil
+	}
+	if _, err := Get(); err == nil {
+		t.Error("expected error when enableSigstoreGo is set without offline rekor mode")
+	}
+
+	// enableSigstoreGo with offline mode is allowed.
+	execFn = func() (io.Reader, error) {
+		return strings.NewReader("gitsign.enableSigstoreGo true\ngitsign.rekorMode offline\n"), nil
+	}
+	if _, err := Get(); err != nil {
+		t.Errorf("expected enableSigstoreGo + offline mode to be valid, got: %v", err)
 	}
 }

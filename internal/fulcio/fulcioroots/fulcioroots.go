@@ -58,13 +58,39 @@ func New(root *x509.CertPool, opts ...CertificateSource) (*x509.CertPool, *x509.
 }
 
 func NewFromConfig(ctx context.Context, cfg *config.Config) (*x509.CertPool, *x509.CertPool, error) {
-	src := []CertificateSource{FromTUF(ctx)}
+	return New(x509.NewCertPool(), sourcesFromConfig(ctx, cfg)...)
+}
 
-	if cfg.FulcioRoot != "" {
-		src = []CertificateSource{FromFile(cfg.FulcioRoot)}
+// CertsFromConfig returns the Fulcio root and intermediate certificates (rather
+// than CertPools) selected by the config. This is used to build a sigstore-go
+// root.TrustedMaterial, whose FulcioCertificateAuthority requires the raw
+// certificates - a CertPool does not expose its contents.
+func CertsFromConfig(ctx context.Context, cfg *config.Config) (roots, intermediates []*x509.Certificate, err error) {
+	var certs []*x509.Certificate
+	for _, fn := range sourcesFromConfig(ctx, cfg) {
+		c, err := fn()
+		if err != nil {
+			return nil, nil, err
+		}
+		certs = append(certs, c...)
 	}
 
-	return New(x509.NewCertPool(), src...)
+	for _, cert := range certs {
+		// root certificates are self-signed
+		if bytes.Equal(cert.RawSubject, cert.RawIssuer) {
+			roots = append(roots, cert)
+		} else {
+			intermediates = append(intermediates, cert)
+		}
+	}
+	return roots, intermediates, nil
+}
+
+func sourcesFromConfig(ctx context.Context, cfg *config.Config) []CertificateSource {
+	if cfg.FulcioRoot != "" {
+		return []CertificateSource{FromFile(cfg.FulcioRoot)}
+	}
+	return []CertificateSource{FromTUF(ctx)}
 }
 
 const (
