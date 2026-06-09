@@ -223,8 +223,10 @@ func (v *Verifier) verifyOnlineSigner(ctx context.Context, sd *cms.SignedData, s
 		return nil, nil, nil, fmt.Errorf("CMS signature is invalid: %w", err)
 	}
 
-	// Fetch the commit-SHA Rekor entry via the online search API.
-	le, err := v.rekor.Verify(ctx, commitSHA, cert)
+	// Fetch the commit-SHA Rekor entry via the online search API. We only search
+	// here - sigstore-go verifies the entry's inclusion proof / SET below, so we
+	// deliberately avoid the legacy rekor.Verify which does its own verification.
+	le, err := v.rekor.Search(ctx, commitSHA, cert)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("looking up rekor entry: %w", err)
 	}

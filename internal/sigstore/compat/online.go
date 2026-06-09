@@ -43,7 +43,7 @@ import (
 // signature over the commit SHA carried in the Rekor entry. Callers MUST supply
 // the returned Artifact ([]byte(commitSHA)) as the verification artifact.
 //
-// le is the entry returned by an online Rekor search (rekor.Verifier.Verify);
+// le is the entry returned by an online Rekor search (rekor.Verifier.Search);
 // cert is the leaf certificate from the CMS signature.
 func OnlineBundle(commitSHA string, le *models.LogEntryAnon, cert *x509.Certificate) (*SignerBundle, error) {
 	if le == nil {

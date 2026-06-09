@@ -47,6 +47,11 @@ import (
 type Verifier interface {
 	Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
 	VerifyInclusion(ctx context.Context, sig []byte, cert *x509.Certificate) (*models.LogEntryAnon, error)
+	// Search returns the Rekor entry matching the commit SHA + cert via the
+	// online search API, without verifying its inclusion proof / SET. It is the
+	// lookup half of Verify, broken out for callers that perform their own entry
+	// verification (e.g. the sigstore-go path).
+	Search(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error)
 }
 
 // Writer represents a mechanism to write content to Rekor.
@@ -178,6 +183,16 @@ func (c *Client) findTLogEntriesByPK(ctx context.Context, pubKey []byte) (uuids 
 	return searchIndex.GetPayload(), nil
 }
 
+// Search returns the Rekor entry matching the commit SHA + cert using the online
+// search API, without verifying the entry's inclusion proof / SET. It is the
+// lookup half of Verify.
+//
+// Note: this relies on non-GA behavior of Rekor (the search index), and remains
+// for backwards compatibility with older "online" signatures.
+func (c *Client) Search(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
+	return c.get(ctx, []byte(commitSHA), cert)
+}
+
 // Verify verifies a commit using online verification.
 //
 // This is done by:
@@ -188,7 +203,7 @@ func (c *Client) findTLogEntriesByPK(ctx context.Context, pubKey []byte) (uuids 
 // This function relies on non-GA behavior of Rekor, and remains for backwards
 // compatibility with older signatures.
 func (c *Client) Verify(ctx context.Context, commitSHA string, cert *x509.Certificate) (*models.LogEntryAnon, error) {
-	e, err := c.get(ctx, []byte(commitSHA), cert)
+	e, err := c.Search(ctx, commitSHA, cert)
 	if err != nil {
 		return nil, err
 	}
