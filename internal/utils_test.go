@@ -108,14 +108,11 @@ func TestSigningIdentityString(t *testing.T) {
 	}
 	out := s.String()
 
-	// The formatted guidance must surface both values and point at the verify
-	// flags so a user can copy them directly.
+	// The output should surface both the identity and the issuer.
 	for _, want := range []string{
 		"foo@example.com",
 		"https://github.com/login/oauth",
-		"--certificate-identity",
-		"--certificate-oidc-issuer",
-		"gitsign verify",
+		"signed with identity",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("String() output missing %q\ngot: %s", want, out)

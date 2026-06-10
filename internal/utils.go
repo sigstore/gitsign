@@ -71,11 +71,10 @@ func NewSigningIdentity(cert *x509.Certificate) SigningIdentity {
 	}
 }
 
-// String formats the signing identity as guidance for the verify command,
-// pointing the user at the exact flag values to pass.
+// String reports the identity and issuer the signature was made with, so the
+// user can see who they signed as.
 func (s SigningIdentity) String() string {
-	return fmt.Sprintf("gitsign: signed with identity %q (issuer %q)\ngitsign: to verify, run: gitsign verify --certificate-identity %q --certificate-oidc-issuer %q",
-		s.Identity, s.Issuer, s.Identity, s.Issuer)
+	return fmt.Sprintf("gitsign: signed with identity %q (issuer %q)", s.Identity, s.Issuer)
 }
 
 // StripURL returns the baseHost with the basePath given a full endpoint
