@@ -19,11 +19,13 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/sigstore/cosign/v3/cmd/cosign/cli/fulcio"
 	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/v3/cmd/cosign/cli/signcommon"
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/gitsign/internal/attest"
 	"github.com/sigstore/gitsign/internal/config"
+	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/spf13/cobra"
 )
 
@@ -75,16 +77,44 @@ func (o *options) Run(ctx context.Context) error {
 		digestType = attest.DigestTypeTree
 	}
 
-	sv, closerFunc, err := signcommon.GetSignerVerifier(ctx, "", "", cosignopts.KeyOpts{
+	ko := cosignopts.KeyOpts{
 		FulcioURL:    o.Config.Fulcio,
 		RekorURL:     o.Config.Rekor,
 		OIDCIssuer:   o.Config.Issuer,
 		OIDCClientID: o.Config.ClientID,
-	})
+	}
+
+	// cosign v3.1 unexported its keyless SignerVerifier constructor
+	// (signcommon.GetSignerVerifier). Build the equivalent here the way cosign
+	// used to: generate an ephemeral key, get a Fulcio cert for it, and wrap
+	// both in a signcommon.SignerVerifier, which the attestor uses to DSSE-sign
+	// and for the Rekor upload.
+	keyDetails, err := signcommon.ParseSignatureAlgorithmFlag("")
+	if err != nil {
+		return fmt.Errorf("parsing signature algorithm: %w", err)
+	}
+	algo, err := signature.GetAlgorithmDetails(keyDetails)
+	if err != nil {
+		return fmt.Errorf("getting algorithm details: %w", err)
+	}
+	privKey, err := cosign.GeneratePrivateKeyWithAlgorithm(&algo)
+	if err != nil {
+		return fmt.Errorf("generating ephemeral key: %w", err)
+	}
+	loadOptions := cosign.GetDefaultLoadOptions(nil)
+	signer, err := signature.LoadSignerVerifierFromAlgorithmDetails(privKey, algo, *loadOptions...)
+	if err != nil {
+		return fmt.Errorf("loading ephemeral signer: %w", err)
+	}
+	fulcioSigner, err := fulcio.NewSigner(ctx, ko, signer)
 	if err != nil {
 		return fmt.Errorf("getting signer: %w", err)
 	}
-	defer closerFunc()
+	sv := &signcommon.SignerVerifier{
+		Cert:           fulcioSigner.Cert,
+		Chain:          fulcioSigner.Chain,
+		SignerVerifier: fulcioSigner.SignerVerifier,
+	}
 
 	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config, digestType)
 
