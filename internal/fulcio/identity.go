@@ -223,15 +223,25 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 		fmt.Println("error getting interactive success html, using static default", err)
 		html = oauth.InteractiveSuccessHTML
 	}
-	defaultFlow := &oauthflow.InteractiveIDTokenGetter{
+	flow := &oauthflow.InteractiveIDTokenGetter{
 		HTMLPage: html,
 		Input:    f.in,
 		Output:   f.out,
 	}
 	if cfg.ConnectorID != "" {
-		defaultFlow.ExtraAuthURLParams = []oauth2.AuthCodeOption{oauthflow.ConnectorIDOpt(cfg.ConnectorID)}
+		flow.ExtraAuthURLParams = []oauth2.AuthCodeOption{oauthflow.ConnectorIDOpt(cfg.ConnectorID)}
 	}
-	var authFlow oauthflow.TokenGetter = defaultFlow
+	// If a custom URL opener command is configured, open the login URL with it
+	// instead of the platform default browser.
+	if cfg.URLOpener != "" {
+		open, err := newCommandURLOpener(cfg.URLOpener)
+		if err != nil {
+			return nil, err
+		}
+		flow.BrowserOpener = open
+	}
+
+	var authFlow oauthflow.TokenGetter = flow
 
 	// If enabled, try OIDC token providers to get a token. unless the token provider is "interactive" (in which case always do default interactive flow).
 	var provider providers.Interface

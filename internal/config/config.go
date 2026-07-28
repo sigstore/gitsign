@@ -97,6 +97,21 @@ type Config struct {
 	Autoclose bool
 	// AutocloseTimeout specifies the time to wait before closing the window
 	AutocloseTimeout int
+
+	// URLOpener is an optional command used to open the OIDC login URL in a
+	// browser during the interactive auth flow. When empty, the platform
+	// default browser is used.
+	//
+	// The command is split into a program and its arguments using shell-style
+	// word splitting (arguments containing spaces may be quoted), and each
+	// resulting token is rendered as a Go text/template with the login URL
+	// available as {{.URL}}. For example:
+	//
+	//	firefox --new-tab {{.URL}}
+	//
+	// The command is not run through a shell - the split tokens are passed
+	// directly to exec, so shell metacharacters are inert.
+	URLOpener string
 }
 
 // CLientSecret retrieves the OIDC client secret from the file provided
@@ -167,6 +182,7 @@ func Get() (*Config, error) {
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
+	out.URLOpener = envOrValue("GITSIGN_URL_OPENER", out.URLOpener)
 	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
 
 	// The sigstore-go signing path embeds the Rekor entry in the signature, which
@@ -244,6 +260,8 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.Issuer = v
 		case strings.EqualFold(k, "gitsign.logPath"):
 			out.LogPath = v
+		case strings.EqualFold(k, "gitsign.urlOpener"):
+			out.URLOpener = v
 		case strings.EqualFold(k, "gitsign.connectorID"):
 			out.ConnectorID = v
 		case strings.EqualFold(k, "gitsign.tokenProvider"):

@@ -6,3 +6,4 @@ gitsign
 gitsign.connectorid https://accounts.google.com
 gitsign.FULCIO example.com
 gitsign.Rekor example.com
+gitsign.urlOpener firefox --new-tab {{.URL}}
