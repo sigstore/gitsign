@@ -89,6 +89,8 @@ func TestGet(t *testing.T) {
 		RekorMode:        "online",
 		Autoclose:        true,
 		AutocloseTimeout: 6,
+		// From config file.
+		URLOpener: "firefox --new-tab {{.URL}}",
 	}
 
 	execFn = func() (io.Reader, error) {
