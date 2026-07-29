@@ -350,8 +350,6 @@ github.com/go-openapi/testify/v2 v2.6.0 h1:5PKH2HE7YJ/LuRPQGvSxBRlFXNQhSetBLlGAg
 github.com/go-openapi/testify/v2 v2.6.0/go.mod h1:SgsVHtfooshd0tublTtJ50FPKhujf47YRqauXXOUxfw=
 github.com/go-openapi/validate v0.26.1 h1:pZSbvtRO8G2R2FpWTYRn3w8LrsNwbtaVhP2dWiBa0Us=
 github.com/go-openapi/validate v0.26.1/go.mod h1:B8UMgXiQiwwQWIbmuROlwJZDPGlikPuh7iHV1vPX9Oo=
-github.com/go-piv/piv-go/v2 v2.6.0 h1:/Z+uqlv5luC8aqLh/uO05egk23UH4KT/ldvPHXpnKls=
-github.com/go-piv/piv-go/v2 v2.6.0/go.mod h1:gcsS2WGbToZk5PwtsCIlCWzV/R+r/wN+Xi+6O6IlU3c=
 github.com/go-rod/rod v0.116.2 h1:A5t2Ky2A+5eD/ZJQr1EfsQSe5rms5Xof/qj296e+ZqA=
 github.com/go-rod/rod v0.116.2/go.mod h1:H+CMO9SCNc2TJ2WfrG+pKhITz57uGNYU43qYHh438Mg=
 github.com/go-sql-driver/mysql v1.9.3 h1:U/N249h2WzJ3Ukj8SowVFjdtZKfu9vlLZxjPXV1aweo=

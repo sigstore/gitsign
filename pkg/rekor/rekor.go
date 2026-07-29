@@ -31,6 +31,7 @@ import (
 
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
+	"github.com/sigstore/gitsign/internal/rekor/tlog"
 	"github.com/sigstore/gitsign/internal/sigstore/compat"
 	rekor "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client"
@@ -104,7 +105,7 @@ func (c *Client) WriteMessage(ctx context.Context, message, signature []byte, ce
 	if _, err := checkSum.Write(message); err != nil {
 		return nil, err
 	}
-	return cosign.TLogUpload(ctx, c.Rekor, signature, checkSum, pem)
+	return tlog.Upload(ctx, c.Rekor, signature, checkSum, pem)
 }
 
 func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
@@ -129,7 +130,7 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 			return nil, fmt.Errorf("invalid rekor UUID: %w", err)
 		}
 
-		e, err := cosign.GetTlogEntry(ctx, c.Rekor, u)
+		e, err := tlog.GetEntry(ctx, c.Rekor, u)
 		if err != nil {
 			return nil, err
 		}

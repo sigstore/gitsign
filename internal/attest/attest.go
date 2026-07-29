@@ -34,10 +34,10 @@ import (
 	"github.com/go-openapi/strfmt"
 	spb "github.com/in-toto/attestation/go/v1"
 	"github.com/jonboulle/clockwork"
-	"github.com/sigstore/cosign/v3/cmd/cosign/cli/signcommon"
 	"github.com/sigstore/cosign/v3/pkg/types"
 	utils "github.com/sigstore/gitsign/internal"
 	gitsignconfig "github.com/sigstore/gitsign/internal/config"
+	"github.com/sigstore/gitsign/internal/signerverifier"
 	rekorclient "github.com/sigstore/rekor/pkg/generated/client"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	dssesig "github.com/sigstore/sigstore/pkg/signature/dsse"
@@ -57,18 +57,18 @@ var (
 	clock = clockwork.NewRealClock()
 )
 
-// rekorUpload stubs out cosign.TLogUploadInTotoAttestation for testing.
+// rekorUpload stubs out tlog.UploadInTotoAttestation for testing.
 type rekorUpload func(ctx context.Context, rekorClient *rekorclient.Rekor, signature []byte, pemBytes []byte) (*models.LogEntryAnon, error)
 
 type Attestor struct {
 	repo       *git.Repository
-	sv         *signcommon.SignerVerifier
+	sv         *signerverifier.CertSignerVerifier
 	rekorFn    rekorUpload
 	config     *gitsignconfig.Config
 	digestType string
 }
 
-func NewAttestor(repo *git.Repository, sv *signcommon.SignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config, digestType string) *Attestor {
+func NewAttestor(repo *git.Repository, sv *signerverifier.CertSignerVerifier, rekorFn rekorUpload, config *gitsignconfig.Config, digestType string) *Attestor {
 	return &Attestor{
 		repo:       repo,
 		sv:         sv,
