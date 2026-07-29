@@ -56,10 +56,15 @@ type Config struct {
 	// Note: online verification will be deprecated in favor of offline in the future.
 	RekorMode string
 
-	// EnableSigstoreGo enables the experimental sigstore-go code paths for both
-	// signing and verification (via the CMS<->bundle compat layer). When false
-	// (the default), the legacy CMS + Rekor signing and verification are used.
-	// The on-disk CMS signature format is unchanged either way.
+	// EnableSigstoreGo enables the sigstore-go code paths (via the CMS<->bundle
+	// compat layer). It is on by default; set it to false to fall back to the
+	// legacy CMS + Rekor implementation. The on-disk CMS signature format is
+	// unchanged either way.
+	//
+	// Verification uses sigstore-go in all Rekor modes (legacy online signatures
+	// with no embedded entry fall back to the legacy verifier). Signing uses
+	// sigstore-go only in offline Rekor mode, where the Rekor entry is embedded
+	// in the signature; online/legacy signing stays on the existing CMS path.
 	EnableSigstoreGo bool
 
 	// OIDC client ID for application
@@ -153,6 +158,7 @@ func Get() (*Config, error) {
 		Issuer:   "https://oauth2.sigstore.dev/auth",
 		// TODO: default to offline
 		RekorMode:        "online",
+		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,
 	}
@@ -189,13 +195,6 @@ func Get() (*Config, error) {
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
 	out.URLOpener = envOrValue("GITSIGN_URL_OPENER", out.URLOpener)
 	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
-
-	// The sigstore-go signing path embeds the Rekor entry in the signature, which
-	// only applies to offline Rekor mode. Fail loudly rather than silently
-	// ignoring the setting in online mode.
-	if out.EnableSigstoreGo && out.RekorMode != "offline" {
-		return nil, fmt.Errorf("gitsign.enableSigstoreGo requires gitsign.rekorMode=offline, got %q", out.RekorMode)
-	}
 
 	return out, nil
 }

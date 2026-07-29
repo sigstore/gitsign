@@ -87,6 +87,7 @@ func TestGet(t *testing.T) {
 		RedirectURL:      "example.com",
 		ConnectorID:      "bar",
 		RekorMode:        "online",
+		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,
 		// From config file.
@@ -107,22 +108,44 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestEnableSigstoreGoRequiresOffline(t *testing.T) {
+func TestEnableSigstoreGo(t *testing.T) {
 	t.Cleanup(func() { execFn = realExec })
 
-	// enableSigstoreGo with the default (online) Rekor mode must error.
+	// sigstore-go is opted in by default, including in the default (online)
+	// Rekor mode.
 	execFn = func() (io.Reader, error) {
-		return strings.NewReader("gitsign.enableSigstoreGo true\n"), nil
+		return strings.NewReader(""), nil
 	}
-	if _, err := Get(); err == nil {
-		t.Error("expected error when enableSigstoreGo is set without offline rekor mode")
+	got, err := Get()
+	if err != nil {
+		t.Fatalf("unexpected error with default config: %v", err)
+	}
+	if !got.EnableSigstoreGo {
+		t.Error("expected EnableSigstoreGo to default to true")
 	}
 
-	// enableSigstoreGo with offline mode is allowed.
+	// It can be turned off via git config.
 	execFn = func() (io.Reader, error) {
-		return strings.NewReader("gitsign.enableSigstoreGo true\ngitsign.rekorMode offline\n"), nil
+		return strings.NewReader("gitsign.enableSigstoreGo false\n"), nil
 	}
-	if _, err := Get(); err != nil {
-		t.Errorf("expected enableSigstoreGo + offline mode to be valid, got: %v", err)
+	got, err = Get()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.EnableSigstoreGo {
+		t.Error("expected gitsign.enableSigstoreGo=false to disable sigstore-go")
+	}
+
+	// It can be turned off via environment variable.
+	t.Setenv("GITSIGN_ENABLE_SIGSTORE_GO", "false")
+	execFn = func() (io.Reader, error) {
+		return strings.NewReader(""), nil
+	}
+	got, err = Get()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.EnableSigstoreGo {
+		t.Error("expected GITSIGN_ENABLE_SIGSTORE_GO=false to disable sigstore-go")
 	}
 }
