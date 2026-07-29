@@ -190,12 +190,11 @@ func Get() (*Config, error) {
 	out.URLOpener = envOrValue("GITSIGN_URL_OPENER", out.URLOpener)
 	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
 
-	// The sigstore-go signing path embeds the Rekor entry in the signature, which
-	// only applies to offline Rekor mode. Fail loudly rather than silently
-	// ignoring the setting in online mode.
-	if out.EnableSigstoreGo && out.RekorMode != "offline" {
-		return nil, fmt.Errorf("gitsign.enableSigstoreGo requires gitsign.rekorMode=offline, got %q", out.RekorMode)
-	}
+	// Note: EnableSigstoreGo is intentionally allowed with any Rekor mode. The
+	// sigstore-go bundle signing path embeds the Rekor entry and so only applies
+	// to offline mode; online-mode signing falls back to the legacy path (handled
+	// in the sign command). Verification enables sigstore-go regardless of mode,
+	// including for legacy online signatures.
 
 	return out, nil
 }
