@@ -43,16 +43,7 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 	}
 
 	if o.Config.EnableSigstoreGo {
-		// The sigstore-go signing path produces the Rekor entry embedded in the
-		// signature, which only applies to offline Rekor mode. In online mode there
-		// is no bundle representation (the entry is keyed on the commit SHA in
-		// Rekor), so signing uses the legacy path; sigstore-go still applies to
-		// verification of the resulting signature.
-		if o.Config.RekorMode == "offline" {
-			fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go signing enabled") // nolint:errcheck
-		} else {
-			fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go enabled; online Rekor mode signs via the legacy path (sigstore-go applies to verification)") // nolint:errcheck
-		}
+		fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go signing enabled") // nolint:errcheck
 	}
 
 	userIdent, err := fulcio.NewIdentity(ctx, o.Config, s.TTYIn, s.TTYOut)
@@ -93,11 +84,12 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
-		// Experimental: sign via sigstore-go (bundle), gated by
-		// gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO. The bundle
-		// signing path embeds the Rekor entry, so it only applies to offline
-		// Rekor mode; online mode falls back to legacy signing.
-		Bundle:   o.Config.EnableSigstoreGo && o.Config.RekorMode == "offline",
+		// Experimental: drive signing and the Rekor upload through sigstore-go,
+		// gated by gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO. Offline
+		// mode embeds the entry (git.Sign -> signBundle); online mode uploads the
+		// commit-SHA entry via sigstore-go without embedding (git.LegacySHASign
+		// -> signature.SignOnline). The on-disk CMS format is unchanged either way.
+		Bundle:   o.Config.EnableSigstoreGo,
 		RekorURL: o.Config.Rekor,
 	}
 	if o.Config.MatchCommitter {

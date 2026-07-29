@@ -60,11 +60,13 @@ type SignOptions struct {
 	// signature output.
 	Rekor rekor.Writer
 
-	// Bundle, when true, attaches the Rekor transparency log entry using
-	// sigstore-go's signing libraries and the CMS<->bundle compat layer instead
-	// of the legacy Rekor writer. The embedded entry (and resulting CMS) is
-	// byte-compatible with the legacy path. Only takes effect when Rekor is also
-	// set (i.e. offline mode); RekorURL must be provided.
+	// Bundle, when true, drives signing's Rekor interaction through sigstore-go's
+	// libraries and the CMS<->bundle compat layer instead of the legacy cosign
+	// helpers. In offline mode (Rekor set) the transparency log entry is embedded
+	// in the CMS, byte-compatible with the legacy path. In online mode
+	// (git.LegacySHASign) the commit-SHA entry is signed and uploaded via
+	// sigstore-go but not embedded (see signature.SignOnline). RekorURL must be
+	// provided.
 	Bundle bool
 	// RekorURL is the Rekor base URL, required when Bundle is true.
 	RekorURL string

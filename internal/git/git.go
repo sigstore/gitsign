@@ -57,6 +57,18 @@ func LegacySHASign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identi
 		return nil, fmt.Errorf("error generating commit hash: %w", err)
 	}
 
+	// Experimental: drive the commit-SHA signing and Rekor upload through
+	// sigstore-go (gated by gitsign.enableSigstoreGo, surfaced as opts.Bundle).
+	// The commit body CMS signature above is unchanged, so the on-disk signature
+	// is identical to legacy online signing; only the Rekor interaction differs.
+	if opts.Bundle {
+		resp.LogEntry, err = signature.SignOnline(ctx, commit, ident, resp.Cert, opts.RekorURL)
+		if err != nil {
+			return nil, fmt.Errorf("error uploading tlog (commit): %w", err)
+		}
+		return resp, nil
+	}
+
 	sv, err := ident.SignerVerifier()
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer: %w", err)

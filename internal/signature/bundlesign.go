@@ -18,16 +18,20 @@ package signature
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
 
 	rekoroid "github.com/sigstore/gitsign/internal/rekor/oid"
 	"github.com/sigstore/gitsign/internal/sigstore/compat"
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorclient "github.com/sigstore/rekor/pkg/client"
 	"github.com/sigstore/rekor/pkg/generated/client/entries"
 	"github.com/sigstore/rekor/pkg/generated/models"
 	"github.com/sigstore/sigstore-go/pkg/sign"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 // signBundle implements the experimental "sign -> bundle -> CMS" path: it builds
@@ -99,6 +103,86 @@ func signBundle(ctx context.Context, body []byte, ident Identity, tlog sign.Tran
 		sig = pem.EncodeToMemory(&pem.Block{Type: "SIGNED MESSAGE", Bytes: der})
 	}
 	return &SignResponse{Signature: sig, Cert: cert, LogEntry: lea, Bundle: pb}, nil
+}
+
+// SignOnline performs the Rekor half of the legacy "online" signing flow using
+// sigstore-go instead of the cosign helpers. It signs the reconstructed commit
+// SHA with the identity's key (via a sigstore-go sign.Keypair) and uploads a
+// HashedRekord over the commit SHA using sigstore-go's Rekor client, returning
+// the resulting log entry.
+//
+// Unlike signBundle / the offline path, the entry is keyed on the commit SHA and
+// is NOT embedded in the signature - it is discovered at verification time via
+// Rekor's online search API (see compat.OnlineBundle). The commit body CMS
+// signature is produced separately by the legacy path, so the on-disk signature
+// is byte-for-byte identical to legacy online signing; only the signing of the
+// commit SHA and its Rekor upload now go through sigstore-go.
+func SignOnline(ctx context.Context, commitSHA string, ident Identity, cert *x509.Certificate, rekorURL string) (*models.LogEntryAnon, error) {
+	tlog, err := newRekorTransparency(rekorURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rekor client: %w", err)
+	}
+	return signOnline(ctx, commitSHA, ident, cert, tlog)
+}
+
+// signOnline is the transport-independent core of SignOnline, with the Rekor
+// transparency log injected so it can be exercised without a live Rekor.
+func signOnline(ctx context.Context, commitSHA string, ident Identity, cert *x509.Certificate, tlog sign.Transparency) (*models.LogEntryAnon, error) {
+	kp, err := ident.Keypair()
+	if err != nil {
+		return nil, err
+	}
+
+	// Defend against an identity whose certificate and signing key disagree, as
+	// the offline bundle path does: otherwise we would log an entry signed with
+	// one key under a certificate for another.
+	if err := samePublicKey(kp.GetPublicKey(), cert.PublicKey); err != nil {
+		return nil, fmt.Errorf("identity certificate does not match signing key: %w", err)
+	}
+
+	// Sign the commit SHA. SignData returns the signature and the bytes that were
+	// signed - the sha256(commitSHA) digest for gitsign's P-256 keys - which is
+	// exactly the HashedRekord's artifact digest and matches what the verifier
+	// reconstructs in compat.OnlineBundle.
+	sig, digest, err := kp.SignData(ctx, []byte(commitSHA))
+	if err != nil {
+		return nil, fmt.Errorf("signing commit hash: %w", err)
+	}
+
+	certPEM, err := cryptoutils.MarshalCertificateToPEM(cert)
+	if err != nil {
+		return nil, err
+	}
+
+	// A minimal bundle carrying the commit-SHA MessageSignature; sigstore-go's
+	// Rekor client reads it, uploads a HashedRekord, and appends the log entry.
+	b := &protobundle.Bundle{
+		MediaType: compat.MediaType,
+		Content: &protobundle.Bundle_MessageSignature{
+			MessageSignature: &protocommon.MessageSignature{
+				MessageDigest: &protocommon.HashOutput{
+					Algorithm: kp.GetHashAlgorithm(),
+					Digest:    digest,
+				},
+				Signature: sig,
+			},
+		},
+		VerificationMaterial: &protobundle.VerificationMaterial{
+			Content: &protobundle.VerificationMaterial_Certificate{
+				Certificate: &protocommon.X509Certificate{RawBytes: cert.Raw},
+			},
+		},
+	}
+
+	if err := tlog.GetTransparencyLogEntry(ctx, certPEM, b); err != nil {
+		return nil, fmt.Errorf("uploading commit-SHA rekor entry: %w", err)
+	}
+
+	tles := b.GetVerificationMaterial().GetTlogEntries()
+	if len(tles) == 0 {
+		return nil, errors.New("rekor upload produced no log entry")
+	}
+	return rekoroid.ProtoToLogEntryAnon(tles[0]), nil
 }
 
 // newRekorTransparency builds a sign.Transparency for the given Rekor URL whose
