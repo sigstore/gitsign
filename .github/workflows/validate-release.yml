@@ -33,21 +33,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Free disk space
+      # This job only validates that the release config still works end to end,
+      # so there is no value in cross-compiling every os/arch pair. Trim the
+      # matrix to a single target to keep the job fast. `goreleaser release`
+      # has no --single-target flag, and templates are not supported in
+      # builds.targets, so patch the config in place instead.
+      - name: Reduce build matrix to linux/amd64
         run: |
-          echo "Disk space before cleanup:"
-          df -h
-
-          # Remove unnecessary tools and packages
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          echo "Disk space after cleanup:"
-          df -h
+          yq -i '
+            .builds[].goos = ["linux"] |
+            .builds[].goarch = ["amd64"] |
+            .kos[].platforms = ["linux/amd64"]
+          ' .goreleaser.yaml
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
