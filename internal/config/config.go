@@ -77,7 +77,12 @@ type Config struct {
 	ConnectorID string
 	// TokenProviders select a OIDC token provider to use to fetch tokens. If not set, all providers are attempted.
 	// See https://github.com/sigstore/cosign/tree/main/pkg/providers for more details.
-	// Valid values are: [interactive, spiffe, google-workload-identity, google-impersonation, github-actions, filesystem, buildkite-agent]
+	// Valid values are: [interactive, device, spiffe, google-workload-identity, google-impersonation, github-actions, filesystem, buildkite-agent]
+	//
+	// "device" runs the OAuth 2.0 device authorization grant (RFC 8628) against
+	// the configured Issuer — the user opens the printed verification URL on any
+	// browser to complete consent; the SSH session never needs a browser or
+	// port forward. Intended for headless / remote-SSH developer workflows.
 	TokenProvider string
 
 	// Timestamp Authority address to use to get a trusted timestamp
