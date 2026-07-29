@@ -278,6 +278,7 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
 	}
 
+	fmt.Fprintln(f.out, "Generating ephemeral keys...") // nolint:errcheck
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generating private key: %w", err)
