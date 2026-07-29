@@ -56,10 +56,12 @@ type Config struct {
 	// Note: online verification will be deprecated in favor of offline in the future.
 	RekorMode string
 
-	// EnableSigstoreGo enables the experimental sigstore-go code paths for both
-	// signing and verification (via the CMS<->bundle compat layer). When false
-	// (the default), the legacy CMS + Rekor signing and verification are used.
-	// The on-disk CMS signature format is unchanged either way.
+	// EnableSigstoreGo enables the sigstore-go code paths for both signing and
+	// verification (via the CMS<->bundle compat layer), for online and offline
+	// Rekor modes. It defaults to true; set gitsign.enableSigstoreGo=false (or
+	// GITSIGN_ENABLE_SIGSTORE_GO=false) to fall back to the legacy CMS + Rekor
+	// signing and verification. The on-disk CMS signature format is unchanged
+	// either way.
 	EnableSigstoreGo bool
 
 	// OIDC client ID for application
@@ -153,6 +155,7 @@ func Get() (*Config, error) {
 		Issuer:   "https://oauth2.sigstore.dev/auth",
 		// TODO: default to offline
 		RekorMode:        "online",
+		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,
 	}

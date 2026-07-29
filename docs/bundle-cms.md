@@ -14,8 +14,9 @@ explains how the two formats relate and how the conversion works. The
 compatibility layer lives in
 [`internal/sigstore/compat`](../internal/sigstore/compat).
 
-> **Note:** This conversion is currently experimental and opt-in. See
-> [Enabling the sigstore-go path](#enabling-the-sigstore-go-path) below.
+> **Note:** This conversion is enabled by default. See
+> [Enabling the sigstore-go path](#enabling-the-sigstore-go-path) below for how
+> to fall back to the legacy path.
 
 ## The key insight: the signed artifact is the SignedAttrs
 
@@ -104,17 +105,20 @@ Because the signature is over the `SignedAttrs` — which include the signing ti
 
 ## Enabling the sigstore-go path
 
-Both directions are gated behind a single experimental option, off by default:
+The sigstore-go path is used by default for both signing and verification, in
+both online and offline Rekor modes. To fall back to the legacy CMS + Rekor
+path, disable it:
 
 ```sh
-git config gitsign.enableSigstoreGo true
-# or: GITSIGN_ENABLE_SIGSTORE_GO=true
+git config gitsign.enableSigstoreGo false
+# or: GITSIGN_ENABLE_SIGSTORE_GO=false
 ```
 
-This requires offline Rekor mode (`gitsign.rekorMode=offline`); gitsign will
-error at startup otherwise, since the bundle signing path embeds the Rekor entry
-in the signature (which is meaningless in online mode). Online/legacy signing
-remains on the existing CMS path.
+The two Rekor modes map onto sigstore-go differently. In offline mode the Rekor
+entry is embedded in the signature (the standard bundle shape). In online mode
+the entry is keyed on the commit SHA and uploaded to Rekor without being embedded
+— sigstore-go signs and uploads it, and verification discovers it via Rekor's
+online search API before verifying the assembled commit-SHA bundle.
 
 The on-disk CMS signature format is identical whether or not the option is set;
 only the implementation of how signing and verification are performed changes.
