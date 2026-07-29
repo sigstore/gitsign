@@ -62,7 +62,7 @@ func LegacySHASign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identi
 	// The commit body CMS signature above is unchanged, so the on-disk signature
 	// is identical to legacy online signing; only the Rekor interaction differs.
 	if opts.Bundle {
-		resp.LogEntry, err = signature.SignOnline(ctx, commit, ident, resp.Cert, opts.RekorURL)
+		resp.LogEntry, err = signature.SignOnline(ctx, commit, ident, resp.Cert, opts.RekorURL, opts.RekorVersion)
 		if err != nil {
 			return nil, fmt.Errorf("error uploading tlog (commit): %w", err)
 		}

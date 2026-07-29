@@ -117,8 +117,8 @@ func signBundle(ctx context.Context, body []byte, ident Identity, tlog sign.Tran
 // signature is produced separately by the legacy path, so the on-disk signature
 // is byte-for-byte identical to legacy online signing; only the signing of the
 // commit SHA and its Rekor upload now go through sigstore-go.
-func SignOnline(ctx context.Context, commitSHA string, ident Identity, cert *x509.Certificate, rekorURL string) (*models.LogEntryAnon, error) {
-	tlog, err := newRekorTransparency(rekorURL)
+func SignOnline(ctx context.Context, commitSHA string, ident Identity, cert *x509.Certificate, rekorURL string, rekorVersion uint32) (*models.LogEntryAnon, error) {
+	tlog, err := newRekorTransparency(rekorURL, rekorVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rekor client: %w", err)
 	}
@@ -185,19 +185,31 @@ func signOnline(ctx context.Context, commitSHA string, ident Identity, cert *x50
 	return rekoroid.ProtoToLogEntryAnon(tles[0]), nil
 }
 
-// newRekorTransparency builds a sign.Transparency for the given Rekor URL whose
-// CreateLogEntry responses are checked to contain an inclusion proof. Without
-// this, a proof-less response would panic inside sigstore-go's transparency log
-// entry conversion; here it surfaces as an error instead.
-func newRekorTransparency(url string) (sign.Transparency, error) {
-	rc, err := rekorclient.GetRekorClient(url, rekorclient.WithUserAgent("gitsign"))
-	if err != nil {
-		return nil, err
-	}
-	return sign.NewRekor(&sign.RekorOptions{
+// newRekorTransparency builds a sign.Transparency for the given Rekor URL and
+// API version. Both versions upload through sigstore-go's sign.NewRekor; the
+// version selects which Rekor API it targets.
+//
+// For Rekor v2 (rekor-tiles), sigstore-go constructs its own writer from BaseURL
+// and returns log entries that already carry an inclusion proof, so no client is
+// injected.
+//
+// For Rekor v1, we inject a REST client wrapped so its CreateLogEntry responses
+// are checked to contain an inclusion proof. Without this, a proof-less response
+// would panic inside sigstore-go's transparency log entry conversion; here it
+// surfaces as an error instead.
+func newRekorTransparency(url string, version uint32) (sign.Transparency, error) {
+	opts := &sign.RekorOptions{
 		BaseURL: url,
-		Client:  &validatingRekorClient{inner: rc.Entries},
-	}), nil
+		Version: version,
+	}
+	if version != 2 {
+		rc, err := rekorclient.GetRekorClient(url, rekorclient.WithUserAgent("gitsign"))
+		if err != nil {
+			return nil, err
+		}
+		opts.Client = &validatingRekorClient{inner: rc.Entries}
+	}
+	return sign.NewRekor(opts), nil
 }
 
 // validatingRekorClient wraps a sign.RekorClient and rejects responses whose log

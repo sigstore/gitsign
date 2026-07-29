@@ -89,8 +89,9 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		// mode embeds the entry (git.Sign -> signBundle); online mode uploads the
 		// commit-SHA entry via sigstore-go without embedding (git.LegacySHASign
 		// -> signature.SignOnline). The on-disk CMS format is unchanged either way.
-		Bundle:   o.Config.EnableSigstoreGo,
-		RekorURL: o.Config.Rekor,
+		Bundle:       o.Config.EnableSigstoreGo,
+		RekorURL:     o.Config.Rekor,
+		RekorVersion: o.Config.RekorVersion,
 	}
 	if o.Config.MatchCommitter {
 		opts.UserName = o.Config.CommitterName
