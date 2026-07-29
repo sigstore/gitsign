@@ -234,6 +234,60 @@ func TestSignOnlineThroughRekorClient(t *testing.T) {
 	}
 }
 
+// fakeRekorV2Client is a sign.RekorV2Client (Rekor v2 / rekor-tiles) returning a
+// fixed transparency log entry.
+type fakeRekorV2Client struct {
+	entry *rekorpb.TransparencyLogEntry
+}
+
+func (f fakeRekorV2Client) Add(_ context.Context, _ any) (*rekorpb.TransparencyLogEntry, error) {
+	return f.entry, nil
+}
+
+// TestSignBundleThroughRekorV2Client exercises the Rekor v2 (rekor-tiles) signing
+// path through sigstore-go's getRekorV2TLE by injecting a fake v2 client
+// (RekorOptions.ClientV2) that returns a canned, proof-bearing log entry. This
+// covers the v2 hashedrekord request construction and entry embedding without a
+// live rekor-tiles instance or OIDC. It mirrors TestSignBundleThroughRekorClient
+// but selects Version 2, which is what gitsign.rekorVersion=2 configures.
+func TestSignBundleThroughRekorV2Client(t *testing.T) {
+	ctx := context.Background()
+	cert, signer := selfSignedCert(t)
+	body := []byte("tree deadbeef\n\nhello world")
+
+	tle := fakeTLE()
+	tlog := sign.NewRekor(&sign.RekorOptions{
+		BaseURL:  "https://rekor-v2.example.com",
+		Version:  2,
+		ClientV2: fakeRekorV2Client{entry: tle},
+	})
+
+	resp, err := signBundle(ctx, body, testIdentity{cert: cert, signer: signer}, tlog, SignOptions{})
+	if err != nil {
+		t.Fatalf("signBundle: %v", err)
+	}
+	if diff := cmp.Diff(rekoroid.ProtoToLogEntryAnon(tle), resp.LogEntry); diff != "" {
+		t.Errorf("log entry mismatch (-want +got):\n%s", diff)
+	}
+
+	sd, err := cms.ParseSignedData(resp.Signature)
+	if err != nil {
+		t.Fatalf("ParseSignedData: %v", err)
+	}
+	si := sd.Raw().SignerInfos[0]
+	if !si.UnsignedAttrs.HasAttribute(rekoroid.OIDRekorTransparencyLogEntry) {
+		t.Error("signature is missing the Rekor transparency log entry attribute")
+	}
+	msg, err := si.SignedAttrs.MarshaledForVerification()
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(msg)
+	if !ecdsa.VerifyASN1(cert.PublicKey.(*ecdsa.PublicKey), digest[:], si.Signature) {
+		t.Error("CMS signature does not verify against the signed attributes")
+	}
+}
+
 // fakeTLE builds a structurally complete transparency log entry with dummy
 // values, sufficient to round-trip through the compat conversion.
 func fakeTLE() *rekorpb.TransparencyLogEntry {

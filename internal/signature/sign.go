@@ -70,6 +70,11 @@ type SignOptions struct {
 	Bundle bool
 	// RekorURL is the Rekor base URL, required when Bundle is true.
 	RekorURL string
+	// RekorVersion selects the Rekor API version to upload to on the Bundle
+	// signing path. 1 (or 0, the zero value) uses the legacy Rekor v1 REST API;
+	// 2 uses the Rekor v2 / rekor-tiles API. Only takes effect when Bundle is
+	// true.
+	RekorVersion uint32
 }
 
 // Identity is a copy of smimesign.Identity to allow for compatibility without
@@ -129,7 +134,7 @@ func Sign(ctx context.Context, ident Identity, body []byte, opts SignOptions) (*
 	// Rekor entry as a bundle, which is then converted to CMS for storage. Only
 	// used in offline Rekor mode (opts.Rekor set).
 	if opts.Bundle && opts.Rekor != nil {
-		tlog, err := newRekorTransparency(opts.RekorURL)
+		tlog, err := newRekorTransparency(opts.RekorURL, opts.RekorVersion)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create rekor client: %w", err)
 		}

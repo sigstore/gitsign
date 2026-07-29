@@ -64,6 +64,13 @@ type Config struct {
 	// either way.
 	EnableSigstoreGo bool
 
+	// RekorVersion selects the Rekor API version to upload signatures to. One of
+	// [1, 2] (default: 1).
+	// 1 - the legacy Rekor v1 REST API (POST /api/v1/log/entries).
+	// 2 - the Rekor v2 / rekor-tiles API. Only supported on the sigstore-go
+	// signing path, so it can only be set when gitsign.enableSigstoreGo=true.
+	RekorVersion uint32
+
 	// OIDC client ID for application
 	ClientID string
 	// File containing the OIDC Client Secret
@@ -156,6 +163,9 @@ func Get() (*Config, error) {
 		// TODO: default to offline
 		RekorMode:        "online",
 		EnableSigstoreGo: true,
+		// RekorVersion is left at its zero value ("unset") here; it is normalized
+		// to the v1 default after validation, so that an explicitly-set value can
+		// be distinguished from the default and gated on enableSigstoreGo.
 		Autoclose:        true,
 		AutocloseTimeout: 6,
 	}
@@ -192,11 +202,43 @@ func Get() (*Config, error) {
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
 	out.URLOpener = envOrValue("GITSIGN_URL_OPENER", out.URLOpener)
 	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
+	// RekorVersion honors both the SIGSTORE and GITSIGN prefixes; GITSIGN is
+	// checked last so it takes precedence, consistent with the other shared
+	// environment variables above.
+	for _, env := range []string{"SIGSTORE_REKOR_VERSION", "GITSIGN_REKOR_VERSION"} {
+		v, ok := os.LookupEnv(env)
+		if !ok {
+			continue
+		}
+		n, err := strconv.ParseUint(v, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s %q: %w", env, v, err)
+		}
+		out.RekorVersion = uint32(n)
+	}
 
 	// Note: EnableSigstoreGo is intentionally allowed with any Rekor mode. Both
 	// signing (offline embeds the entry; online uploads the commit-SHA entry via
 	// sigstore-go without embedding) and verification (including legacy online
 	// signatures) support sigstore-go regardless of the configured mode.
+
+	// Rekor version selection only applies to the sigstore-go signing path (the
+	// legacy path is Rekor v1 only), so the option can only be set when
+	// enableSigstoreGo is enabled. A zero value means the user did not set it.
+	if out.RekorVersion != 0 {
+		switch out.RekorVersion {
+		case 1, 2:
+		default:
+			return nil, fmt.Errorf("gitsign.rekorVersion must be 1 or 2, got %d", out.RekorVersion)
+		}
+		if !out.EnableSigstoreGo {
+			return nil, fmt.Errorf("gitsign.rekorVersion can only be set when gitsign.enableSigstoreGo=true (Rekor version selection only applies to the sigstore-go signing path)")
+		}
+	}
+	// Default to Rekor v1 when unset.
+	if out.RekorVersion == 0 {
+		out.RekorVersion = 1
+	}
 
 	return out, nil
 }
@@ -256,6 +298,12 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.RekorMode = v
 		case strings.EqualFold(k, "gitsign.enableSigstoreGo"):
 			out.EnableSigstoreGo = strings.EqualFold(v, "true")
+		case strings.EqualFold(k, "gitsign.rekorVersion"):
+			if n, err := strconv.ParseUint(v, 10, 32); err == nil {
+				out.RekorVersion = uint32(n)
+			} else {
+				log.Printf("invalid gitsign.rekorVersion value %q, ignoring", v)
+			}
 		case strings.EqualFold(k, "gitsign.clientID"):
 			out.ClientID = v
 		case strings.EqualFold(k, "gitsign.clientSecretFile"):
