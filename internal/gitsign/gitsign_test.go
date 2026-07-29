@@ -25,11 +25,14 @@ import (
 	"encoding/asn1"
 	"io"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/google/go-cmp/cmp"
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	certverifier "github.com/sigstore/gitsign/internal/cert"
 	"github.com/sigstore/gitsign/internal/signature"
@@ -184,4 +187,36 @@ func (i *identity) Signer() (crypto.Signer, error) {
 
 func (i *identity) Keypair() (sign.Keypair, error) {
 	return compat.NewKeypair(i.priv)
+}
+
+func TestLoadDetachedSCT(t *testing.T) {
+	want := []byte(`{"sct_version":0,"id":"tacocat"}`)
+	path := filepath.Join(t.TempDir(), "sct.json")
+	if err := os.WriteFile(path, want, 0600); err != nil {
+		t.Fatalf("error writing sct: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name    string
+		path    string
+		want    []byte
+		wantErr bool
+	}{
+		{name: "unset", path: "", want: nil},
+		{name: "file", path: path, want: want},
+		{name: "missing file", path: filepath.Join(t.TempDir(), "nope.json"), wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := loadDetachedSCT(tc.path)
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Fatalf("loadDetachedSCT(%q) error = %v, wantErr %t", tc.path, err, tc.wantErr)
+			}
+			if tc.wantErr {
+				return
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("loadDetachedSCT(%q) diff:\n%s", tc.path, diff)
+			}
+		})
+	}
 }

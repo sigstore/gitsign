@@ -17,13 +17,13 @@ package attest
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-git/go-git/v5"
-	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
-	"github.com/sigstore/cosign/v3/cmd/cosign/cli/signcommon"
-	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/gitsign/internal/attest"
 	"github.com/sigstore/gitsign/internal/config"
+	"github.com/sigstore/gitsign/internal/fulcio"
+	"github.com/sigstore/gitsign/internal/rekor/tlog"
 	"github.com/spf13/cobra"
 )
 
@@ -75,18 +75,21 @@ func (o *options) Run(ctx context.Context) error {
 		digestType = attest.DigestTypeTree
 	}
 
-	sv, closerFunc, err := signcommon.GetSignerVerifier(ctx, "", "", cosignopts.KeyOpts{
-		FulcioURL:    o.Config.Fulcio,
-		RekorURL:     o.Config.Rekor,
-		OIDCIssuer:   o.Config.Issuer,
-		OIDCClientID: o.Config.ClientID,
-	})
+	// Use the same keyless identity as commit signing, so attestations honor the
+	// same gitsign OIDC config (issuer, client ID, connector, token provider) and
+	// credential cache.
+	id, err := fulcio.NewIdentity(ctx, o.Config, os.Stdin, os.Stderr)
+	if err != nil {
+		return fmt.Errorf("getting identity: %w", err)
+	}
+	defer id.Close()
+
+	sv, err := id.SignerVerifier()
 	if err != nil {
 		return fmt.Errorf("getting signer: %w", err)
 	}
-	defer closerFunc()
 
-	attestor := attest.NewAttestor(repo, sv, cosign.TLogUploadInTotoAttestation, o.Config, digestType)
+	attestor := attest.NewAttestor(repo, sv, tlog.UploadInTotoAttestation, o.Config, digestType)
 
 	out, err := attestor.WriteFile(ctx, refName, sha, o.FlagPath, o.FlagAttestationType)
 	if err != nil {

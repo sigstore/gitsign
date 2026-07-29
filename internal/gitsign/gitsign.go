@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/v3/pkg/cosign"
@@ -47,6 +48,25 @@ type Verifier struct {
 	identities      []verify.CertificateIdentity
 	// ignoreSCT disables the embedded SCT check, which is performed by default.
 	ignoreSCT bool
+}
+
+// loadDetachedSCT reads a detached Signed Certificate Timestamp, formatted as
+// an RFC6962 AddChainResponse, from path. An empty path means no detached SCT
+// was requested.
+//
+// A detached SCT is only needed when the signing certificate carries no
+// embedded one. Cosign additionally gates this on --certificate being set;
+// gitsign always takes the certificate from the commit, so the flag alone is
+// enough here.
+func loadDetachedSCT(path string) ([]byte, error) {
+	if path == "" {
+		return nil, nil
+	}
+	sct, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, fmt.Errorf("error reading sct from %s: %w", path, err)
+	}
+	return sct, nil
 }
 
 // NewVerifierWithCosignOpts implements a Gitsign verifier using Cosign CertVerifyOptions.
@@ -106,6 +126,10 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 		if err != nil {
 			return nil, fmt.Errorf("error parsing identities: %w", err)
 		}
+		sct, err := loadDetachedSCT(opts.SCT)
+		if err != nil {
+			return nil, err
+		}
 		certverifier = cert.NewCosignVerifier(&cosign.CheckOpts{
 			RekorClient:                  rekor.Rekor,
 			RootCerts:                    root,
@@ -119,6 +143,7 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 			CertGithubWorkflowRef:        opts.CertGithubWorkflowRef,
 			Identities:                   identities,
 			IgnoreSCT:                    opts.IgnoreSCT,
+			SCT:                          sct,
 		})
 	}
 
