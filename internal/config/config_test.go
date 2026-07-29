@@ -86,7 +86,7 @@ func TestGet(t *testing.T) {
 		Issuer:           "tacocat",
 		RedirectURL:      "example.com",
 		ConnectorID:      "bar",
-		RekorMode:        "online",
+		RekorMode:        "offline",
 		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,

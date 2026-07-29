@@ -49,7 +49,7 @@ type Config struct {
 
 	// Address of Rekor server
 	Rekor string
-	// Rekor storage mode to operate in. One of [online, offline] (default: online)
+	// Rekor storage mode to operate in. One of [online, offline] (default: offline)
 	// online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.
 	// offline - Hashed commit content is stored in Rekor, with Rekor attributes
 	// necessary for offline verification being stored in the commit itself.
@@ -152,12 +152,11 @@ func Get() (*Config, error) {
 
 	// Start with default config
 	out := &Config{
-		Fulcio:   "https://fulcio.sigstore.dev",
-		Rekor:    "https://rekor.sigstore.dev",
-		ClientID: "sigstore",
-		Issuer:   "https://oauth2.sigstore.dev/auth",
-		// TODO: default to offline
-		RekorMode:        "online",
+		Fulcio:           "https://fulcio.sigstore.dev",
+		Rekor:            "https://rekor.sigstore.dev",
+		ClientID:         "sigstore",
+		Issuer:           "https://oauth2.sigstore.dev/auth",
+		RekorMode:        "offline",
 		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,
