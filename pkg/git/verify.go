@@ -86,25 +86,12 @@ func Verify(ctx context.Context, git Verifier, rekor rekor.Verifier, data, sig [
 		}, nil
 	}
 
-	// Legacy rekor lookup: reconstruct the raw object bytes so their hash
-	// matches what git-core (and the legacy rekor entries) recorded. We
-	// assume sig is the SHA-1-form signature (gpgsig for commits, in-body
-	// PEM for tags) — which matches how legacy rekor entries were
-	// generated. For new gpgsig-sha256 signatures there are no legacy
-	// entries to look up, so this reconstruction is best-effort.
-	var raw []byte
-	switch {
-	case bytes.HasPrefix(data, []byte("tree ")):
-		raw, err = JoinCommit(&CommitSig{Payload: data, Gpgsig: sig})
-	case bytes.HasPrefix(data, []byte("object ")):
-		raw, err = JoinTag(&TagSig{Payload: data, InBody: sig})
-	default:
-		return nil, errors.New("could not determine Git object type")
-	}
-	if err != nil {
-		return nil, err
-	}
-	commit, err := ObjectHash(raw)
+	// Legacy rekor lookup: reconstruct the object hash that the legacy rekor
+	// entries were keyed on. We assume sig is the SHA-1-form signature (gpgsig
+	// for commits, in-body PEM for tags) — which matches how legacy rekor
+	// entries were generated. For new gpgsig-sha256 signatures there are no
+	// legacy entries to look up, so this reconstruction is best-effort.
+	commit, err := ObjectHashFromSignature(data, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +124,29 @@ func VerifySignature(data, sig []byte, detached bool, rootCerts, intermediates *
 	}
 
 	return v.Verify(context.Background(), data, sig, detached)
+}
+
+// ObjectHashFromSignature reconstructs the git-core object hash from the object
+// body (everything but the signature) and the signature, by reassembling the
+// raw object bytes (gpgsig for commits, in-body PEM for tags) and hashing them.
+// This is the hash legacy "online" Rekor entries are keyed on.
+func ObjectHashFromSignature(data, sig []byte) (string, error) {
+	var (
+		raw []byte
+		err error
+	)
+	switch {
+	case bytes.HasPrefix(data, []byte("tree ")):
+		raw, err = JoinCommit(&CommitSig{Payload: data, Gpgsig: sig})
+	case bytes.HasPrefix(data, []byte("object ")):
+		raw, err = JoinTag(&TagSig{Payload: data, InBody: sig})
+	default:
+		return "", errors.New("could not determine Git object type")
+	}
+	if err != nil {
+		return "", err
+	}
+	return ObjectHash(raw)
 }
 
 // ObjectHash returns the git-core hash of an object given its raw bytes

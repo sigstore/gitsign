@@ -52,13 +52,21 @@ func LegacySHASign(ctx context.Context, rekor rekor.Writer, ident *fulcio.Identi
 	// using the same key, this is probably okay? e.g. even if you could cause a SHA1 collision,
 	// you would still need the underlying commit to be valid and using the same key which seems hard.
 
-	raw, err := git.JoinCommit(&git.CommitSig{Payload: data, Gpgsig: resp.Signature})
-	if err != nil {
-		return nil, fmt.Errorf("error reassembling commit: %w", err)
-	}
-	commit, err := git.ObjectHash(raw)
+	commit, err := git.ObjectHashFromSignature(data, resp.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("error generating commit hash: %w", err)
+	}
+
+	// Experimental: drive the commit-SHA signing and Rekor upload through
+	// sigstore-go (gated by gitsign.enableSigstoreGo, surfaced as opts.Bundle).
+	// The commit body CMS signature above is unchanged, so the on-disk signature
+	// is identical to legacy online signing; only the Rekor interaction differs.
+	if opts.Bundle {
+		resp.LogEntry, err = signature.SignOnline(ctx, commit, ident, resp.Cert, opts.RekorURL)
+		if err != nil {
+			return nil, fmt.Errorf("error uploading tlog (commit): %w", err)
+		}
+		return resp, nil
 	}
 
 	sv, err := ident.SignerVerifier()

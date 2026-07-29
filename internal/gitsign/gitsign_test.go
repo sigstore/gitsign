@@ -156,6 +156,10 @@ func (fakeRekor) Verify(_ context.Context, _ string, _ *x509.Certificate) (*mode
 	return nil, nil
 }
 
+func (fakeRekor) Search(_ context.Context, _ string, _ *x509.Certificate) (*models.LogEntryAnon, error) {
+	return nil, nil
+}
+
 func (fakeRekor) VerifyInclusion(_ context.Context, _ []byte, _ *x509.Certificate) (*models.LogEntryAnon, error) {
 	return nil, nil
 }

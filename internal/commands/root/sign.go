@@ -84,8 +84,11 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		TimestampAuthority: o.Config.TimestampURL,
 		Armor:              o.FlagArmor,
 		IncludeCerts:       o.FlagIncludeCerts,
-		// Experimental: sign via sigstore-go (offline mode only, gated by
-		// gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO).
+		// Experimental: drive signing and the Rekor upload through sigstore-go,
+		// gated by gitsign.enableSigstoreGo / GITSIGN_ENABLE_SIGSTORE_GO. Offline
+		// mode embeds the entry (git.Sign -> signBundle); online mode uploads the
+		// commit-SHA entry via sigstore-go without embedding (git.LegacySHASign
+		// -> signature.SignOnline). The on-disk CMS format is unchanged either way.
 		Bundle:   o.Config.EnableSigstoreGo,
 		RekorURL: o.Config.Rekor,
 	}

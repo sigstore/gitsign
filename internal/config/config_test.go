@@ -87,6 +87,7 @@ func TestGet(t *testing.T) {
 		RedirectURL:      "example.com",
 		ConnectorID:      "bar",
 		RekorMode:        "online",
+		EnableSigstoreGo: true,
 		Autoclose:        true,
 		AutocloseTimeout: 6,
 		// From config file.
@@ -107,22 +108,26 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestEnableSigstoreGoRequiresOffline(t *testing.T) {
+func TestEnableSigstoreGo(t *testing.T) {
 	t.Cleanup(func() { execFn = realExec })
 
-	// enableSigstoreGo with the default (online) Rekor mode must error.
-	execFn = func() (io.Reader, error) {
-		return strings.NewReader("gitsign.enableSigstoreGo true\n"), nil
-	}
-	if _, err := Get(); err == nil {
-		t.Error("expected error when enableSigstoreGo is set without offline rekor mode")
-	}
-
-	// enableSigstoreGo with offline mode is allowed.
-	execFn = func() (io.Reader, error) {
-		return strings.NewReader("gitsign.enableSigstoreGo true\ngitsign.rekorMode offline\n"), nil
-	}
-	if _, err := Get(); err != nil {
-		t.Errorf("expected enableSigstoreGo + offline mode to be valid, got: %v", err)
+	// enableSigstoreGo is valid regardless of Rekor mode: the offline-only
+	// requirement for signing is enforced by the sign command, not Get(), so that
+	// the verification commands can enable sigstore-go to verify legacy online
+	// signatures. Get() must not reject either combination.
+	for _, mode := range []string{"online", "offline"} {
+		execFn = func() (io.Reader, error) {
+			return strings.NewReader("gitsign.enableSigstoreGo true\ngitsign.rekorMode " + mode + "\n"), nil
+		}
+		got, err := Get()
+		if err != nil {
+			t.Fatalf("rekorMode %q: unexpected error: %v", mode, err)
+		}
+		if !got.EnableSigstoreGo {
+			t.Errorf("rekorMode %q: EnableSigstoreGo = false, want true", mode)
+		}
+		if got.RekorMode != mode {
+			t.Errorf("rekorMode %q: RekorMode = %q, want %q", mode, got.RekorMode, mode)
+		}
 	}
 }

@@ -147,6 +147,93 @@ func TestSignBundleThroughRekorClient(t *testing.T) {
 	}
 }
 
+// capturingTransparency records the bundle it is handed before appending the
+// canned entry, so tests can assert on the uploaded MessageSignature.
+type capturingTransparency struct {
+	entry *rekorpb.TransparencyLogEntry
+	got   *protobundle.Bundle
+}
+
+func (c *capturingTransparency) GetTransparencyLogEntry(_ context.Context, _ []byte, b *protobundle.Bundle) error {
+	c.got = b
+	b.VerificationMaterial.TlogEntries = append(b.VerificationMaterial.TlogEntries, c.entry)
+	return nil
+}
+
+// TestSignOnline exercises the online signing path: the commit SHA is signed
+// with the identity's key and uploaded to Rekor as a HashedRekord, without being
+// embedded in any signature. The uploaded MessageSignature must carry
+// sha256(commitSHA) as its digest and a signature that verifies against the
+// signing certificate - the exact shape the verifier reconstructs in
+// compat.OnlineBundle.
+func TestSignOnline(t *testing.T) {
+	ctx := context.Background()
+	cert, signer := selfSignedCert(t)
+	ident := testIdentity{cert: cert, signer: signer}
+
+	const commitSHA = "0123456789abcdef0123456789abcdef01234567"
+	tle := fakeTLE()
+	ct := &capturingTransparency{entry: tle}
+
+	entry, err := signOnline(ctx, commitSHA, ident, cert, ct)
+	if err != nil {
+		t.Fatalf("signOnline: %v", err)
+	}
+
+	// The returned entry is the converted transparency log entry.
+	if diff := cmp.Diff(rekoroid.ProtoToLogEntryAnon(tle), entry); diff != "" {
+		t.Errorf("log entry mismatch (-want +got):\n%s", diff)
+	}
+
+	// The uploaded bundle must carry the commit-SHA MessageSignature and the cert.
+	ms := ct.got.GetMessageSignature()
+	if ms == nil {
+		t.Fatal("uploaded bundle has no MessageSignature")
+	}
+	wantDigest := sha256.Sum256([]byte(commitSHA))
+	if diff := cmp.Diff(wantDigest[:], ms.GetMessageDigest().GetDigest()); diff != "" {
+		t.Errorf("message digest is not sha256(commitSHA) (-want +got):\n%s", diff)
+	}
+	if !ecdsa.VerifyASN1(cert.PublicKey.(*ecdsa.PublicKey), wantDigest[:], ms.GetSignature()) {
+		t.Error("uploaded signature does not verify against the signing certificate over sha256(commitSHA)")
+	}
+	if diff := cmp.Diff(cert.Raw, ct.got.GetVerificationMaterial().GetCertificate().GetRawBytes()); diff != "" {
+		t.Errorf("uploaded certificate mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestSignOnlineThroughRekorClient exercises the online upload through the real
+// sign.Rekor transparency (getRekorV1TLE -> tle.GenerateTransparencyLogEntry) by
+// injecting a fake inner Rekor client returning a canned, proof-bearing entry.
+// This covers the v1 conversion code a live online signing would hit, without
+// OIDC or live infrastructure.
+func TestSignOnlineThroughRekorClient(t *testing.T) {
+	ctx := context.Background()
+	cert, signer := selfSignedCert(t)
+
+	raw, err := os.ReadFile("testdata/tlog.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lea := new(models.LogEntryAnon)
+	if err := json.Unmarshal(raw, lea); err != nil {
+		t.Fatal(err)
+	}
+
+	tlog := sign.NewRekor(&sign.RekorOptions{
+		BaseURL: "https://rekor.example.com",
+		Client:  &validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(*lea)}},
+	})
+
+	entry, err := signOnline(ctx, "0123456789abcdef0123456789abcdef01234567", testIdentity{cert: cert, signer: signer}, cert, tlog)
+	if err != nil {
+		t.Fatalf("signOnline: %v", err)
+	}
+	if entry == nil {
+		t.Error("expected a log entry in the response")
+	}
+}
+
 // fakeTLE builds a structurally complete transparency log entry with dummy
 // values, sufficient to round-trip through the compat conversion.
 func fakeTLE() *rekorpb.TransparencyLogEntry {

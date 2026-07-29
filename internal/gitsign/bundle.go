@@ -64,14 +64,7 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 	}
 
 	// Identity policy is the same for every signer; only the artifact differs.
-	var policyOpts []verify.PolicyOption
-	if len(v.identities) > 0 {
-		for _, id := range v.identities {
-			policyOpts = append(policyOpts, verify.WithCertificateIdentity(id))
-		}
-	} else {
-		policyOpts = append(policyOpts, verify.WithoutIdentitiesUnsafe())
-	}
+	policyOpts := v.identityPolicyOpts()
 
 	// A CMS signature may carry multiple signers. We require at least one to
 	// verify (matching "at least one valid signature"); a failing signer does not
@@ -116,6 +109,150 @@ func (v *Verifier) verifyBundle(ctx context.Context, data, sig []byte, detached 
 		Bundle:   bundle,
 		Claims:   claims,
 	}, nil
+}
+
+// identityPolicyOpts builds the sigstore-go verification policy options for the
+// configured certificate identities. The identity policy is independent of the
+// artifact, so it is shared by the embedded-entry (verifyBundle) and online
+// (verifyOnline) paths. With no identities configured it returns
+// WithoutIdentitiesUnsafe, matching the legacy path which only checks identities
+// when a cert.Verifier is configured.
+func (v *Verifier) identityPolicyOpts() []verify.PolicyOption {
+	if len(v.identities) == 0 {
+		return []verify.PolicyOption{verify.WithoutIdentitiesUnsafe()}
+	}
+	opts := make([]verify.PolicyOption, 0, len(v.identities))
+	for _, id := range v.identities {
+		opts = append(opts, verify.WithCertificateIdentity(id))
+	}
+	return opts
+}
+
+// verifyOnline verifies a legacy "online" gitsign signature - one that embeds no
+// Rekor transparency log entry - through sigstore-go. These signatures store
+// their entry in Rekor keyed on the commit SHA (see git.LegacySHASign), found via
+// the non-GA online search API; sigstore-go cannot discover it from the signature
+// alone, so this path fetches it first and assembles a commit-SHA bundle.
+//
+// It mirrors the guarantees of the legacy online path (git.Verify + the
+// commit-SHA Rekor lookup): the CMS signature validity and its binding to the git
+// object are checked locally, then sigstore-go verifies the commit-SHA bundle
+// (certificate chain at the entry's integrated time, transparency log inclusion,
+// SCT, and certificate identity).
+func (v *Verifier) verifyOnline(ctx context.Context, data, sig []byte, detached bool) (*git.VerificationSummary, error) {
+	sd, err := compat.ParseSignaturePEM(sig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signature: %w", err)
+	}
+
+	raw := sd.Raw()
+	if len(raw.SignerInfos) == 0 {
+		return nil, errors.New("no signers found in signature")
+	}
+
+	// The commit SHA the Rekor entry is keyed on is hash(object body + signature),
+	// so it is the same for every signer.
+	commitSHA, err := git.ObjectHashFromSignature(data, sig)
+	if err != nil {
+		return nil, fmt.Errorf("reconstructing commit hash: %w", err)
+	}
+
+	policyOpts := v.identityPolicyOpts()
+
+	var (
+		leafCert *x509.Certificate
+		logEntry *models.LogEntryAnon
+		bundle   *protobundle.Bundle
+		errs     []error
+	)
+	for i, si := range raw.SignerInfos {
+		cert, le, b, err := v.verifyOnlineSigner(ctx, sd, si, data, detached, commitSHA, policyOpts...)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("signer %d: %w", i, err))
+			continue
+		}
+		leafCert, logEntry, bundle = cert, le, b
+		break
+	}
+	if leafCert == nil {
+		return nil, fmt.Errorf("no signer could be verified online: %w", errors.Join(errs...))
+	}
+
+	claims := []git.Claim{
+		git.NewClaim(git.ClaimValidatedSignature, true),
+		git.NewClaim(git.ClaimValidatedRekorEntry, true),
+		git.NewClaim(git.ClaimValidatedCerificate, len(v.identities) > 0),
+	}
+
+	return &git.VerificationSummary{
+		Cert:     leafCert,
+		LogEntry: logEntry,
+		Bundle:   bundle,
+		Claims:   claims,
+	}, nil
+}
+
+// verifyOnlineSigner verifies a single CMS signer of an online signature. It
+// proves the CMS signature is valid and covers this git object (the checks
+// sigstore-go cannot make against a commit-SHA bundle), fetches the commit-SHA
+// Rekor entry, and verifies the resulting bundle with sigstore-go.
+func (v *Verifier) verifyOnlineSigner(ctx context.Context, sd *cms.SignedData, si protocol.SignerInfo, data []byte, detached bool, commitSHA string, policyOpts ...verify.PolicyOption) (*x509.Certificate, *models.LogEntryAnon, *protobundle.Bundle, error) {
+	certs, err := sd.GetCertificates()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("getting signature certificates: %w", err)
+	}
+	cert, err := si.FindCertificate(certs)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("finding signer certificate: %w", err)
+	}
+
+	// Content binding: prove the signed attributes describe this git object.
+	if err := verifyContentBinding(si, sd, data, detached); err != nil {
+		return nil, nil, nil, err
+	}
+
+	// CMS signature validity: prove the certificate signed the SignedAttrs. The
+	// commit SHA already binds hash(body + signature), but this matches the legacy
+	// git.Verify guarantee that the CMS signature itself is valid. gitsign is
+	// always P-256 / ECDSA-with-SHA256.
+	message, err := si.SignedAttrs.MarshaledForVerification()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("marshalling signed attributes: %w", err)
+	}
+	if err := cert.CheckSignature(x509.ECDSAWithSHA256, message, si.Signature); err != nil {
+		return nil, nil, nil, fmt.Errorf("CMS signature is invalid: %w", err)
+	}
+
+	// Fetch the commit-SHA Rekor entry via the online search API. We only search
+	// here - sigstore-go verifies the entry's inclusion proof / SET below, so we
+	// deliberately avoid the legacy rekor.Verify which does its own verification.
+	le, err := v.rekor.Search(ctx, commitSHA, cert)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("looking up rekor entry: %w", err)
+	}
+
+	sb, err := compat.OnlineBundle(commitSHA, le, cert)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	pb, err := sgbundle.NewBundle(sb.Bundle)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid bundle: %w", err)
+	}
+
+	// Online signatures carry no RFC3161 timestamp; signing time comes from the
+	// Rekor entry's integrated time.
+	sev, err := newSignedEntityVerifier(v.trustedMaterial, false, v.ignoreSCT)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	policy := verify.NewPolicy(verify.WithArtifact(bytes.NewReader(sb.Artifact)), policyOpts...)
+	if _, err := sev.Verify(pb, policy); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return cert, le, sb.Bundle, nil
 }
 
 // allNoEmbeddedRekorEntry reports whether every error in errs is (or wraps)
