@@ -42,8 +42,11 @@ func commandSign(o *options, s *gsio.Streams, args ...string) error {
 		return errors.New("specify --help, --sign, or --verify")
 	}
 
-	if o.Config.EnableSigstoreGo {
-		fmt.Fprintln(s.TTYOut, "gitsign: experimental sigstore-go signing enabled") // nolint:errcheck
+	// The sigstore-go signing path only engages in offline Rekor mode (it embeds
+	// the Rekor entry in the signature); online/legacy signing stays on the CMS
+	// path even when sigstore-go is enabled.
+	if o.Config.EnableSigstoreGo && o.Config.RekorMode == "offline" {
+		fmt.Fprintln(s.TTYOut, "gitsign: sigstore-go signing enabled") // nolint:errcheck
 	}
 
 	userIdent, err := fulcio.NewIdentity(ctx, o.Config, s.TTYIn, s.TTYOut)

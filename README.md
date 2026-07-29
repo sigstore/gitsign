@@ -85,7 +85,7 @@ The following config options are supported:
 | timestampCertChain |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                              |
 | autoclose          |    true                              | If true, autoclose the browser window after `autocloseTimeout`. In order for autoclose to work you must also set `connectorID`. |
 | autocloseTimeout   |   6                               | If `autoclose` is true, this is how long to wait until the window is closed. |
-| enableSigstoreGo   |   false                          | (Experimental) If true, use the sigstore-go libraries for signing and verification via the CMS↔bundle compatibility layer. Requires `rekorMode=offline`. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
+| enableSigstoreGo   |   true                           | If true (the default), use the sigstore-go libraries via the CMS↔bundle compatibility layer. Verification uses sigstore-go in all Rekor modes; signing uses it only in `rekorMode=offline` (online/legacy signing stays on the existing CMS path). Set to false to fall back to the legacy implementation. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
 | urlOpener          |                                  | Optional command used to open the OIDC login URL during the interactive auth flow. If unset, the platform default browser is used. The command is split using shell-style word splitting (quote arguments containing spaces) and each token is rendered as a Go [text/template](https://pkg.go.dev/text/template) with the login URL available as `{{.URL}}` (e.g. `firefox --new-tab {{.URL}}`). No shell is invoked, so shell metacharacters are inert. See [docs/url-opener.md](./docs/url-opener.md) for examples, including opening a specific Chrome profile. |
 
 ### Environment Variables
@@ -105,10 +105,10 @@ The following config options are supported:
 | GITSIGN_TIMESTAMP_SERVER_URL | ✅                 |                                  | Address of timestamping authority. If set, a trusted timestamp will be included in the signature.                                                                                                                                                                                                                                                                                                                     |
 | GITSIGN_TIMESTAMP_CERT_CHAIN | ✅                 |                                  | Path to PEM encoded certificate chain for RFC3161 Timestamp Authority verification.                                                                                                                                                                                                                                                                                                                                   |
 | GITSIGN_FULCIO_ROOT          | ✅                 |                                  | Path to PEM encoded certificate for Fulcio CA (additional alias: SIGSTORE_ROOT_FILE)                                                                                                                                                                                                                                                                                                                                  |
-| GITSIGN_REKOR_MODE           | ❌                 | online                           | Rekor storage mode to operate in. One of [online, offline] (default: online)<br>online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.<br>offline - Hashed commit content is stored in Rekor, with Rekor attributes necessary for offline verification being stored in the commit itself.<br>Note: online verification will be deprecated in favor of offline in the future. |
+| GITSIGN_REKOR_MODE           | ❌                 | offline                          | Rekor storage mode to operate in. One of [online, offline] (default: offline)<br>online - Commit SHAs are stored in Rekor, requiring online verification for all commit objects.<br>offline - Hashed commit content is stored in Rekor, with Rekor attributes necessary for offline verification being stored in the commit itself.<br>Note: online verification will be deprecated in favor of offline in the future. |
 | GITSIGN_AUTOCLOSE            | ❌                 | true                             | If true, autoclose the browser window after `GITSIGN_AUTOCLOSE_TIME`. |
 | GITSIGN_AUTOCLOSE_TIMEOUT    | ❌                 | 6                                | If `GITSIGN_AUTOCLOSE` is true, this is how long to wait until the window is closed. |
-| GITSIGN_ENABLE_SIGSTORE_GO   | ❌                 | false                            | (Experimental) If true, use the sigstore-go libraries for signing and verification via the CMS↔bundle compatibility layer. Requires `GITSIGN_REKOR_MODE=offline`. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
+| GITSIGN_ENABLE_SIGSTORE_GO   | ❌                 | true                             | If true (the default), use the sigstore-go libraries via the CMS↔bundle compatibility layer. Verification uses sigstore-go in all Rekor modes; signing uses it only in `GITSIGN_REKOR_MODE=offline` (online/legacy signing stays on the existing CMS path). Set to false to fall back to the legacy implementation. The on-disk signature format is unchanged. See [docs/bundle-cms.md](./docs/bundle-cms.md) for more details. |
 | GITSIGN_URL_OPENER           | ❌                 |                                  | Optional command used to open the OIDC login URL during the interactive auth flow. If unset, the platform default browser is used. The command is split using shell-style word splitting (quote arguments containing spaces) and each token is rendered as a Go text/template with the login URL available as `{{.URL}}` (e.g. `firefox --new-tab {{.URL}}`). No shell is invoked, so shell metacharacters are inert. See [docs/url-opener.md](./docs/url-opener.md) for examples, including opening a specific Chrome profile. |
 
 For environment variables that support `Sigstore Prefix`, the values may be
@@ -301,7 +301,7 @@ Gitsign stores data in 2 places:
    time, Gitsign records commits and the code signing certificates to
    [Rekor](https://docs.sigstore.dev/rekor/overview/).
 
-   - If `rekorMode = online` (default)
+   - If `rekorMode = online`
 
    This data is a
    [HashedRekord](https://github.com/sigstore/rekor/blob/e375eb461cae524270889b57a249ff086bea6c05/types.md#hashed-rekord)
@@ -310,10 +310,7 @@ Gitsign stores data in 2 places:
    [Verifying the Transparency Log](#verifying-the-transparency-log) for more
    details.
 
-   - If `rekorMode = offline`
-
-   Note: offline verification is new, and should be considered experimental for
-   now.
+   - If `rekorMode = offline` (default)
 
    By default, data is written to the
    [public Rekor instance](https://docs.sigstore.dev/rekor/public-instance). In
