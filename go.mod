@@ -7,7 +7,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-billy/v5 v5.9.1
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-openapi/runtime v0.32.6
 	github.com/go-openapi/strfmt v0.27.0
 	github.com/go-openapi/swag/conv v0.27.3
