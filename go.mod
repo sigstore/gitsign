@@ -10,7 +10,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-openapi/runtime v0.32.6
 	github.com/go-openapi/strfmt v0.27.0
-	github.com/go-openapi/swag/conv v0.27.3
+	github.com/go-openapi/swag/conv v0.28.0
 	github.com/google/go-cmp v0.7.0
 	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
@@ -145,7 +145,7 @@ require (
 	github.com/go-openapi/swag/netutils v0.26.1 // indirect
 	github.com/go-openapi/swag/pools v0.27.3 // indirect
 	github.com/go-openapi/swag/stringutils v0.27.3 // indirect
-	github.com/go-openapi/swag/typeutils v0.27.3 // indirect
+	github.com/go-openapi/swag/typeutils v0.28.0 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.3 // indirect
 	github.com/go-openapi/validate v0.26.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
