@@ -44,7 +44,7 @@ The token is written to stdout so it can be piped or inspected; all prompts
 and status messages are written to the TTY/stderr. Treat the token as a
 credential - it grants the ability to obtain a signing certificate for your
 identity.`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			s := gsio.New(cfg.LogPath)
 			defer s.Close() // nolint:errcheck
 
