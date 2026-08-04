@@ -7,7 +7,7 @@ Manage cached signing credentials
 Manage cached signing credentials.
 
 The credential cache backend is selected by gitsign.credentialCacheMode:
-the system keyring (`keyring`), or the gitsign-credential-cache daemon
+the system keyring (`system`), or the gitsign-credential-cache daemon
 (`socket`). When no mode is configured, the system keyring is used.
 
 ### Options

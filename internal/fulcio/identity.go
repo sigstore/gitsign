@@ -99,7 +99,7 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 // or nil if credential caching is disabled.
 func newCacheClient(ctx context.Context, cfg *config.Config) (cache.Cache, error) {
 	switch strings.ToLower(cfg.CredentialCacheMode) {
-	case "keyring", "system":
+	case "system":
 		roots, intermediates, err := fulcioroots.NewFromConfig(ctx, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("error loading certificate roots: %w", err)
@@ -122,7 +122,7 @@ func newCacheClient(ctx context.Context, cfg *config.Config) (cache.Cache, error
 		}
 		return cache.NewClient(cfg.CredentialCache, cfg, roots, intermediates)
 	default:
-		return nil, fmt.Errorf("unknown credential cache mode %q (expected one of: keyring, system, socket)", cfg.CredentialCacheMode)
+		return nil, fmt.Errorf("unknown credential cache mode %q (expected one of: system, socket)", cfg.CredentialCacheMode)
 	}
 }
 

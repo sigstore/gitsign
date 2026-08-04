@@ -139,14 +139,14 @@ func TestCredentialCache(t *testing.T) {
 	t.Run("from git config", func(t *testing.T) {
 		// git config lowercases key names.
 		execFn = func() (io.Reader, error) {
-			return strings.NewReader("gitsign.credentialcachemode keyring\ngitsign.credentialcache /tmp/cache.sock\n"), nil
+			return strings.NewReader("gitsign.credentialcachemode system\ngitsign.credentialcache /tmp/cache.sock\n"), nil
 		}
 		got, err := Get()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got.CredentialCacheMode != "keyring" {
-			t.Errorf("CredentialCacheMode: got %q, want %q", got.CredentialCacheMode, "keyring")
+		if got.CredentialCacheMode != "system" {
+			t.Errorf("CredentialCacheMode: got %q, want %q", got.CredentialCacheMode, "system")
 		}
 		if got.CredentialCache != "/tmp/cache.sock" {
 			t.Errorf("CredentialCache: got %q, want %q", got.CredentialCache, "/tmp/cache.sock")

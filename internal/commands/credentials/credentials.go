@@ -36,7 +36,7 @@ func New(cfg *config.Config) *cobra.Command {
 		Short: "Manage cached signing credentials",
 		Long: "Manage cached signing credentials.\n\n" +
 			"The credential cache backend is selected by gitsign.credentialCacheMode:\n" +
-			"the system keyring (`keyring`), or the gitsign-credential-cache daemon\n" +
+			"the system keyring (`system`), or the gitsign-credential-cache daemon\n" +
 			"(`socket`). When no mode is configured, the system keyring is used.",
 	}
 	cmd.AddCommand(newList(cfg))
@@ -49,7 +49,7 @@ func New(cfg *config.Config) *cobra.Command {
 // operations don't validate certs.
 func newManager(cfg *config.Config) (cache.Manager, error) {
 	switch strings.ToLower(cfg.CredentialCacheMode) {
-	case "", "keyring", "system":
+	case "", "system":
 		// Default to the keyring when no mode is set so that entries are
 		// inspectable even before caching is enabled.
 		if cfg.CredentialCacheMode == "" && cfg.CredentialCache != "" {
@@ -64,7 +64,7 @@ func newManager(cfg *config.Config) (cache.Manager, error) {
 		}
 		return cache.NewClient(cfg.CredentialCache, cfg, nil, nil)
 	default:
-		return nil, fmt.Errorf("unknown credential cache mode %q (expected one of: keyring, system, socket)", cfg.CredentialCacheMode)
+		return nil, fmt.Errorf("unknown credential cache mode %q (expected one of: system, socket)", cfg.CredentialCacheMode)
 	}
 }
 
