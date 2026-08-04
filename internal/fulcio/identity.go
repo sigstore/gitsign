@@ -204,14 +204,12 @@ func NewIdentityFactory(in io.Reader, out io.Writer) *IdentityFactory {
 	}
 }
 
-func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (*Identity, error) {
+// tokenGetter builds the OIDC TokenGetter for the configured auth flow. This is
+// the same flow gitsign uses when exchanging an OIDC token for a Fulcio signing
+// certificate, factored out so it can be reused (e.g. by "gitsign debug token")
+// to obtain the raw OIDC token on its own.
+func (f *IdentityFactory) tokenGetter(ctx context.Context, cfg *config.Config) (oauthflow.TokenGetter, error) {
 	clientID := cfg.ClientID
-
-	clientSecret, err := cfg.ClientSecret()
-
-	if err != nil {
-		return nil, err
-	}
 
 	// Autoclose only works if we don't go through the identity selection page
 	// (otherwise it'll show a countdown timer that doesn't work)
@@ -276,6 +274,38 @@ func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (
 			return nil, fmt.Errorf("error getting id token: %w", err)
 		}
 		authFlow = &oauthflow.StaticTokenGetter{RawToken: idToken}
+	}
+
+	return authFlow, nil
+}
+
+// GetToken runs the configured OIDC auth flow and returns the resulting ID
+// token. This is the same token gitsign exchanges for a Fulcio signing
+// certificate.
+func (f *IdentityFactory) GetToken(ctx context.Context, cfg *config.Config) (*oauthflow.OIDCIDToken, error) {
+	authFlow, err := f.tokenGetter(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	clientSecret, err := cfg.ClientSecret()
+	if err != nil {
+		return nil, err
+	}
+	return oauthflow.OIDConnect(cfg.Issuer, cfg.ClientID, clientSecret, cfg.RedirectURL, authFlow)
+}
+
+func (f *IdentityFactory) NewIdentity(ctx context.Context, cfg *config.Config) (*Identity, error) {
+	clientID := cfg.ClientID
+
+	clientSecret, err := cfg.ClientSecret()
+
+	if err != nil {
+		return nil, err
+	}
+
+	authFlow, err := f.tokenGetter(ctx, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	fmt.Fprintln(f.out, "Generating ephemeral keys...") // nolint:errcheck
