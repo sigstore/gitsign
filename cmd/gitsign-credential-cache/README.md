@@ -50,20 +50,20 @@ There are systemd user units in contrib
 Change path to gitsign-credential-cache in service unit
 
 ```sh
-${EDITOR:-vi} ./contrib/gitsign-credential-cache.service
+${EDITOR:-vi} ./contrib/systemd/gitsign-credential-cache.service
 ```
 
 Install units in home directory for specific user
 
 ```sh
-install -m 0660 -D -t $HOME/.config/systemd/user/ ./contrib/gitsign-credential-cache.{socket,service}
+install -m 0660 -D -t $HOME/.config/systemd/user/ ./contrib/systemd/gitsign-credential-cache.{socket,service}
 systemctl --user daemon-reload
 ```
 
 OR install them for all users
 
 ```sh
-sudo install -m 0660 -D -t /etc/systemd/user/ ./contrib/gitsign-credential-cache.{socket,service}
+sudo install -m 0660 -D -t /etc/systemd/user/ ./contrib/systemd/gitsign-credential-cache.{socket,service}
 sudo systemctl daemon-reload
 ```
 
