@@ -17,16 +17,14 @@ lifetime instead of once per signature.
 ## Setup
 
 ```sh
-git config --global gitsign.credentialCacheMode keyring
+git config --global gitsign.credentialCacheMode system
 ```
 
 or via environment variable:
 
 ```sh
-export GITSIGN_CREDENTIAL_CACHE_MODE=keyring
+export GITSIGN_CREDENTIAL_CACHE_MODE=system
 ```
-
-(`system` is accepted as an alias for `keyring`.)
 
 The first `git commit -S` runs the normal OIDC flow and stores the resulting
 credential; subsequent signatures reuse it until the certificate expires.

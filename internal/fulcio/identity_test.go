@@ -51,8 +51,8 @@ func TestNewCacheClient(t *testing.T) {
 		}
 	})
 
-	t.Run("keyring mode", func(t *testing.T) {
-		for _, mode := range []string{"keyring", "system", "KeyRing"} {
+	t.Run("system keyring mode", func(t *testing.T) {
+		for _, mode := range []string{"system", "System"} {
 			c, err := newCacheClient(ctx, &config.Config{
 				FulcioRoot:          rootPath,
 				CredentialCacheMode: mode,

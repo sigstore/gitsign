@@ -104,13 +104,13 @@ type Config struct {
 
 	// CredentialCacheMode selects how signing credentials (the ephemeral
 	// private key and Fulcio certificate) are cached between invocations:
-	// ""                  - (default) use the gitsign-credential-cache daemon
-	//                       if CredentialCache is set, otherwise no caching.
-	// "keyring", "system" - store credentials in the operating system keyring
-	//                       (macOS Keychain, Windows Credential Manager,
-	//                       Linux Secret Service). No daemon required.
-	// "socket"            - use the gitsign-credential-cache daemon socket
-	//                       pointed to by CredentialCache.
+	// ""       - (default) use the gitsign-credential-cache daemon if
+	//            CredentialCache is set, otherwise no caching.
+	// "system" - store credentials in the operating system keyring
+	//            (macOS Keychain, Windows Credential Manager, Linux Secret
+	//            Service). No daemon required.
+	// "socket" - use the gitsign-credential-cache daemon socket pointed to
+	//            by CredentialCache.
 	CredentialCacheMode string
 	// CredentialCache is the path to the gitsign-credential-cache daemon
 	// socket.

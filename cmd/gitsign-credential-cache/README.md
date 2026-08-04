@@ -5,7 +5,7 @@ cache signing credentials. This can be helpful in situations where you need to
 perform multiple signing operations back to back.
 
 💡 Gitsign also has a built-in [system keyring cache](../../docs/keyring-cache.md)
-(`git config --global gitsign.credentialCacheMode keyring`) that needs no
+(`git config --global gitsign.credentialCacheMode system`) that needs no
 daemon. The daemon remains useful when you want credentials to live in memory
 only, or to forward the cache over SSH.
 
