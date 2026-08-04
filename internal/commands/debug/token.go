@@ -16,7 +16,6 @@
 package debug
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/pkg/browser"
@@ -44,7 +43,9 @@ The token is written to stdout so it can be piped or inspected; all prompts
 and status messages are written to the TTY/stderr. Treat the token as a
 credential - it grants the ability to obtain a signing certificate for your
 identity.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+
 			s := gsio.New(cfg.LogPath)
 			defer s.Close() // nolint:errcheck
 
@@ -55,7 +56,7 @@ identity.`,
 
 			return s.Wrap(func() error {
 				idf := fulcio.NewIdentityFactory(s.TTYIn, s.TTYOut)
-				tok, err := idf.GetToken(context.Background(), cfg)
+				tok, err := idf.GetToken(ctx, cfg)
 				if err != nil {
 					return fmt.Errorf("failed to get token: %w", err)
 				}
