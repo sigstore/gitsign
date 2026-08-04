@@ -102,6 +102,20 @@ type Config struct {
 	// Path to log status output. Helpful for debugging when no TTY is available in the environment.
 	LogPath string
 
+	// CredentialCacheMode selects how signing credentials (the ephemeral
+	// private key and Fulcio certificate) are cached between invocations:
+	// ""                  - (default) use the gitsign-credential-cache daemon
+	//                       if CredentialCache is set, otherwise no caching.
+	// "keyring", "system" - store credentials in the operating system keyring
+	//                       (macOS Keychain, Windows Credential Manager,
+	//                       Linux Secret Service). No daemon required.
+	// "socket"            - use the gitsign-credential-cache daemon socket
+	//                       pointed to by CredentialCache.
+	CredentialCacheMode string
+	// CredentialCache is the path to the gitsign-credential-cache daemon
+	// socket.
+	CredentialCache string
+
 	// Committer details
 	CommitterName  string
 	CommitterEmail string
@@ -199,6 +213,8 @@ func Get() (*Config, error) {
 	}
 
 	out.LogPath = envOrValue("GITSIGN_LOG", out.LogPath)
+	out.CredentialCacheMode = envOrValue("GITSIGN_CREDENTIAL_CACHE_MODE", out.CredentialCacheMode)
+	out.CredentialCache = envOrValue("GITSIGN_CREDENTIAL_CACHE", out.CredentialCache)
 	out.RekorMode = envOrValue("GITSIGN_REKOR_MODE", out.RekorMode)
 	out.URLOpener = envOrValue("GITSIGN_URL_OPENER", out.URLOpener)
 	out.EnableSigstoreGo = envOrValue("GITSIGN_ENABLE_SIGSTORE_GO", fmt.Sprintf("%t", out.EnableSigstoreGo)) == "true"
@@ -314,6 +330,10 @@ func applyGitOptions(out *Config, cfg map[string]string) {
 			out.Issuer = v
 		case strings.EqualFold(k, "gitsign.logPath"):
 			out.LogPath = v
+		case strings.EqualFold(k, "gitsign.credentialCacheMode"):
+			out.CredentialCacheMode = v
+		case strings.EqualFold(k, "gitsign.credentialCache"):
+			out.CredentialCache = v
 		case strings.EqualFold(k, "gitsign.urlOpener"):
 			out.URLOpener = v
 		case strings.EqualFold(k, "gitsign.connectorID"):
