@@ -18,107 +18,126 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"encoding/asn1"
 	"fmt"
 	"net/rpc"
-	"os"
-	"time"
+	"path/filepath"
+	"strings"
 
 	"github.com/sigstore/gitsign/internal/cache/api"
 	"github.com/sigstore/gitsign/internal/config"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
+// Client talks to the gitsign-credential-cache daemon over its unix socket.
 type Client struct {
 	Client        *rpc.Client
 	Roots         *x509.CertPool
 	Intermediates *x509.CertPool
+	// Config is used to derive the identity key for credentials.
+	Config *config.Config
+}
+
+var _ Manager = (*Client)(nil)
+
+// NewClient dials the gitsign-credential-cache daemon socket. Roots and
+// intermediates are only needed for GetCredentials validation and may be nil
+// for management operations (List/Delete/DeleteAll).
+func NewClient(socketPath string, cfg *config.Config, roots, intermediates *x509.CertPool) (*Client, error) {
+	absPath, err := filepath.Abs(socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving cache path: %w", err)
+	}
+	rpcClient, err := rpc.Dial("unix", absPath)
+	if err != nil {
+		return nil, fmt.Errorf("error creating RPC socket client: %w", err)
+	}
+	return &Client{
+		Client:        rpcClient,
+		Roots:         roots,
+		Intermediates: intermediates,
+		Config:        cfg,
+	}, nil
 }
 
 func (c *Client) GetCredentials(_ context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
-	id, err := id()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error getting credential ID: %w", err)
+	if cfg == nil {
+		cfg = c.Config
 	}
 	resp := new(api.Credential)
 	if err := c.Client.Call("Service.GetCredential", api.GetCredentialRequest{
-		ID:     id,
+		ID:     CredentialKey(cfg),
 		Config: cfg,
 	}, resp); err != nil {
+		// net/rpc flattens errors to strings, so a plain miss can only be
+		// recognized by message.
+		if strings.Contains(err.Error(), "not found") {
+			return nil, nil, nil, fmt.Errorf("%w: %v", ErrNotFound, err)
+		}
 		return nil, nil, nil, err
 	}
 
-	privateKey, err := cryptoutils.UnmarshalPEMToPrivateKey(resp.PrivateKey, cryptoutils.SkipPassword)
+	privateKey, cert, chain, err := DecodeCredential(resp)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error unmarshalling private key: %w", err)
+		return nil, nil, nil, err
 	}
 
 	// Check that the cert is in fact still valid.
-	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(resp.Cert)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error unmarshalling cert: %w", err)
-	}
-	// There should really only be 1 cert, but check them all anyway.
-	for _, cert := range certs {
-		if len(cert.UnhandledCriticalExtensions) > 0 {
-			var unhandledExts []asn1.ObjectIdentifier
-			for _, oid := range cert.UnhandledCriticalExtensions {
-				if !oid.Equal(cryptoutils.SANOID) {
-					unhandledExts = append(unhandledExts, oid)
-				}
-			}
-
-			cert.UnhandledCriticalExtensions = unhandledExts
-		}
-
-		if _, err := cert.Verify(x509.VerifyOptions{
-			Roots:         c.Roots,
-			Intermediates: c.Intermediates,
-			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
-			// We're going to be using this key immediately, so we don't need a long window.
-			// Just make sure it's not about to expire.
-			CurrentTime: time.Now().Add(30 * time.Second),
-		}); err != nil {
-			return nil, nil, nil, fmt.Errorf("stored cert no longer valid: %w", err)
-		}
+	if err := ValidateCert(cert, c.Roots, c.Intermediates); err != nil {
+		return nil, nil, nil, err
 	}
 
-	return privateKey, resp.Cert, resp.Chain, nil
+	return privateKey, cert, chain, nil
 }
 
 func (c *Client) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain []byte) error {
-	id, err := id()
-	if err != nil {
-		return fmt.Errorf("error getting credential ID: %w", err)
-	}
-	privPEM, err := cryptoutils.MarshalPrivateKeyToPEM(priv)
+	cred, err := EncodeCredential(priv, cert, chain)
 	if err != nil {
 		return err
 	}
 
-	if err := c.Client.Call("Service.StoreCredential", api.StoreCredentialRequest{
-		ID: id,
-		Credential: &api.Credential{
-			PrivateKey: privPEM,
-			Cert:       cert,
-			Chain:      chain,
-		},
-	}, new(api.Credential)); err != nil {
-		return err
-	}
-
-	return err
+	return c.Client.Call("Service.StoreCredential", api.StoreCredentialRequest{
+		ID:         CredentialKey(c.Config),
+		Credential: cred,
+		Meta:       MetadataFromConfig(c.Config),
+	}, new(api.Credential))
 }
 
-func id() (string, error) {
-	// Prefix host name in case cache socket is being shared over a SSH session.
-	host, err := os.Hostname()
-	if err != nil {
-		return "", fmt.Errorf("error getting hostname: %w", err)
+// List returns info about the credentials stored in the daemon. Requires a
+// daemon new enough to support the ListCredentials RPC.
+func (c *Client) List(_ context.Context) ([]CredentialInfo, error) {
+	var resp []api.CredentialInfo
+	if err := c.Client.Call("Service.ListCredentials", api.ListCredentialsRequest{}, &resp); err != nil {
+		if strings.Contains(err.Error(), "can't find method") {
+			return nil, fmt.Errorf("the gitsign-credential-cache daemon does not support listing credentials - upgrade the daemon: %w", err)
+		}
+		return nil, err
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("error getting working directory: %w", err)
+	return resp, nil
+}
+
+// Delete removes the daemon's credential for the identity described by the
+// configured Config.
+func (c *Client) Delete(_ context.Context) error {
+	if err := c.Client.Call("Service.DeleteCredential", api.DeleteCredentialRequest{
+		ID: CredentialKey(c.Config),
+	}, new(api.DeleteCredentialsResponse)); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return fmt.Errorf("%w: %v", ErrNotFound, err)
+		}
+		if strings.Contains(err.Error(), "can't find method") {
+			return fmt.Errorf("the gitsign-credential-cache daemon does not support deleting credentials - upgrade the daemon: %w", err)
+		}
+		return err
 	}
-	return fmt.Sprintf("%s@%s", host, wd), nil
+	return nil
+}
+
+// DeleteAll removes all credentials stored in the daemon.
+func (c *Client) DeleteAll(_ context.Context) error {
+	if err := c.Client.Call("Service.DeleteAllCredentials", api.DeleteAllCredentialsRequest{}, new(api.DeleteCredentialsResponse)); err != nil {
+		if strings.Contains(err.Error(), "can't find method") {
+			return fmt.Errorf("the gitsign-credential-cache daemon does not support deleting credentials - upgrade the daemon: %w", err)
+		}
+		return err
+	}
+	return nil
 }

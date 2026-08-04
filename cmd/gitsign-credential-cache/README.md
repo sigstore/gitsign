@@ -4,6 +4,11 @@
 cache signing credentials. This can be helpful in situations where you need to
 perform multiple signing operations back to back.
 
+💡 Gitsign also has a built-in [system keyring cache](../../docs/keyring-cache.md)
+(`git config --global gitsign.credentialCacheMode keyring`) that needs no
+daemon. The daemon remains useful when you want credentials to live in memory
+only, or to forward the cache over SSH.
+
 Credentials are stored in memory, and the cache is exposed via a Unix socket.
 Credentials stored in this cache are only as secure as the unix socket
 implementation on your OS - any user that can access the socket can access the
@@ -24,8 +29,16 @@ If you understand the risks, read on!
 - Ephemeral Private Key
 - Fulcio Code Signing certificate + chain
 
-All data is stored in memory, keyed to your Git working directory (i.e.
-different repo paths will cache different keys)
+All data is stored in memory, keyed to the identity configuration used to
+obtain the credential (Fulcio URL, OIDC issuer, client ID, connector ID, and
+committer email). Repositories that share the same configuration share a
+cached credential; repositories with a different `user.email` (or issuer,
+connector, etc.) get their own entry, so multiple identities can be cached at
+once. Entries expire with the signing certificate.
+
+Cached credentials can be inspected and removed with
+`gitsign credentials list` / `gitsign credentials clear` (with
+`GITSIGN_CREDENTIAL_CACHE` pointing at the socket).
 
 The data that is cached would allow any user with access to sign artifacts as
 you, until the signing certificate expires, typically in ten minutes.
