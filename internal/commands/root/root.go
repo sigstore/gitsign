@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/sigstore/gitsign/internal/commands/attest"
+	"github.com/sigstore/gitsign/internal/commands/debug"
 	"github.com/sigstore/gitsign/internal/commands/initialize"
 	"github.com/sigstore/gitsign/internal/commands/show"
 	"github.com/sigstore/gitsign/internal/commands/verify"
@@ -101,6 +102,7 @@ func New(cfg *config.Config) *cobra.Command {
 	rootCmd.AddCommand(verify.New(cfg))
 	rootCmd.AddCommand(verifytag.New(cfg))
 	rootCmd.AddCommand(initialize.New())
+	rootCmd.AddCommand(debug.New(cfg))
 	o.AddFlags(rootCmd)
 
 	return rootCmd
