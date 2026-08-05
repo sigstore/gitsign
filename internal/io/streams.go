@@ -24,6 +24,10 @@ import (
 	"github.com/mattn/go-tty"
 )
 
+// openTTY is overridden in tests to avoid depending on a real TTY being
+// attached to the test process.
+var openTTY = tty.Open
+
 type Streams struct {
 	In  io.Reader
 	Out io.Writer
@@ -42,6 +46,7 @@ func New(logPath string) *Streams {
 		Err: os.Stderr,
 	}
 
+	var logErr error
 	if logPath != "" {
 		// Since Git eats both stdout and stderr, we don't have a good way of
 		// getting error information back from clients if things go wrong.
@@ -50,12 +55,14 @@ func New(logPath string) *Streams {
 		if f, err := os.Create(logPath); err == nil { // nolint:gosec
 			s.close = append(s.close, f.Close)
 			s.Err = io.MultiWriter(s.Err, f)
+		} else {
+			logErr = err
 		}
 	}
 
 	// A TTY may not be available in all environments (e.g. in CI), so only
 	// set the input/output if we can actually open it.
-	tty, err := tty.Open()
+	tty, err := openTTY()
 	if err == nil {
 		s.close = append(s.close, tty.Close)
 		s.TTYIn = tty.Input()
@@ -64,6 +71,13 @@ func New(logPath string) *Streams {
 		// If we can't connect to a TTY, fall back to stderr for output (which
 		// will also log to file if GITSIGN_LOG is set).
 		s.TTYOut = s.Err
+	}
+
+	// Surface log file creation failures once we know where output can
+	// actually be seen (TTY if present, otherwise stderr), since this
+	// would otherwise be silently swallowed by Git consuming stdout/stderr.
+	if logErr != nil {
+		fmt.Fprintf(s.TTYOut, "failed to create log file %q: %v\n", logPath, logErr) // nolint:errcheck
 	}
 	return s
 }

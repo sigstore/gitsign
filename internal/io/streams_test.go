@@ -18,8 +18,13 @@ package io // nolint:revive
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mattn/go-tty"
 )
 
 func TestWrap(t *testing.T) {
@@ -75,5 +80,42 @@ func TestWrap(t *testing.T) {
 				t.Errorf("TTYOut = %q, want it to contain %q", tty.String(), tc.wantTTYSub)
 			}
 		})
+	}
+}
+
+func TestNew_LogFileCreateError(t *testing.T) {
+	// Force the no-TTY path so output deterministically falls back to
+	// stderr, regardless of whether the test process has a real TTY attached.
+	origOpenTTY := openTTY
+	openTTY = func() (*tty.TTY, error) { return nil, errors.New("no tty") }
+	t.Cleanup(func() { openTTY = origOpenTTY })
+
+	// A path under a non-existent directory so os.Create fails.
+	logPath := filepath.Join(t.TempDir(), "missing-dir", "gitsign.log")
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	origStderr := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	s := New(logPath)
+
+	w.Close()
+	os.Stderr = origStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(out), logPath) {
+		t.Errorf("stderr output = %q, want it to contain the failing log path %q", out, logPath)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Errorf("Close() = %v, want nil", err)
 	}
 }
