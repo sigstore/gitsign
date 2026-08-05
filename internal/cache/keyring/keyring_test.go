@@ -23,16 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/99designs/keyring"
 	"github.com/github/smimesign/fakeca"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
-	"github.com/zalando/go-keyring"
 )
-
-// Note: keyring.MockInit and MockInitWithError mutate package-global state in
-// go-keyring, so these tests must not run in parallel.
 
 func testConfig(email string) *config.Config {
 	return &config.Config{
@@ -44,9 +41,10 @@ func testConfig(email string) *config.Config {
 	}
 }
 
-// newTestCredential issues a leaf cert from a fresh fake CA and returns the
-// cache under test along with the credential parts.
-func newTestCredential(t *testing.T, caOpts ...fakeca.Option) (*Cache, *ecdsa.PrivateKey, []byte, []byte) {
+// newTestCredential issues a leaf cert from a fresh fake CA and returns a
+// cache backed by the given in-memory keyring along with the credential
+// parts.
+func newTestCredential(t *testing.T, kr keyring.Keyring, caOpts ...fakeca.Option) (*Cache, *ecdsa.PrivateKey, []byte, []byte) {
 	t.Helper()
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -66,17 +64,18 @@ func newTestCredential(t *testing.T, caOpts ...fakeca.Option) (*Cache, *ecdsa.Pr
 	}
 
 	c := &Cache{
-		Roots:  ca.ChainPool(),
-		Config: testConfig("user@example.com"),
+		Roots:   ca.ChainPool(),
+		Config:  testConfig("user@example.com"),
+		Keyring: kr,
 	}
 	return c, priv, certPEM, chainPEM
 }
 
 func TestRoundtrip(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	c, priv, certPEM, chainPEM := newTestCredential(t)
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
 
 	// Miss before store.
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
@@ -107,7 +106,7 @@ func TestRoundtrip(t *testing.T) {
 		t.Fatalf("StoreCert (second): %v", err)
 	}
 
-	// The index should have exactly one row for this identity.
+	// Enumeration should show exactly one credential for this identity.
 	entries, err := c.List(ctx)
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -121,11 +120,11 @@ func TestRoundtrip(t *testing.T) {
 }
 
 func TestMultipleIdentities(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	a, privA, certA, chainA := newTestCredential(t)
-	b, privB, certB, chainB := newTestCredential(t)
+	a, privA, certA, chainA := newTestCredential(t, kr)
+	b, privB, certB, chainB := newTestCredential(t, kr)
 	b.Config = testConfig("other@example.com")
 
 	if err := a.StoreCert(ctx, privA, certA, chainA); err != nil {
@@ -160,10 +159,10 @@ func TestMultipleIdentities(t *testing.T) {
 }
 
 func TestExpiredCert(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	c, priv, certPEM, chainPEM := newTestCredential(t,
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr,
 		fakeca.NotBefore(time.Now().Add(-2*time.Hour)),
 		fakeca.NotAfter(time.Now().Add(-time.Hour)),
 	)
@@ -178,7 +177,7 @@ func TestExpiredCert(t *testing.T) {
 	}
 
 	// ...and the entries are removed.
-	if _, err := keyring.Get(defaultService, cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrNotFound) {
+	if _, err := kr.Get(cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrKeyNotFound) {
 		t.Errorf("credential entry not deleted: %v", err)
 	}
 	entries, err := c.List(ctx)
@@ -191,10 +190,10 @@ func TestExpiredCert(t *testing.T) {
 }
 
 func TestChainChunking(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	c, priv, certPEM, chainPEM := newTestCredential(t)
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
 	// Force the chain to split into many chunks.
 	c.maxEntrySize = 64
 
@@ -204,7 +203,7 @@ func TestChainChunking(t *testing.T) {
 
 	// Sanity check that chunking actually happened.
 	key := cache.CredentialKey(c.Config)
-	if got := c.chainChunkCount(key); got < 2 {
+	if got := chainChunkCount(kr, key); got < 2 {
 		t.Fatalf("expected multiple chain chunks, got %d", got)
 	}
 
@@ -217,22 +216,22 @@ func TestChainChunking(t *testing.T) {
 	}
 
 	// Deleting removes the chunk entries too.
-	chunks := c.chainChunkCount(key)
+	chunks := chainChunkCount(kr, key)
 	if err := c.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for i := range chunks {
-		if _, err := keyring.Get(defaultService, chainKey(key, i)); !errors.Is(err, keyring.ErrNotFound) {
+		if _, err := kr.Get(chainKey(key, i)); !errors.Is(err, keyring.ErrKeyNotFound) {
 			t.Errorf("chain chunk %d not deleted: %v", i, err)
 		}
 	}
 }
 
 func TestValidationFailure(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	c, priv, certPEM, chainPEM := newTestCredential(t)
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
@@ -243,18 +242,27 @@ func TestValidationFailure(t *testing.T) {
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); err == nil {
 		t.Fatal("GetCredentials: expected error with wrong roots")
 	}
-	if _, err := keyring.Get(defaultService, cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrNotFound) {
+	if _, err := kr.Get(cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrKeyNotFound) {
 		t.Errorf("credential entry not deleted: %v", err)
 	}
 }
 
+// errKeyring simulates an unavailable/locked keyring.
+type errKeyring struct {
+	err error
+}
+
+func (e errKeyring) Get(string) (keyring.Item, error)             { return keyring.Item{}, e.err }
+func (e errKeyring) GetMetadata(string) (keyring.Metadata, error) { return keyring.Metadata{}, e.err }
+func (e errKeyring) Set(keyring.Item) error                       { return e.err }
+func (e errKeyring) Remove(string) error                          { return e.err }
+func (e errKeyring) Keys() ([]string, error)                      { return nil, e.err }
+
 func TestKeyringUnavailable(t *testing.T) {
 	wantErr := errors.New("keyring unavailable")
-	keyring.MockInitWithError(wantErr)
-	t.Cleanup(keyring.MockInit)
 	ctx := context.Background()
 
-	c, priv, certPEM, chainPEM := newTestCredential(t)
+	c, priv, certPEM, chainPEM := newTestCredential(t, errKeyring{err: wantErr})
 
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, wantErr) {
 		t.Errorf("GetCredentials: want %v, got %v", wantErr, err)
@@ -265,11 +273,11 @@ func TestKeyringUnavailable(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	keyring.MockInit()
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	a, privA, certA, chainA := newTestCredential(t)
-	b, privB, certB, chainB := newTestCredential(t)
+	a, privA, certA, chainA := newTestCredential(t, kr)
+	b, privB, certB, chainB := newTestCredential(t, kr)
 	b.Config = testConfig("other@example.com")
 
 	// Deleting a missing entry reports a miss.
@@ -295,12 +303,19 @@ func TestDelete(t *testing.T) {
 		t.Errorf("GetCredentials for other identity: %v", err)
 	}
 
-	// DeleteAll removes everything, including the index.
+	// DeleteAll removes everything, including chain chunks.
 	if err := b.DeleteAll(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, _, err := b.GetCredentials(ctx, b.Config); !errors.Is(err, cache.ErrNotFound) {
 		t.Errorf("GetCredentials after DeleteAll: want ErrNotFound, got %v", err)
+	}
+	keys, err := kr.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("Keys after DeleteAll: want 0 entries, got %d: %v", len(keys), keys)
 	}
 	entries, err := b.List(ctx)
 	if err != nil {

@@ -6,7 +6,7 @@ Fulcio-issued certificate) in the operating system keyring:
 - macOS Keychain
 - Windows Credential Manager
 - Linux [Secret Service](https://specifications.freedesktop.org/secret-service/latest/)
-  (GNOME Keyring, KWallet, etc.)
+  (GNOME Keyring, etc.) or KWallet
 
 Unlike the [gitsign-credential-cache](../cmd/gitsign-credential-cache/README.md)
 daemon, no long-running helper process is required. Credentials are cached for
@@ -31,6 +31,19 @@ credential; subsequent signatures reuse it until the certificate expires.
 Expired or invalid entries are removed automatically the next time they are
 read. If the keyring is unavailable (e.g. locked, or no D-Bus session on a
 headless Linux host), gitsign falls back to the normal OIDC flow.
+
+## Platform notes
+
+- **macOS**: the Keychain is accessed via the `/usr/bin/security` CLI
+  (gitsign is built without cgo, which the native Security.framework API
+  would require). This is the same model as other CLI tools that use the
+  Keychain - entries are readable by any process that can run `security` in
+  your session.
+- **Linux**: requires a running Secret Service (GNOME Keyring, etc.) or
+  KWallet with a D-Bus session. Headless hosts should use the
+  [daemon](../cmd/gitsign-credential-cache/README.md) or no cache.
+- **Windows**: uses Credential Manager; credentials are chunked to stay under
+  its per-credential size limits.
 
 ## Multiple identities
 
