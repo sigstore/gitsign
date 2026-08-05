@@ -14,7 +14,11 @@
 
 package api // nolint:revive
 
-import "github.com/sigstore/gitsign/internal/config"
+import (
+	"time"
+
+	"github.com/sigstore/gitsign/internal/config"
+)
 
 type Credential struct {
 	PrivateKey []byte
@@ -22,12 +26,42 @@ type Credential struct {
 	Chain      []byte
 }
 
+// Metadata describes the configuration a cached credential was derived from.
+type Metadata struct {
+	Fulcio         string `json:"fulcio,omitempty"`
+	Issuer         string `json:"issuer,omitempty"`
+	ClientID       string `json:"clientID,omitempty"`
+	ConnectorID    string `json:"connectorID,omitempty"`
+	CommitterEmail string `json:"committerEmail,omitempty"`
+}
+
+// CredentialInfo describes a stored credential for enumeration
+// (e.g. `gitsign credentials list`).
+type CredentialInfo struct {
+	ID       string    `json:"id"`
+	NotAfter time.Time `json:"notAfter"`
+	Meta     Metadata  `json:"meta"`
+}
+
 type StoreCredentialRequest struct {
 	ID         string
 	Credential *Credential
+	// Meta describes the identity configuration the credential was obtained
+	// with. Optional: older clients don't send it.
+	Meta Metadata
 }
 
 type GetCredentialRequest struct {
 	ID     string
 	Config *config.Config
 }
+
+type ListCredentialsRequest struct{}
+
+type DeleteCredentialRequest struct {
+	ID string
+}
+
+type DeleteAllCredentialsRequest struct{}
+
+type DeleteCredentialsResponse struct{}
