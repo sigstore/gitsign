@@ -85,15 +85,32 @@ func TestTimestampsVerifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Timestamped maybe before not-before
+	// Timestamped exactly on not-before (inclusive boundary - valid).
 	//
 	//       Not-Before                       Not-After
 	//          |--------------------------------|
-	//     |--------|
-	//  sig-min   sig-max
+	//          *
+	//        GenTime
 	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
-		info.Accuracy.Seconds = 30
 		info.GenTime = leaf.Certificate.NotBefore
+		return info
+	})
+	sd = getTimestampedSignedData()
+	if _, err := getTimestamp(sd.psd.SignerInfos[0], intermediateOpts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sd.Verify(intermediateOpts, intermediateOpts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Timestamped strictly before not-before (outside window - rejected).
+	//
+	//       Not-Before                       Not-After
+	//          |--------------------------------|
+	//       *
+	//     GenTime
+	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
+		info.GenTime = leaf.Certificate.NotBefore.Add(-1 * time.Second)
 		return info
 	})
 	sd = getTimestampedSignedData()
@@ -104,14 +121,13 @@ func TestTimestampsVerifications(t *testing.T) {
 		t.Fatalf("expected expired error, got %v", err)
 	}
 
-	// Timestamped after not-before
+	// Timestamped after not-before (inside window - valid).
 	//
 	//       Not-Before                       Not-After
 	//          |--------------------------------|
-	//          |--------|
-	//      sig-min   sig-max
+	//                  *
+	//                GenTime
 	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
-		info.Accuracy.Seconds = 30
 		info.GenTime = leaf.Certificate.NotBefore.Add(31 * time.Second)
 		return info
 	})
@@ -123,15 +139,32 @@ func TestTimestampsVerifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Timestamped maybe after not-after
+	// Timestamped exactly on not-after (inclusive boundary - valid).
 	//
 	//       Not-Before                       Not-After
 	//          |--------------------------------|
-	//                                      |--------|
-	//                                  sig-min   sig-max
+	//                                           *
+	//                                         GenTime
 	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
-		info.Accuracy.Seconds = 30
 		info.GenTime = leaf.Certificate.NotAfter
+		return info
+	})
+	sd = getTimestampedSignedData()
+	if _, err := getTimestamp(sd.psd.SignerInfos[0], intermediateOpts); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sd.Verify(intermediateOpts, intermediateOpts); err != nil {
+		t.Fatal(err)
+	}
+
+	// Timestamped strictly after not-after (outside window - rejected).
+	//
+	//       Not-Before                       Not-After
+	//          |--------------------------------|
+	//                                              *
+	//                                            GenTime
+	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
+		info.GenTime = leaf.Certificate.NotAfter.Add(1 * time.Second)
 		return info
 	})
 	sd = getTimestampedSignedData()
@@ -142,14 +175,13 @@ func TestTimestampsVerifications(t *testing.T) {
 		t.Fatalf("expected expired error, got %v", err)
 	}
 
-	// Timestamped before not-after
+	// Timestamped before not-after (inside window - valid).
 	//
 	//       Not-Before                       Not-After
 	//          |--------------------------------|
-	//                                  |--------|
-	//                              sig-min   sig-max
+	//                                   *
+	//                                 GenTime
 	tsa.HookInfo(func(info timestamp.Info) timestamp.Info {
-		info.Accuracy.Seconds = 30
 		info.GenTime = leaf.Certificate.NotAfter.Add(-31 * time.Second)
 		return info
 	})
