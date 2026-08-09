@@ -415,6 +415,36 @@ func TestSplitCommit_LenientContinuation(t *testing.T) {
 	}
 }
 
+// TestSplitCommit_TrailingCR confirms a trailing CR stays in the payload. git
+// hashes it as object content, so dropping it would collapse two distinct
+// commits onto one payload and let a single signature verify for both.
+func TestSplitCommit_TrailingCR(t *testing.T) {
+	sig := "gpgsig -----BEGIN SIGNED MESSAGE-----\n ZmFrZQ==\n -----END SIGNED MESSAGE-----\n"
+	base := "tree b333504b8cf3d9c314fed2cc242c5c38e89534a5\n" +
+		"author Alice <alice@example.com> 1700000000 +0000\n" +
+		"committer Alice <alice@example.com> 1700000000 +0000\n" + sig + "\n"
+	raw := []byte(base + "release v1.0\n")
+	rawCR := []byte(base + "release v1.0\r\n")
+
+	hash, _ := ObjectHash(raw)
+	hashCR, _ := ObjectHash(rawCR)
+	if hash == hashCR {
+		t.Fatalf("setup: expected distinct objects, both hashed to %s", hash)
+	}
+
+	c, err := SplitCommit(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("SplitCommit: %v", err)
+	}
+	cCR, err := SplitCommit(bytes.NewReader(rawCR))
+	if err != nil {
+		t.Fatalf("SplitCommit (CR variant): %v", err)
+	}
+	if bytes.Equal(c.Payload, cCR.Payload) {
+		t.Errorf("payloads should differ, both are %q", c.Payload)
+	}
+}
+
 // TestJoinCommit_RoundTrip uses the real signed HEAD commit: split it, join
 // it back, and confirm the bytes are identical.
 func TestJoinCommit_RoundTrip(t *testing.T) {
@@ -623,6 +653,29 @@ func TestSplitTag_NoHeaderTerminator(t *testing.T) {
 	}
 }
 
+// TestSplitTag_TrailingCR is the tag counterpart to
+// TestSplitCommit_TrailingCR.
+func TestSplitTag_TrailingCR(t *testing.T) {
+	sig := "-----BEGIN SIGNED MESSAGE-----\nZmFrZQ==\n-----END SIGNED MESSAGE-----\n"
+	base := "object 2d9cff2bad7132c586e128bcc23322dbb5297e8e\n" +
+		"type commit\ntag v1\n" +
+		"tagger Alice <alice@example.com> 1700000000 +0000\n\n"
+	raw := []byte(base + "release v1.0\n" + sig)
+	rawCR := []byte(base + "release v1.0\r\n" + sig)
+
+	tag, err := SplitTag(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("SplitTag: %v", err)
+	}
+	tagCR, err := SplitTag(bytes.NewReader(rawCR))
+	if err != nil {
+		t.Fatalf("SplitTag (CR variant): %v", err)
+	}
+	if bytes.Equal(tag.Payload, tagCR.Payload) {
+		t.Errorf("payloads should differ, both are %q", tag.Payload)
+	}
+}
+
 func TestJoinTag_RoundTrip(t *testing.T) {
 	raw := loadObject(t, "tag.txt")
 	tag, err := SplitTag(bytes.NewReader(raw))
@@ -663,6 +716,7 @@ func TestValidateCommit(t *testing.T) {
 		{"duplicate gpgsig-sha256", base + "gpgsig-sha256 sig1\ngpgsig-sha256 sig2\n\nmsg\n", true},
 		{"gpgsig with continuation lines does not count as duplicate", base + "gpgsig line1\n line2\n line3\n\nmsg\n", false},
 		{"duplicate headers in message body are ignored", base + "\ntree fake\ntree alsofake\n", false},
+		{"duplicate tree behind a bare-CR line", "tree aaaa\n" + authorLine + commLine + "\r\ntree bbbb\n\nmsg\n", true},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
@@ -693,6 +747,7 @@ func TestValidateTag(t *testing.T) {
 		{"duplicate tag", "object aaaa\ntype commit\ntag v1\ntag v2\n" + taggerLine + "\nmsg\n", true},
 		{"duplicate tagger", "object aaaa\ntype commit\ntag v1\n" + taggerLine + taggerLine + "\nmsg\n", true},
 		{"duplicate headers in message body are ignored", base + "\nobject fake\nobject alsofake\n", false},
+		{"duplicate object behind a bare-CR line", "object aaaa\ntype commit\ntag v1\n" + taggerLine + "\r\nobject bbbb\n\nmsg\n", true},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {

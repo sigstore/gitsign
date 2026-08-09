@@ -113,7 +113,7 @@ type TagSig struct {
 // or gpgsig-sha256 headers, because either is ambiguous about which
 // signature to extract.
 func SplitCommit(r io.Reader) (*CommitSig, error) {
-	scanner := bufio.NewScanner(r)
+	scanner := newRawObjectScanner(r)
 
 	var (
 		payloadBuf bytes.Buffer
@@ -245,7 +245,7 @@ func JoinCommit(c *CommitSig) ([]byte, error) {
 // signatures (gpgsig, gpgsig-sha256) are stripped from the header section
 // the same way SplitCommit does.
 func SplitTag(r io.Reader) (*TagSig, error) {
-	scanner := bufio.NewScanner(r)
+	scanner := newRawObjectScanner(r)
 
 	var (
 		payloadBuf   bytes.Buffer
@@ -392,6 +392,26 @@ func sigOrNil(b *bytes.Buffer) []byte {
 	return b.Bytes()
 }
 
+// newRawObjectScanner splits on '\n' like bufio.ScanLines but keeps a trailing
+// '\r' in the token. git treats the '\r' as object content, so dropping it
+// would make what we split diverge from the bytes git hashes.
+func newRawObjectScanner(r io.Reader) *bufio.Scanner {
+	s := bufio.NewScanner(r)
+	s.Split(func(data []byte, atEOF bool) (int, []byte, error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if i := bytes.IndexByte(data, '\n'); i >= 0 {
+			return i + 1, data[:i], nil
+		}
+		if atEOF {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
+	return s
+}
+
 // commitSingletons / tagSingletons name the headers a well-formed object
 // carries at most once. parent is intentionally absent from the commit set
 // (merge commits have several); mergetag and encoding are intentionally
@@ -453,7 +473,7 @@ func checkUniqueHeaders(obj plumbing.EncodedObject, singletons map[string]bool) 
 	defer r.Close() // nolint:errcheck
 
 	seen := make(map[string]bool, len(singletons))
-	scanner := bufio.NewScanner(r)
+	scanner := newRawObjectScanner(r)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
