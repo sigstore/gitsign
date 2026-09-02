@@ -35,7 +35,7 @@ linters:
       # separately - the sigstore-go TUF client has a different API.
       - linters:
           - staticcheck
-        text: 'SA1019: "github.com/sigstore/sigstore/pkg/tuf" is deprecated'
+        text: 'SA1019: "?github.com/sigstore/sigstore/pkg/tuf"? is deprecated'
     paths:
       - internal/fork
       - third_party$
