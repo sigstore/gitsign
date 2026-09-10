@@ -16,17 +16,23 @@
 package compat
 
 import (
+	"encoding/asn1"
 	"fmt"
 
 	"github.com/github/smimesign/ietf-cms/oid"
 	"github.com/github/smimesign/ietf-cms/protocol"
+	"github.com/sigstore/gitsign/internal/fork/ietf-cms/timestamp"
 )
 
-// timestampTokens extracts the raw DER RFC3161 timestamp tokens stored in the
-// SignerInfo's unsigned attributes. Each token is the full DER of an RFC3161
-// TimeStampToken (a CMS ContentInfo), which is exactly what a sigstore bundle's
-// RFC3161SignedTimestamp.SignedTimestamp holds. gitsign normally stores at most
-// one, but the CMS structure permits several, so all are returned.
+// timestampTokens extracts the RFC3161 timestamp tokens stored in the
+// SignerInfo's unsigned attributes and re-encodes each as a DER TimeStampResp
+// (status "granted" wrapping the token), which is what a sigstore bundle's
+// RFC3161SignedTimestamp.SignedTimestamp field is specified to hold. The CMS
+// attribute itself stores a bare TimeStampToken (a ContentInfo) per RFC 5652
+// SS11.4, which is a different ASN.1 structure and fails downstream
+// TimeStampResp parsing if passed through unwrapped. gitsign normally stores
+// at most one token, but the CMS structure permits several, so all are
+// returned.
 func timestampTokens(si protocol.SignerInfo) ([][]byte, error) {
 	if !si.UnsignedAttrs.HasAttribute(oid.AttributeTimeStampToken) {
 		return nil, nil
@@ -39,7 +45,18 @@ func timestampTokens(si protocol.SignerInfo) ([][]byte, error) {
 	var tokens [][]byte
 	for _, v := range vals {
 		for _, el := range v.Elements {
-			tokens = append(tokens, el.FullBytes)
+			tok, err := protocol.ParseContentInfo(el.FullBytes)
+			if err != nil {
+				return nil, fmt.Errorf("parsing timestamp token: %w", err)
+			}
+			resp, err := asn1.Marshal(timestamp.Response{
+				Status:         timestamp.PKIStatusInfo{Status: 0}, // granted
+				TimeStampToken: tok,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("encoding timestamp response: %w", err)
+			}
+			tokens = append(tokens, resp)
 		}
 	}
 	return tokens, nil
