@@ -9,8 +9,46 @@ on:
 permissions: {}
 
 jobs:
-  release:
+  # Create the draft release up front so the per-OS release jobs below can
+  # upload into it concurrently instead of racing to create it.
+  draft:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # needed to write releases
+
+    steps:
+      - name: Create draft release
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "release ${GITHUB_REF_NAME} already exists"
+          else
+            # The title must match goreleaser's release name ({{ .Tag }}) for
+            # use_existing_draft to find it.
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
+              --draft --verify-tag --title "${GITHUB_REF_NAME}" --notes ""
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: draft
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # linux, windows, freebsd, gitsign-credential-cache, packages,
+          # container image, and release notes.
+          - runs-on: ubuntu-latest
+            config: .goreleaser.yaml
+            publish-image: true
+          # darwin gitsign, built with cgo for native Keychain support.
+          - runs-on: macos-latest
+            config: .goreleaser-darwin.yaml
+            publish-image: false
+
+    runs-on: ${{ matrix.runs-on }}
 
     permissions:
       contents: write # needed to write releases
@@ -30,6 +68,7 @@ jobs:
           cache: 'false'
 
       - uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+        if: matrix.publish-image
 
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
@@ -39,6 +78,7 @@ jobs:
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> "$GITHUB_ENV"
 
       - name: Login to GitHub Containers
+        if: matrix.publish-image
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
           registry: ghcr.io
@@ -48,18 +88,20 @@ jobs:
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           version: latest
-          args: release --clean
+          args: release --clean --config ${{ matrix.config }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KO_DOCKER_REPO: ghcr.io/sigstore/gitsign
 
       - name: get the digest
+        if: matrix.publish-image
         id: digest
         run: |
-          digest=$(crane digest ghcr.io/sigstore/gitsign:${RELEASE_VERSION})
+          digest=$(crane digest "ghcr.io/sigstore/gitsign:${RELEASE_VERSION}")
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: sign image
+        if: matrix.publish-image
         run: |
           cosign sign "ghcr.io/sigstore/gitsign@${DIGEST_TO_SIGN}"
         env:
@@ -67,6 +109,7 @@ jobs:
           COSIGN_YES: true
 
       - name: Generate build provenance attestation
+        if: matrix.publish-image
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-name: ghcr.io/sigstore/gitsign

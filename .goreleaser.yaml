@@ -1,6 +1,10 @@
 project_name: gitsign
 version: 2
 
+# Release for everything except the darwin gitsign binary, which needs cgo and
+# is built on a macOS runner by .goreleaser-darwin.yaml. Both configs publish
+# into the same draft release - see .github/workflows/release.yml.
+
 gomod:
   proxy: true
 
@@ -13,7 +17,6 @@ builds:
       - -trimpath
     goos:
       - linux
-      - darwin
       - freebsd
       - windows
     goarch:
@@ -115,6 +118,10 @@ signs:
 release:
   prerelease: allow
   draft: true # allow for manual edits
+  # The draft is created up front by the release workflow so the per-OS
+  # release jobs can upload into it concurrently.
+  use_existing_draft: true
+  mode: replace # this config owns the release notes
   github:
     owner: sigstore
     name: gitsign
