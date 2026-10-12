@@ -61,6 +61,10 @@ const (
 	envelopeVersion = 1
 )
 
+// errMalformedEntry is returned by backends when a stored value can't be
+// decoded, e.g. an entry written by an incompatible version of gitsign.
+var errMalformedEntry = errors.New("malformed keyring entry")
+
 // envelope is the JSON payload stored under the credential key.
 type envelope struct {
 	Version    int       `json:"version"`
@@ -132,13 +136,17 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		if errors.Is(err, keyring.ErrKeyNotFound) {
 			return nil, nil, nil, fmt.Errorf("%w: no entry for identity", cache.ErrNotFound)
 		}
+		if errors.Is(err, errMalformedEntry) {
+			c.deleteEntry(kr, key, 0)
+			return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
+		}
 		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
 	}
 
 	env := new(envelope)
 	if err := json.Unmarshal(item.Data, env); err != nil {
 		c.deleteEntry(kr, key, 0)
-		return nil, nil, nil, fmt.Errorf("error unmarshalling stored credential (entry deleted): %w", err)
+		return nil, nil, nil, fmt.Errorf("%w: %w: %w (entry deleted)", cache.ErrNotFound, errMalformedEntry, err)
 	}
 	if env.Version != envelopeVersion {
 		c.deleteEntry(kr, key, env.ChainChunks)

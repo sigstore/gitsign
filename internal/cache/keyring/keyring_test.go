@@ -272,6 +272,64 @@ func TestKeyringUnavailable(t *testing.T) {
 	}
 }
 
+// malformedKeyring reports every stored value as undecodable, mirroring the
+// security CLI backend reading an entry it didn't write.
+type malformedKeyring struct {
+	keyring.Keyring
+}
+
+func (m malformedKeyring) Get(key string) (keyring.Item, error) {
+	if _, err := m.Keyring.Get(key); err != nil {
+		return keyring.Item{}, err
+	}
+	return keyring.Item{}, errMalformedEntry
+}
+
+func TestMalformedEntry(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		kr   func(*keyring.ArrayKeyring) keyring.Keyring
+		data []byte
+	}{{
+		// e.g. raw JSON written by a different keychain backend.
+		name: "invalid envelope",
+		kr:   func(kr *keyring.ArrayKeyring) keyring.Keyring { return kr },
+		data: []byte("not json"),
+	}, {
+		name: "undecodable value",
+		kr:   func(kr *keyring.ArrayKeyring) keyring.Keyring { return malformedKeyring{kr} },
+		data: []byte("{}"),
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			arr := keyring.NewArrayKeyring(nil)
+			c, priv, certPEM, chainPEM := newTestCredential(t, tc.kr(arr))
+			key := cache.CredentialKey(c.Config)
+			if err := arr.Set(keyring.Item{Key: key, Data: tc.data}); err != nil {
+				t.Fatal(err)
+			}
+
+			// Malformed entries are a miss, not an error, and are removed.
+			if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+				t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
+			}
+			if _, err := arr.Get(key); !errors.Is(err, keyring.ErrKeyNotFound) {
+				t.Errorf("malformed entry was not deleted: %v", err)
+			}
+
+			// The identity can be re-cached afterwards.
+			c.Keyring = arr
+			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+				t.Fatalf("StoreCert: %v", err)
+			}
+			if _, _, _, err := c.GetCredentials(ctx, c.Config); err != nil {
+				t.Errorf("GetCredentials after re-store: %v", err)
+			}
+		})
+	}
+}
+
 func TestDelete(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()

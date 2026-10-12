@@ -76,7 +76,7 @@ func (k *securityCLIKeyring) Get(key string) (keyring.Item, error) {
 	}
 	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(out)))
 	if err != nil {
-		return keyring.Item{}, fmt.Errorf("error decoding stored value: %w", err)
+		return keyring.Item{}, fmt.Errorf("%w: error decoding stored value: %w", errMalformedEntry, err)
 	}
 	return keyring.Item{Key: key, Data: data}, nil
 }
