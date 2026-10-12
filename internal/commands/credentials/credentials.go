@@ -89,6 +89,10 @@ func newList(cfg *config.Config) *cobra.Command {
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 8, 2, ' ', 0)
 			fmt.Fprintln(w, "EMAIL\tISSUER\tCLIENTID\tCONNECTOR\tFULCIO\tEXPIRES\tSTATUS")
 			for _, e := range entries {
+				if e.Error != "" {
+					fmt.Fprintf(w, "-\t-\t-\t-\t-\t-\tunreadable: %s\n", e.Error)
+					continue
+				}
 				status := "valid"
 				if time.Now().After(e.NotAfter) {
 					status = "expired"

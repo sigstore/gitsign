@@ -22,12 +22,6 @@ import (
 	"github.com/sigstore/gitsign/internal/config"
 )
 
-// Metadata describes the configuration a cached credential was derived from.
-type Metadata = api.Metadata
-
-// CredentialInfo describes a stored credential for enumeration.
-type CredentialInfo = api.CredentialInfo
-
 // credentialKeyPrefix versions the key format so incompatible changes can
 // rotate the namespace.
 const credentialKeyPrefix = "credential/v1/" //nolint:gosec // key namespace, not a credential
@@ -47,11 +41,11 @@ func CredentialKey(cfg *config.Config) string {
 }
 
 // MetadataFromConfig extracts the identity-defining configuration fields.
-func MetadataFromConfig(cfg *config.Config) Metadata {
+func MetadataFromConfig(cfg *config.Config) api.Metadata {
 	if cfg == nil {
-		return Metadata{}
+		return api.Metadata{}
 	}
-	return Metadata{
+	return api.Metadata{
 		Fulcio:         cfg.Fulcio,
 		Issuer:         cfg.Issuer,
 		ClientID:       cfg.ClientID,
@@ -62,6 +56,6 @@ func MetadataFromConfig(cfg *config.Config) Metadata {
 
 // keyFields returns the metadata fields in the (stable) order used for key
 // derivation.
-func keyFields(m Metadata) []string {
+func keyFields(m api.Metadata) []string {
 	return []string{m.Fulcio, m.Issuer, m.ClientID, m.ConnectorID, m.CommitterEmail}
 }

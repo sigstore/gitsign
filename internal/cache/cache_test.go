@@ -28,6 +28,7 @@ import (
 
 	"github.com/github/smimesign/fakeca"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/cache/api"
 	"github.com/sigstore/gitsign/internal/cache/service"
@@ -81,8 +82,11 @@ func TestCache(t *testing.T) {
 		t.Fatalf("StoreCert: %v", err)
 	}
 
-	// The credential is stored under the shared config-derived key.
-	id := cache.CredentialKey(client.Config)
+	// The credential is stored under the host-prefixed config-derived key.
+	id, err := cache.DaemonKey(client.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cred := new(api.Credential)
 	if err := client.Client.Call("Service.GetCredential", &api.GetCredentialRequest{ID: id}, cred); err != nil {
 		t.Fatal(err)
@@ -154,14 +158,21 @@ func TestCacheManagement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("List: want 1 entry, got %d", len(entries))
+	id, err := cache.DaemonKey(client.Config)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if entries[0].ID != cache.CredentialKey(client.Config) {
-		t.Errorf("List: unexpected ID %q", entries[0].ID)
+	notAfter, err := cache.NotAfter(certPEM)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if entries[0].NotAfter.IsZero() {
-		t.Error("List: NotAfter not set")
+	want := []api.CredentialInfo{{
+		ID:       id,
+		NotAfter: notAfter,
+		Meta:     cache.MetadataFromConfig(client.Config),
+	}}
+	if diff := cmp.Diff(want, entries); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
 	}
 
 	if err := client.Delete(ctx); err != nil {
@@ -182,7 +193,8 @@ func TestCacheManagement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		t.Errorf("List after DeleteAll: want 0 entries, got %d", len(entries))
+	// gob decodes an empty slice as nil.
+	if diff := cmp.Diff([]api.CredentialInfo{}, entries, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("List after DeleteAll (-want +got):\n%s", diff)
 	}
 }

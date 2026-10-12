@@ -74,8 +74,8 @@ type envelope struct {
 	// ChainSHA256 is the hex SHA-256 of the full chain. Chunks are
 	// overwritten in place, so this detects a chain spliced together from
 	// two different stores.
-	ChainSHA256 string         `json:"chainSHA256"`
-	Meta        cache.Metadata `json:"meta"`
+	ChainSHA256 string       `json:"chainSHA256"`
+	Meta        api.Metadata `json:"meta"`
 }
 
 // Cache implements cache.Cache backed by the OS keyring.
@@ -141,7 +141,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 	if err := json.Unmarshal(item.Data, env); err != nil {
 		// e.g. an entry written by an incompatible build - treat as a miss so
 		// it's replaced on the next store.
-		c.deleteEntry(kr, key, 0)
+		_ = c.deleteMalformedEntry(kr, key)
 		return nil, nil, nil, fmt.Errorf("%w: malformed entry (entry deleted): %w", cache.ErrNotFound, err)
 	}
 	if env.Version != envelopeVersion {
@@ -262,7 +262,7 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 }
 
 // List enumerates stored credentials.
-func (c *Cache) List(_ context.Context) ([]cache.CredentialInfo, error) {
+func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 	kr, err := c.keyring()
 	if err != nil {
 		return nil, err
@@ -271,20 +271,24 @@ func (c *Cache) List(_ context.Context) ([]cache.CredentialInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error listing keyring entries: %w", err)
 	}
-	out := []cache.CredentialInfo{}
+	out := []api.CredentialInfo{}
 	for _, key := range keys {
 		if !isCredentialKey(key) {
 			continue
 		}
+		// Report unreadable entries rather than hiding them, so they can be
+		// found and cleared.
 		item, err := kr.Get(key)
 		if err != nil {
+			out = append(out, api.CredentialInfo{ID: key, Error: err.Error()})
 			continue
 		}
 		env := new(envelope)
 		if err := json.Unmarshal(item.Data, env); err != nil {
+			out = append(out, api.CredentialInfo{ID: key, Error: fmt.Sprintf("malformed entry: %v", err)})
 			continue
 		}
-		out = append(out, cache.CredentialInfo{
+		out = append(out, api.CredentialInfo{
 			ID:       key,
 			NotAfter: env.NotAfter,
 			Meta:     env.Meta,
@@ -310,15 +314,17 @@ func (c *Cache) Delete(_ context.Context) error {
 		}
 		return fmt.Errorf("error reading credential from keyring: %w", err)
 	}
-	chunks := 0
 	env := new(envelope)
-	if err := json.Unmarshal(item.Data, env); err == nil {
-		chunks = env.ChainChunks
+	if err := json.Unmarshal(item.Data, env); err != nil {
+		if err := c.deleteMalformedEntry(kr, key); err != nil {
+			return fmt.Errorf("error deleting credential from keyring: %w", err)
+		}
+		return nil
 	}
 	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return fmt.Errorf("error deleting credential from keyring: %w", err)
 	}
-	deleteChain(kr, key, chunks)
+	deleteChain(kr, key, env.ChainChunks)
 	return nil
 }
 
@@ -387,6 +393,26 @@ func readChain(kr keyring.Keyring, key string, chunks int) ([]byte, error) {
 func (c *Cache) deleteEntry(kr keyring.Keyring, key string, chunks int) {
 	_ = kr.Remove(key)
 	deleteChain(kr, key, chunks)
+}
+
+// deleteMalformedEntry removes an entry whose envelope can't be decoded. The
+// chunk count is unknown, so chain chunks are found by enumeration (best
+// effort). Returns any error removing the credential entry itself.
+func (c *Cache) deleteMalformedEntry(kr keyring.Keyring, key string) error {
+	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+		return err
+	}
+	keys, err := kr.Keys()
+	if err != nil {
+		return nil
+	}
+	prefix := key + chainKeyMarker
+	for _, k := range keys {
+		if strings.HasPrefix(k, prefix) {
+			_ = kr.Remove(k)
+		}
+	}
+	return nil
 }
 
 func deleteChain(kr keyring.Keyring, key string, chunks int) {

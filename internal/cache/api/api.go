@@ -41,6 +41,10 @@ type CredentialInfo struct {
 	ID       string    `json:"id"`
 	NotAfter time.Time `json:"notAfter"`
 	Meta     Metadata  `json:"meta"`
+	// Error is set if the entry exists but couldn't be read (e.g. written by
+	// an incompatible build, or access was denied). NotAfter and Meta are
+	// unset in that case.
+	Error string `json:"error,omitempty"`
 }
 
 type StoreCredentialRequest struct {

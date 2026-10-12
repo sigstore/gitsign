@@ -19,6 +19,7 @@ import (
 	"crypto"
 	"errors"
 
+	"github.com/sigstore/gitsign/internal/cache/api"
 	"github.com/sigstore/gitsign/internal/config"
 )
 
@@ -45,7 +46,7 @@ type Cache interface {
 type Manager interface {
 	Cache
 	// List returns info about the stored credentials.
-	List(ctx context.Context) ([]CredentialInfo, error)
+	List(ctx context.Context) ([]api.CredentialInfo, error)
 	// Delete removes the credential for the identity described by the
 	// backend's configured Config. It returns an error wrapping ErrNotFound
 	// if no entry exists.

@@ -27,7 +27,9 @@ import (
 	"github.com/99designs/keyring"
 	"github.com/github/smimesign/fakeca"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/cache/api"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
@@ -112,13 +114,28 @@ func TestRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("List: want 1 entry, got %d", len(entries))
-	}
-	if entries[0].Meta.CommitterEmail != "user@example.com" {
-		t.Errorf("List: unexpected meta %+v", entries[0].Meta)
+	if diff := cmp.Diff([]api.CredentialInfo{wantInfo(t, c, certPEM)}, entries); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
 	}
 }
+
+// wantInfo returns the CredentialInfo List should report for a credential
+// stored by c with the given cert.
+func wantInfo(t *testing.T, c *Cache, certPEM []byte) api.CredentialInfo {
+	t.Helper()
+	notAfter, err := cache.NotAfter(certPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return api.CredentialInfo{
+		ID:       cache.CredentialKey(c.Config),
+		NotAfter: notAfter,
+		Meta:     cache.MetadataFromConfig(c.Config),
+	}
+}
+
+// byID sorts List output for stable comparison.
+var byID = cmpopts.SortSlices(func(a, b api.CredentialInfo) bool { return a.ID < b.ID })
 
 func TestMultipleIdentities(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
@@ -154,8 +171,9 @@ func TestMultipleIdentities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("List: want 2 entries, got %d", len(entries))
+	want := []api.CredentialInfo{wantInfo(t, a, certA), wantInfo(t, b, certB)}
+	if diff := cmp.Diff(want, entries, byID); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
 	}
 }
 
@@ -185,8 +203,8 @@ func TestExpiredCert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		t.Errorf("List: want 0 entries, got %d", len(entries))
+	if diff := cmp.Diff([]api.CredentialInfo{}, entries); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
 	}
 }
 
@@ -342,17 +360,42 @@ func TestMalformedEntry(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
 	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
 	key := cache.CredentialKey(c.Config)
-	// e.g. an entry written by an incompatible build.
-	if err := kr.Set(keyring.Item{Key: key, Data: []byte("not json")}); err != nil {
-		t.Fatal(err)
+	// e.g. an entry written by an incompatible build, with chain chunks
+	// alongside it.
+	for _, item := range []keyring.Item{
+		{Key: key, Data: []byte("not json")},
+		{Key: chainKey(key, 0), Data: []byte("chunk")},
+		{Key: chainKey(key, 1), Data: []byte("chunk")},
+	} {
+		if err := kr.Set(item); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	// Malformed entries are a miss, not an error, and are removed.
+	// List reports the unreadable entry instead of hiding it.
+	entries, err := c.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []api.CredentialInfo{{ID: key}}
+	if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
+	}
+	if len(entries) == 1 && entries[0].Error == "" {
+		t.Error("List: expected Error to be set for unreadable entry")
+	}
+
+	// Malformed entries are a miss, not an error, and are removed along
+	// with their chain chunks.
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
 		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
 	}
-	if _, err := kr.Get(key); !errors.Is(err, keyring.ErrKeyNotFound) {
-		t.Errorf("malformed entry was not deleted: %v", err)
+	keys, err := kr.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{}, keys, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after malformed read (-want +got):\n%s", diff)
 	}
 
 	// The identity can be re-cached afterwards.
@@ -406,14 +449,14 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(keys) != 0 {
-		t.Errorf("Keys after DeleteAll: want 0 entries, got %d: %v", len(keys), keys)
+	if diff := cmp.Diff([]string{}, keys, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("Keys after DeleteAll (-want +got):\n%s", diff)
 	}
 	entries, err := b.List(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 0 {
-		t.Errorf("List after DeleteAll: want 0 entries, got %d", len(entries))
+	if diff := cmp.Diff([]api.CredentialInfo{}, entries); diff != "" {
+		t.Errorf("List after DeleteAll (-want +got):\n%s", diff)
 	}
 }

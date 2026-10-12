@@ -31,10 +31,11 @@ If you understand the risks, read on!
 
 All data is stored in memory, keyed to the identity configuration used to
 obtain the credential (Fulcio URL, OIDC issuer, client ID, connector ID, and
-committer email). Repositories that share the same configuration share a
-cached credential; repositories with a different `user.email` (or issuer,
-connector, etc.) get their own entry, so multiple identities can be cached at
-once. Entries expire with the signing certificate.
+committer email) and the client's hostname. Repositories on the same host that
+share the same configuration share a cached credential; repositories with a
+different `user.email` (or issuer, connector, etc.) get their own entry, so
+multiple identities can be cached at once. Hosts sharing a forwarded socket
+each get their own credential. Entries expire with the signing certificate.
 
 Cached credentials can be inspected and removed with
 `gitsign credentials list` / `gitsign credentials clear` (with

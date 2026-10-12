@@ -18,8 +18,10 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/rpc"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -62,14 +64,16 @@ func (c *Client) GetCredentials(_ context.Context, cfg *config.Config) (crypto.P
 	if cfg == nil {
 		cfg = c.Config
 	}
+	id, err := DaemonKey(cfg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	resp := new(api.Credential)
 	if err := c.Client.Call("Service.GetCredential", api.GetCredentialRequest{
-		ID:     CredentialKey(cfg),
+		ID:     id,
 		Config: cfg,
 	}, resp); err != nil {
-		// net/rpc flattens errors to strings, so a plain miss can only be
-		// recognized by message.
-		if strings.Contains(err.Error(), "not found") {
+		if isNotFound(err) {
 			return nil, nil, nil, fmt.Errorf("%w: %w", ErrNotFound, err)
 		}
 		return nil, nil, nil, err
@@ -93,9 +97,13 @@ func (c *Client) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chai
 	if err != nil {
 		return err
 	}
+	id, err := DaemonKey(c.Config)
+	if err != nil {
+		return err
+	}
 
 	return c.Client.Call("Service.StoreCredential", api.StoreCredentialRequest{
-		ID:         CredentialKey(c.Config),
+		ID:         id,
 		Credential: cred,
 		Meta:       MetadataFromConfig(c.Config),
 	}, new(api.Credential))
@@ -103,7 +111,7 @@ func (c *Client) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chai
 
 // List returns info about the credentials stored in the daemon. Requires a
 // daemon new enough to support the ListCredentials RPC.
-func (c *Client) List(_ context.Context) ([]CredentialInfo, error) {
+func (c *Client) List(_ context.Context) ([]api.CredentialInfo, error) {
 	var resp []api.CredentialInfo
 	if err := c.Client.Call("Service.ListCredentials", api.ListCredentialsRequest{}, &resp); err != nil {
 		if strings.Contains(err.Error(), "can't find method") {
@@ -117,10 +125,14 @@ func (c *Client) List(_ context.Context) ([]CredentialInfo, error) {
 // Delete removes the daemon's credential for the identity described by the
 // configured Config.
 func (c *Client) Delete(_ context.Context) error {
+	id, err := DaemonKey(c.Config)
+	if err != nil {
+		return err
+	}
 	if err := c.Client.Call("Service.DeleteCredential", api.DeleteCredentialRequest{
-		ID: CredentialKey(c.Config),
+		ID: id,
 	}, new(api.DeleteCredentialsResponse)); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if isNotFound(err) {
 			return fmt.Errorf("%w: %w", ErrNotFound, err)
 		}
 		if strings.Contains(err.Error(), "can't find method") {
@@ -140,4 +152,29 @@ func (c *Client) DeleteAll(_ context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// DaemonKey returns the daemon cache key for the identity described by cfg:
+// the shared config-derived CredentialKey, prefixed with the hostname so that
+// hosts sharing a daemon socket (e.g. forwarded over SSH) each get their own
+// credential.
+func DaemonKey(cfg *config.Config) (string, error) {
+	host, err := os.Hostname()
+	if err != nil {
+		return "", fmt.Errorf("error getting hostname: %w", err)
+	}
+	return host + "@" + CredentialKey(cfg), nil
+}
+
+// isNotFound reports whether a daemon RPC error is a plain cache miss. net/rpc
+// flattens errors to strings, so this matches the exact message the daemon
+// returns for a missing ID (`"<id>" not found`) rather than any error that
+// happens to mention "not found".
+func isNotFound(err error) bool {
+	var se rpc.ServerError
+	if !errors.As(err, &se) {
+		return false
+	}
+	msg := string(se)
+	return strings.HasPrefix(msg, `"`) && strings.HasSuffix(msg, `" not found`)
 }

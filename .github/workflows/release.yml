@@ -20,8 +20,16 @@ jobs:
     steps:
       - name: Create draft release
         run: |
-          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "release ${GITHUB_REF_NAME} already exists"
+          # goreleaser's use_existing_draft only matches drafts, so a
+          # published release would make each matrix leg create its own new
+          # draft. Reuse an existing draft (e.g. on re-run), but refuse to
+          # release over a published one.
+          if is_draft=$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "${is_draft}" != "true" ]]; then
+              echo "::error::release ${GITHUB_REF_NAME} is already published; convert it back to a draft to re-run the release"
+              exit 1
+            fi
+            echo "reusing existing draft release ${GITHUB_REF_NAME}"
           else
             # The title must match goreleaser's release name ({{ .Tag }}) for
             # use_existing_draft to find it.
