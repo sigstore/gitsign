@@ -20,6 +20,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"sort"
 	"testing"
 	"time"
 
@@ -224,6 +225,69 @@ func TestChainChunking(t *testing.T) {
 		if _, err := kr.Get(chainKey(key, i)); !errors.Is(err, keyring.ErrKeyNotFound) {
 			t.Errorf("chain chunk %d not deleted: %v", i, err)
 		}
+	}
+}
+
+func TestRestoreRemovesStaleChunks(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	key := cache.CredentialKey(c.Config)
+
+	// First store with many chunks, then re-store with a single chunk.
+	c.maxEntrySize = 64
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+	c.maxEntrySize = len(chainPEM)
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err := kr.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(keys)
+	want := []string{key, chainKey(key, 0)}
+	sort.Strings(want)
+	if diff := cmp.Diff(want, keys); diff != "" {
+		t.Errorf("keys after re-store (-want +got):\n%s", diff)
+	}
+
+	_, _, gotChain, err := c.GetCredentials(ctx, c.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(chainPEM, gotChain); diff != "" {
+		t.Errorf("chain mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestSplicedChain(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	c.maxEntrySize = 64
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+	key := cache.CredentialKey(c.Config)
+
+	// Simulate a concurrent store replacing a chunk after the envelope was
+	// written.
+	if err := kr.Set(keyring.Item{Key: chainKey(key, 0), Data: []byte("other chain data")}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
+	}
+	// The entry is left for the concurrent writer rather than deleted.
+	if _, err := kr.Get(key); err != nil {
+		t.Errorf("credential entry was deleted: %v", err)
 	}
 }
 

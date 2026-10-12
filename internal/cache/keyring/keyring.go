@@ -29,7 +29,9 @@ package keyring
 import (
 	"context"
 	"crypto"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,7 +70,11 @@ type envelope struct {
 	Cert       string    `json:"cert"`
 	// ChainChunks is the number of chain chunk entries stored alongside the
 	// credential (0 if there is no chain).
-	ChainChunks int            `json:"chainChunks"`
+	ChainChunks int `json:"chainChunks"`
+	// ChainSHA256 is the hex SHA-256 of the full chain. Chunks are
+	// overwritten in place, so this detects a chain spliced together from
+	// two different stores.
+	ChainSHA256 string         `json:"chainSHA256"`
 	Meta        cache.Metadata `json:"meta"`
 }
 
@@ -155,6 +161,12 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		c.deleteEntry(kr, key, env.ChainChunks)
 		return nil, nil, nil, fmt.Errorf("error reading stored chain (entry deleted): %w", err)
 	}
+	if chainDigest(chain) != env.ChainSHA256 {
+		// Most likely a concurrent StoreCert replaced the chunks after we
+		// read the envelope. Don't delete - the entry being written is
+		// probably valid; just miss this time.
+		return nil, nil, nil, fmt.Errorf("%w: stored chain does not match credential", cache.ErrNotFound)
+	}
 
 	certPEM := []byte(env.Cert)
 	if err := cache.ValidateCert(certPEM, c.Roots, c.Intermediates); err != nil {
@@ -195,6 +207,10 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		return err
 	}
 
+	// Remember how many chunks the entry being replaced had, so leftovers
+	// beyond the new count can be cleaned up.
+	oldChunks := chainChunkCount(kr, key)
+
 	chunks := chunk(chain, c.entrySize())
 	meta := cache.MetadataFromConfig(cfg)
 	env := &envelope{
@@ -203,6 +219,7 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		PrivateKey:  string(cred.PrivateKey),
 		Cert:        string(cert),
 		ChainChunks: len(chunks),
+		ChainSHA256: chainDigest(chain),
 		Meta:        meta,
 	}
 	raw, err := json.Marshal(env) //nolint:gosec // intentionally serialized for storage in the OS keyring
@@ -234,6 +251,11 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		Description: "gitsign signing credential",
 	}); err != nil {
 		return fmt.Errorf("error storing credential in keyring: %w", err)
+	}
+
+	// Best-effort: remove chunks left over from a longer previous chain.
+	for i := len(chunks); i < oldChunks; i++ {
+		_ = kr.Remove(chainKey(key, i))
 	}
 
 	return nil
@@ -371,6 +393,11 @@ func deleteChain(kr keyring.Keyring, key string, chunks int) {
 	for i := range chunks {
 		_ = kr.Remove(chainKey(key, i))
 	}
+}
+
+func chainDigest(chain []byte) string {
+	sum := sha256.Sum256(chain)
+	return hex.EncodeToString(sum[:])
 }
 
 func chainKey(key string, i int) string {

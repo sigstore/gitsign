@@ -16,9 +16,11 @@
 package fulcio
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/github/smimesign/fakeca"
@@ -92,4 +94,43 @@ func TestNewCacheClient(t *testing.T) {
 			t.Fatal("expected error for unknown mode")
 		}
 	})
+}
+
+func TestCacheFromConfigSoftFails(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		cfg  *config.Config
+	}{{
+		name: "unknown mode",
+		cfg:  &config.Config{CredentialCacheMode: "carrier-pigeon"},
+	}, {
+		name: "socket mode without a path",
+		cfg:  &config.Config{CredentialCacheMode: "socket"},
+	}, {
+		// cache.NewClient returns a typed nil *Client on error, which must
+		// not leak out as a non-nil cache.Cache.
+		name: "unreachable socket",
+		cfg:  &config.Config{CredentialCache: filepath.Join(t.TempDir(), "missing.sock")},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := new(bytes.Buffer)
+			if c := cacheFromConfig(ctx, tc.cfg, out); c != nil {
+				t.Fatalf("expected nil cache, got %T", c)
+			}
+			if !strings.Contains(out.String(), "continuing without it") {
+				t.Errorf("expected setup error to be reported, got %q", out.String())
+			}
+		})
+	}
+
+	// Caching disabled is not an error and prints nothing.
+	out := new(bytes.Buffer)
+	if c := cacheFromConfig(ctx, &config.Config{}, out); c != nil {
+		t.Fatalf("expected nil cache, got %T", c)
+	}
+	if out.Len() != 0 {
+		t.Errorf("expected no output, got %q", out.String())
+	}
 }

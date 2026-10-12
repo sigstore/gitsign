@@ -56,11 +56,7 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.Writer) (*Identity, error) {
-	cacheClient, err := newCacheClient(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-
+	cacheClient := cacheFromConfig(ctx, cfg, out)
 	if cacheClient != nil {
 		priv, cert, chain, err := cacheClient.GetCredentials(ctx, cfg)
 		if err == nil {
@@ -93,6 +89,20 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 	}
 
 	return id, nil
+}
+
+// cacheFromConfig returns the configured credential cache, or nil if caching
+// is disabled or can't be set up. Cache setup problems (bad mode, unreachable
+// daemon, root loading) are reported but never fail signing - gitsign falls
+// back to the normal OIDC flow.
+func cacheFromConfig(ctx context.Context, cfg *config.Config, out io.Writer) cache.Cache {
+	c, err := newCacheClient(ctx, cfg)
+	if err != nil {
+		fmt.Fprintf(out, "error setting up credential cache, continuing without it: %v\n", err) // nolint:errcheck
+		// Return an untyped nil: c may hold a typed nil (e.g. *cache.Client).
+		return nil
+	}
+	return c
 }
 
 // newCacheClient returns the credential cache backend selected by the config,
