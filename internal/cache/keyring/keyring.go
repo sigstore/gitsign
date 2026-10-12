@@ -22,9 +22,8 @@
 // stored concurrently; entries live for the lifetime of the certificate and
 // are removed lazily on read once expired.
 //
-// On macOS the Keychain is accessed via the /usr/bin/security CLI (the
-// native Security.framework API requires cgo, which gitsign builds don't
-// use); other platforms use the native credential store APIs.
+// On macOS the Keychain is accessed via Security.framework, which requires
+// gitsign to be built with cgo.
 package keyring
 
 import (
@@ -61,10 +60,6 @@ const (
 	envelopeVersion = 1
 )
 
-// errMalformedEntry is returned by backends when a stored value can't be
-// decoded, e.g. an entry written by an incompatible version of gitsign.
-var errMalformedEntry = errors.New("malformed keyring entry")
-
 // envelope is the JSON payload stored under the credential key.
 type envelope struct {
 	Version    int       `json:"version"`
@@ -96,9 +91,6 @@ var _ cache.Manager = (*Cache)(nil)
 
 // keyring lazily opens the OS keyring, so that construction never fails and
 // unavailable keyrings (e.g. headless Linux) surface as soft errors on use.
-// The backend is selected per-platform by openSystemKeyring: the native
-// credential store on most builds, or the /usr/bin/security CLI on macOS
-// builds without cgo.
 func (c *Cache) keyring() (keyring.Keyring, error) {
 	if c.Keyring != nil {
 		return c.Keyring, nil
@@ -136,17 +128,15 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		if errors.Is(err, keyring.ErrKeyNotFound) {
 			return nil, nil, nil, fmt.Errorf("%w: no entry for identity", cache.ErrNotFound)
 		}
-		if errors.Is(err, errMalformedEntry) {
-			c.deleteEntry(kr, key, 0)
-			return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
-		}
 		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
 	}
 
 	env := new(envelope)
 	if err := json.Unmarshal(item.Data, env); err != nil {
+		// e.g. an entry written by an incompatible build - treat as a miss so
+		// it's replaced on the next store.
 		c.deleteEntry(kr, key, 0)
-		return nil, nil, nil, fmt.Errorf("%w: %w: %w (entry deleted)", cache.ErrNotFound, errMalformedEntry, err)
+		return nil, nil, nil, fmt.Errorf("%w: malformed entry (entry deleted): %w", cache.ErrNotFound, err)
 	}
 	if env.Version != envelopeVersion {
 		c.deleteEntry(kr, key, env.ChainChunks)

@@ -34,11 +34,15 @@ headless Linux host), gitsign falls back to the normal OIDC flow.
 
 ## Platform notes
 
-- **macOS**: the Keychain is accessed via the `/usr/bin/security` CLI
-  (gitsign is built without cgo, which the native Security.framework API
-  would require). This is the same model as other CLI tools that use the
-  Keychain - entries are readable by any process that can run `security` in
-  your session.
+- **macOS**: the Keychain is accessed via Security.framework, which requires
+  gitsign to be built with cgo (`CGO_ENABLED=1`, the default for `go build`
+  / `go install` on macOS). Builds without cgo report the keyring as
+  unavailable and fall back to the normal OIDC flow. Entries are created
+  with an access control list that trusts only the gitsign binary that
+  created them - other applications (and other gitsign binaries) trigger a
+  Keychain prompt. Since unsigned binaries are identified by their contents,
+  expect a one-time "Always Allow" prompt after upgrading or rebuilding
+  gitsign. Entries are never synced to iCloud.
 - **Linux**: requires a running Secret Service (GNOME Keyring, etc.) or
   KWallet with a D-Bus session. Headless hosts should use the
   [daemon](../cmd/gitsign-credential-cache/README.md) or no cache.
@@ -98,9 +102,10 @@ in `socket` mode (or when `GITSIGN_CREDENTIAL_CACHE` is set).
 keyring.
 
 - Any process running in your user session that can access the keyring (any
-  process on Linux once the Secret Service collection is unlocked; anything
-  that can invoke `/usr/bin/security` on macOS) can read the cached private
-  key and sign artifacts as you. This is comparable to the
+  process on Linux once the Secret Service collection is unlocked; on macOS,
+  the gitsign binary that created the entry or any application you grant
+  access to via the Keychain prompt) can read the cached private key and
+  sign artifacts as you. This is comparable to the
   gitsign-credential-cache daemon's threat model, where any process that can
   open the socket can use your credentials.
 - Unlike the in-memory daemon, keyring entries are persisted (encrypted at

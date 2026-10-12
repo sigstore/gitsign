@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !darwin
-
 package keyring
 
 import (
+	"errors"
+	"fmt"
+	"runtime"
+
 	"github.com/99designs/keyring"
 )
 
 // allowedBackends restricts storage to native OS credential stores - no
 // file/pass fallbacks that would need their own password prompts.
 var allowedBackends = []keyring.BackendType{
+	keyring.KeychainBackend,
 	keyring.WinCredBackend,
 	keyring.SecretServiceBackend,
 	keyring.KWalletBackend,
@@ -30,9 +33,14 @@ var allowedBackends = []keyring.BackendType{
 
 // openSystemKeyring opens the native OS credential store.
 func openSystemKeyring() (keyring.Keyring, error) {
-	return keyring.Open(keyring.Config{
+	kr, err := keyring.Open(keyring.Config{
 		ServiceName:     serviceName,
 		AllowedBackends: allowedBackends,
+		// macOS: restrict silent access to the gitsign binary that created
+		// the entry, and never sync credentials to iCloud.
+		KeychainTrustApplication:       true,
+		KeychainSynchronizable:         false,
+		KeychainAccessibleWhenUnlocked: true,
 		// Linux: use the default collection instead of creating a
 		// gitsign-specific one (which would prompt for a new password).
 		LibSecretCollectionName: "login",
@@ -40,4 +48,9 @@ func openSystemKeyring() (keyring.Keyring, error) {
 		KWalletAppID:            serviceName,
 		KWalletFolder:           serviceName,
 	})
+	// The Keychain backend is only compiled into cgo builds.
+	if errors.Is(err, keyring.ErrNoAvailImpl) && runtime.GOOS == "darwin" {
+		return nil, fmt.Errorf("macOS Keychain support requires gitsign to be built with cgo (CGO_ENABLED=1): %w", err)
+	}
+	return kr, err
 }
