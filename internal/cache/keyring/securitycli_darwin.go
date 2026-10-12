@@ -64,7 +64,7 @@ func (k *securityCLIKeyring) Get(key string) (keyring.Item, error) {
 	if !validToken(key) {
 		return keyring.Item{}, fmt.Errorf("invalid key %q", key)
 	}
-	out, err := exec.Command(securityPath,
+	out, err := exec.Command(securityPath, //nolint:gosec // fixed binary; args checked by validToken
 		"find-generic-password",
 		"-s", k.service,
 		"-wa", key).CombinedOutput()
@@ -123,7 +123,7 @@ func (k *securityCLIKeyring) Remove(key string) error {
 	if !validToken(key) {
 		return fmt.Errorf("invalid key %q", key)
 	}
-	out, err := exec.Command(securityPath,
+	out, err := exec.Command(securityPath, //nolint:gosec // fixed binary; args checked by validToken
 		"delete-generic-password",
 		"-s", k.service,
 		"-a", key).CombinedOutput()

@@ -49,7 +49,7 @@ const (
 	serviceName = "gitsign"
 	// credentialKeyPrefix mirrors the prefix used by cache.CredentialKey;
 	// used to recognize gitsign entries when enumerating keys.
-	credentialKeyPrefix = "credential/v1/"
+	credentialKeyPrefix = "credential/v1/" //nolint:gosec // key namespace, not a credential
 	// chainKeyMarker distinguishes chain chunk entries from credential
 	// entries.
 	chainKeyMarker = "/chain/"
@@ -207,7 +207,7 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		ChainChunks: len(chunks),
 		Meta:        meta,
 	}
-	raw, err := json.Marshal(env)
+	raw, err := json.Marshal(env) //nolint:gosec // intentionally serialized for storage in the OS keyring
 	if err != nil {
 		return fmt.Errorf("error marshalling credential: %w", err)
 	}

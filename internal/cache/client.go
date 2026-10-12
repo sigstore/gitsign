@@ -70,7 +70,7 @@ func (c *Client) GetCredentials(_ context.Context, cfg *config.Config) (crypto.P
 		// net/rpc flattens errors to strings, so a plain miss can only be
 		// recognized by message.
 		if strings.Contains(err.Error(), "not found") {
-			return nil, nil, nil, fmt.Errorf("%w: %v", ErrNotFound, err)
+			return nil, nil, nil, fmt.Errorf("%w: %w", ErrNotFound, err)
 		}
 		return nil, nil, nil, err
 	}
@@ -121,7 +121,7 @@ func (c *Client) Delete(_ context.Context) error {
 		ID: CredentialKey(c.Config),
 	}, new(api.DeleteCredentialsResponse)); err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			return fmt.Errorf("%w: %v", ErrNotFound, err)
+			return fmt.Errorf("%w: %w", ErrNotFound, err)
 		}
 		if strings.Contains(err.Error(), "can't find method") {
 			return fmt.Errorf("the gitsign-credential-cache daemon does not support deleting credentials - upgrade the daemon: %w", err)

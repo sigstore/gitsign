@@ -30,7 +30,7 @@ type CredentialInfo = api.CredentialInfo
 
 // credentialKeyPrefix versions the key format so incompatible changes can
 // rotate the namespace.
-const credentialKeyPrefix = "credential/v1/"
+const credentialKeyPrefix = "credential/v1/" //nolint:gosec // key namespace, not a credential
 
 // CredentialKey derives the cache key for the identity described by the given
 // config. The OIDC identity is not known until after the auth flow completes,
