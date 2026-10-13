@@ -29,6 +29,7 @@ package keyring
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -51,31 +52,38 @@ const (
 	// credentialKeyPrefix mirrors the prefix used by cache.CredentialKey;
 	// used to recognize gitsign entries when enumerating keys.
 	credentialKeyPrefix = "credential/v1/" //nolint:gosec // key namespace, not a credential
-	// chainKeyMarker distinguishes chain chunk entries from credential
-	// entries.
-	chainKeyMarker = "/chain/"
+	// dataKeyMarker distinguishes payload chunk entries from credential
+	// header entries.
+	dataKeyMarker = "/data/"
 	// defaultMaxEntrySize bounds individual keyring entry values. Windows
-	// Credential Manager limits credential blobs to 2560 bytes, so larger
-	// payloads (typically the certificate chain) are split across entries.
+	// Credential Manager limits credential blobs to 2560 bytes, so the
+	// payload is split across entries and the header must fit in one.
 	defaultMaxEntrySize = 2000
 
-	envelopeVersion = 1
+	envelopeVersion = 2
 )
 
-// envelope is the JSON payload stored under the credential key.
-type envelope struct {
-	Version    int       `json:"version"`
-	NotAfter   time.Time `json:"notAfter"`
-	PrivateKey string    `json:"privateKey"`
-	Cert       string    `json:"cert"`
-	// ChainChunks is the number of chain chunk entries stored alongside the
-	// credential (0 if there is no chain).
-	ChainChunks int `json:"chainChunks"`
-	// ChainSHA256 is the hex SHA-256 of the full chain. Chunks are
-	// overwritten in place, so this detects a chain spliced together from
-	// two different stores.
-	ChainSHA256 string       `json:"chainSHA256"`
-	Meta        api.Metadata `json:"meta"`
+// header is stored under the credential key. It is kept small so it fits in
+// a single keyring entry; the credential itself lives in payload chunks.
+type header struct {
+	Version  int       `json:"version"`
+	NotAfter time.Time `json:"notAfter"`
+	// Generation names the payload chunks written by one StoreCert call
+	// (<key>/data/<generation>/<i>). Chunks are never modified after being
+	// written, so concurrent stores can't corrupt each other: a reader
+	// either sees a complete generation or a miss.
+	Generation string `json:"generation"`
+	Chunks     int    `json:"chunks"`
+	// SHA256 is the hex SHA-256 of the reassembled payload.
+	SHA256 string       `json:"sha256"`
+	Meta   api.Metadata `json:"meta"`
+}
+
+// payload is the credential, serialized and split across chunk entries.
+type payload struct {
+	PrivateKey string `json:"privateKey"`
+	Cert       string `json:"cert"`
+	Chain      string `json:"chain"`
 }
 
 // Cache implements cache.Cache backed by the OS keyring.
@@ -118,6 +126,22 @@ func (c *Cache) entrySize() int {
 	return defaultMaxEntrySize
 }
 
+// readHeader decodes a credential header. errUnsupportedEntry is returned
+// for entries that can't be decoded or were written in another format.
+func readHeader(item keyring.Item) (*header, error) {
+	h := new(header)
+	if err := json.Unmarshal(item.Data, h); err != nil {
+		return nil, fmt.Errorf("%w: %w", errUnsupportedEntry, err)
+	}
+	if h.Version != envelopeVersion {
+		return nil, fmt.Errorf("%w: version %d", errUnsupportedEntry, h.Version)
+	}
+	return h, nil
+}
+
+// errUnsupportedEntry marks an entry written by an incompatible build.
+var errUnsupportedEntry = errors.New("unsupported keyring entry")
+
 // GetCredentials returns the cached credential for the identity described by
 // cfg. Expired or invalid entries are deleted and reported as a miss/error.
 func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
@@ -137,50 +161,59 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
 	}
 
-	env := new(envelope)
-	if err := json.Unmarshal(item.Data, env); err != nil {
+	h, err := readHeader(item)
+	if err != nil {
 		// e.g. an entry written by an incompatible build - treat as a miss so
 		// it's replaced on the next store.
-		_ = c.deleteMalformedEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("%w: malformed entry (entry deleted): %w", cache.ErrNotFound, err)
-	}
-	if env.Version != envelopeVersion {
-		c.deleteEntry(kr, key, env.ChainChunks)
-		return nil, nil, nil, fmt.Errorf("%w: unsupported credential version %d (entry deleted)", cache.ErrNotFound, env.Version)
+		_ = deleteAllForKey(kr, key)
+		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
 	}
 
 	// Cheap expiry check before doing any crypto - the credential is only
 	// useful for the lifetime of the cert.
-	if time.Now().Add(30 * time.Second).After(env.NotAfter) {
-		c.deleteEntry(kr, key, env.ChainChunks)
+	if time.Now().Add(30 * time.Second).After(h.NotAfter) {
+		deleteEntry(kr, key, h)
 		return nil, nil, nil, fmt.Errorf("%w: stored cert expired", cache.ErrNotFound)
 	}
 
-	chain, err := readChain(kr, key, env.ChainChunks)
+	raw, err := readChunks(kr, key, h)
 	if err != nil {
-		c.deleteEntry(kr, key, env.ChainChunks)
-		return nil, nil, nil, fmt.Errorf("error reading stored chain (entry deleted): %w", err)
+		if errors.Is(err, keyring.ErrKeyNotFound) {
+			// Most likely a concurrent StoreCert replaced this generation
+			// after we read the header. Don't delete - the entry now in place
+			// is probably valid; just miss this time.
+			return nil, nil, nil, fmt.Errorf("%w: credential replaced while reading", cache.ErrNotFound)
+		}
+		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
 	}
-	if chainDigest(chain) != env.ChainSHA256 {
-		// Most likely a concurrent StoreCert replaced the chunks after we
-		// read the envelope. Don't delete - the entry being written is
-		// probably valid; just miss this time.
-		return nil, nil, nil, fmt.Errorf("%w: stored chain does not match credential", cache.ErrNotFound)
+	// Generations are immutable, so a mismatch means the entry is corrupt.
+	if digest(raw) != h.SHA256 {
+		deleteEntry(kr, key, h)
+		return nil, nil, nil, fmt.Errorf("%w: stored credential is corrupt (entry deleted)", cache.ErrNotFound)
+	}
+	p := new(payload)
+	if err := json.Unmarshal(raw, p); err != nil {
+		deleteEntry(kr, key, h)
+		return nil, nil, nil, fmt.Errorf("%w: malformed credential (entry deleted): %w", cache.ErrNotFound, err)
 	}
 
-	certPEM := []byte(env.Cert)
+	certPEM := []byte(p.Cert)
 	if err := cache.ValidateCert(certPEM, c.Roots, c.Intermediates); err != nil {
-		c.deleteEntry(kr, key, env.ChainChunks)
+		deleteEntry(kr, key, h)
 		return nil, nil, nil, err
 	}
 
+	var chain []byte
+	if p.Chain != "" {
+		chain = []byte(p.Chain)
+	}
 	privateKey, _, _, err := cache.DecodeCredential(&api.Credential{
-		PrivateKey: []byte(env.PrivateKey),
+		PrivateKey: []byte(p.PrivateKey),
 		Cert:       certPEM,
 		Chain:      chain,
 	})
 	if err != nil {
-		c.deleteEntry(kr, key, env.ChainChunks)
+		deleteEntry(kr, key, h)
 		return nil, nil, nil, fmt.Errorf("error unmarshalling private key (entry deleted): %w", err)
 	}
 
@@ -188,7 +221,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 }
 
 // StoreCert stores the credential under the identity derived from the
-// configured Config, overwriting any previous entry.
+// configured Config, replacing any previous entry.
 func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain []byte) error {
 	kr, err := c.keyring()
 	if err != nil {
@@ -207,24 +240,42 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		return err
 	}
 
-	// Remember how many chunks the entry being replaced had, so leftovers
-	// beyond the new count can be cleaned up.
-	oldChunks := chainChunkCount(kr, key)
-
-	chunks := chunk(chain, c.entrySize())
-	meta := cache.MetadataFromConfig(cfg)
-	env := &envelope{
-		Version:     envelopeVersion,
-		NotAfter:    notAfter,
-		PrivateKey:  string(cred.PrivateKey),
-		Cert:        string(cert),
-		ChainChunks: len(chunks),
-		ChainSHA256: chainDigest(chain),
-		Meta:        meta,
-	}
-	raw, err := json.Marshal(env) //nolint:gosec // intentionally serialized for storage in the OS keyring
+	raw, err := json.Marshal(&payload{ //nolint:gosec // intentionally serialized for storage in the OS keyring
+		PrivateKey: string(cred.PrivateKey),
+		Cert:       string(cert),
+		Chain:      string(chain),
+	})
 	if err != nil {
 		return fmt.Errorf("error marshalling credential: %w", err)
+	}
+
+	gen, err := newGeneration()
+	if err != nil {
+		return err
+	}
+	chunks := chunk(raw, c.entrySize())
+	meta := cache.MetadataFromConfig(cfg)
+	h := &header{
+		Version:    envelopeVersion,
+		NotAfter:   notAfter,
+		Generation: gen,
+		Chunks:     len(chunks),
+		SHA256:     digest(raw),
+		Meta:       meta,
+	}
+	rawHeader, err := json.Marshal(h)
+	if err != nil {
+		return fmt.Errorf("error marshalling credential header: %w", err)
+	}
+	if len(rawHeader) > c.entrySize() {
+		return fmt.Errorf("credential metadata too large for a keyring entry (%d > %d bytes)", len(rawHeader), c.entrySize())
+	}
+
+	// Remember the generation being replaced so its chunks can be cleaned up
+	// once the new header is in place.
+	var prev *header
+	if item, err := kr.Get(key); err == nil {
+		prev, _ = readHeader(item)
 	}
 
 	label := serviceName
@@ -232,30 +283,33 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		label = fmt.Sprintf("%s (%s)", serviceName, meta.CommitterEmail)
 	}
 
-	// Store chain chunks first so that a reader never sees a credential
-	// entry pointing at chunks that don't exist yet.
+	// Store chunks first so that a reader never sees a header pointing at
+	// chunks that don't exist yet.
 	for i, ch := range chunks {
 		if err := kr.Set(keyring.Item{
-			Key:         chainKey(key, i),
+			Key:         dataKey(key, gen, i),
 			Data:        ch,
 			Label:       label,
-			Description: "gitsign signing certificate chain",
+			Description: "gitsign signing credential data",
 		}); err != nil {
-			return fmt.Errorf("error storing chain in keyring: %w", err)
+			deleteChunks(kr, key, gen, i)
+			return fmt.Errorf("error storing credential in keyring: %w", err)
 		}
 	}
 	if err := kr.Set(keyring.Item{
 		Key:         key,
-		Data:        raw,
+		Data:        rawHeader,
 		Label:       label,
 		Description: "gitsign signing credential",
 	}); err != nil {
+		deleteChunks(kr, key, gen, len(chunks))
 		return fmt.Errorf("error storing credential in keyring: %w", err)
 	}
 
-	// Best-effort: remove chunks left over from a longer previous chain.
-	for i := len(chunks); i < oldChunks; i++ {
-		_ = kr.Remove(chainKey(key, i))
+	// Best-effort: remove the replaced generation. Only ever the one this
+	// call observed - never chunks a concurrent store may still reference.
+	if prev != nil && prev.Generation != gen {
+		deleteChunks(kr, key, prev.Generation, prev.Chunks)
 	}
 
 	return nil
@@ -283,15 +337,15 @@ func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 			out = append(out, api.CredentialInfo{ID: key, Error: err.Error()})
 			continue
 		}
-		env := new(envelope)
-		if err := json.Unmarshal(item.Data, env); err != nil {
-			out = append(out, api.CredentialInfo{ID: key, Error: fmt.Sprintf("malformed entry: %v", err)})
+		h, err := readHeader(item)
+		if err != nil {
+			out = append(out, api.CredentialInfo{ID: key, Error: err.Error()})
 			continue
 		}
 		out = append(out, api.CredentialInfo{
 			ID:       key,
-			NotAfter: env.NotAfter,
-			Meta:     env.Meta,
+			NotAfter: h.NotAfter,
+			Meta:     h.Meta,
 		})
 	}
 	return out, nil
@@ -314,9 +368,9 @@ func (c *Cache) Delete(_ context.Context) error {
 		}
 		return fmt.Errorf("error reading credential from keyring: %w", err)
 	}
-	env := new(envelope)
-	if err := json.Unmarshal(item.Data, env); err != nil {
-		if err := c.deleteMalformedEntry(kr, key); err != nil {
+	h, err := readHeader(item)
+	if err != nil {
+		if err := deleteAllForKey(kr, key); err != nil {
 			return fmt.Errorf("error deleting credential from keyring: %w", err)
 		}
 		return nil
@@ -324,11 +378,11 @@ func (c *Cache) Delete(_ context.Context) error {
 	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return fmt.Errorf("error deleting credential from keyring: %w", err)
 	}
-	deleteChain(kr, key, env.ChainChunks)
+	deleteChunks(kr, key, h.Generation, h.Chunks)
 	return nil
 }
 
-// DeleteAll removes every gitsign credential entry (including chain chunks).
+// DeleteAll removes every gitsign credential entry (including chunks).
 func (c *Cache) DeleteAll(_ context.Context) error {
 	kr, err := c.keyring()
 	if err != nil {
@@ -352,53 +406,36 @@ func (c *Cache) DeleteAll(_ context.Context) error {
 	return errors.Join(errs...)
 }
 
-// isCredentialKey reports whether the key names a credential envelope entry
-// (as opposed to a chain chunk or an unrelated entry).
+// isCredentialKey reports whether the key names a credential header entry (as
+// opposed to a payload chunk or an unrelated entry).
 func isCredentialKey(key string) bool {
-	return strings.HasPrefix(key, credentialKeyPrefix) && !strings.Contains(key, chainKeyMarker)
+	rest, ok := strings.CutPrefix(key, credentialKeyPrefix)
+	return ok && !strings.Contains(rest, "/")
 }
 
-// chainChunkCount reads the stored envelope to discover how many chain chunk
-// entries accompany the credential. Returns 0 if the entry is missing or
-// malformed.
-func chainChunkCount(kr keyring.Keyring, key string) int {
-	item, err := kr.Get(key)
-	if err != nil {
-		return 0
-	}
-	env := new(envelope)
-	if err := json.Unmarshal(item.Data, env); err != nil {
-		return 0
-	}
-	return env.ChainChunks
-}
-
-func readChain(kr keyring.Keyring, key string, chunks int) ([]byte, error) {
-	if chunks == 0 {
-		return nil, nil
-	}
-	var chain []byte
-	for i := range chunks {
-		item, err := kr.Get(chainKey(key, i))
+func readChunks(kr keyring.Keyring, key string, h *header) ([]byte, error) {
+	var raw []byte
+	for i := range h.Chunks {
+		item, err := kr.Get(dataKey(key, h.Generation, i))
 		if err != nil {
-			return nil, fmt.Errorf("error reading chain chunk %d: %w", i, err)
+			return nil, fmt.Errorf("error reading credential chunk %d: %w", i, err)
 		}
-		chain = append(chain, item.Data...)
+		raw = append(raw, item.Data...)
 	}
-	return chain, nil
+	return raw, nil
 }
 
-// deleteEntry removes the credential entry and its chain chunks. All
-// deletions are best-effort.
-func (c *Cache) deleteEntry(kr keyring.Keyring, key string, chunks int) {
+// deleteEntry removes the credential header and its chunks. All deletions
+// are best-effort.
+func deleteEntry(kr keyring.Keyring, key string, h *header) {
 	_ = kr.Remove(key)
-	deleteChain(kr, key, chunks)
+	deleteChunks(kr, key, h.Generation, h.Chunks)
 }
 
-// deleteMalformedEntry removes an entry whose envelope can't be decoded. The
-// chunk count is unknown, so chain chunks are found by enumeration (best
-// effort). Returns any error removing the credential entry itself.
-func (c *Cache) deleteMalformedEntry(kr keyring.Keyring, key string) error {
+// deleteAllForKey removes an entry whose header can't be decoded, along with
+// anything stored under it (found by enumeration, best effort). Returns any
+// error removing the header entry itself.
+func deleteAllForKey(kr keyring.Keyring, key string) error {
 	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return err
 	}
@@ -406,28 +443,35 @@ func (c *Cache) deleteMalformedEntry(kr keyring.Keyring, key string) error {
 	if err != nil {
 		return nil
 	}
-	prefix := key + chainKeyMarker
 	for _, k := range keys {
-		if strings.HasPrefix(k, prefix) {
+		if strings.HasPrefix(k, key+"/") {
 			_ = kr.Remove(k)
 		}
 	}
 	return nil
 }
 
-func deleteChain(kr keyring.Keyring, key string, chunks int) {
+func deleteChunks(kr keyring.Keyring, key, gen string, chunks int) {
 	for i := range chunks {
-		_ = kr.Remove(chainKey(key, i))
+		_ = kr.Remove(dataKey(key, gen, i))
 	}
 }
 
-func chainDigest(chain []byte) string {
-	sum := sha256.Sum256(chain)
+func newGeneration() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("error generating credential generation: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func digest(b []byte) string {
+	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
 
-func chainKey(key string, i int) string {
-	return fmt.Sprintf("%s%s%d", key, chainKeyMarker, i)
+func dataKey(key, gen string, i int) string {
+	return fmt.Sprintf("%s%s%s/%d", key, dataKeyMarker, gen, i)
 }
 
 func chunk(b []byte, size int) [][]byte {

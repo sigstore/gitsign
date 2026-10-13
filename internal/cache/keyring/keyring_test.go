@@ -208,95 +208,229 @@ func TestExpiredCert(t *testing.T) {
 	}
 }
 
-func TestChainChunking(t *testing.T) {
+// storedKeys returns all keys in kr, sorted.
+func storedKeys(t *testing.T, kr keyring.Keyring) []string {
+	t.Helper()
+	keys, err := kr.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// storedHeader returns the header stored under key.
+func storedHeader(t *testing.T, kr keyring.Keyring, key string) *header {
+	t.Helper()
+	item, err := kr.Get(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := readHeader(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// entryKeys returns the keys a credential with header h should occupy.
+func entryKeys(key string, h *header) []string {
+	keys := make([]string, 0, 1+h.Chunks)
+	keys = append(keys, key)
+	for i := range h.Chunks {
+		keys = append(keys, dataKey(key, h.Generation, i))
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func TestChunking(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
 	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
-	// Force the chain to split into many chunks.
-	c.maxEntrySize = 64
+	// Force the payload to split into many chunks.
+	c.maxEntrySize = 512
 
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
 
-	// Sanity check that chunking actually happened.
 	key := cache.CredentialKey(c.Config)
-	if got := chainChunkCount(kr, key); got < 2 {
-		t.Fatalf("expected multiple chain chunks, got %d", got)
+	h := storedHeader(t, kr, key)
+	if h.Chunks < 2 {
+		t.Fatalf("expected multiple chunks, got %d", h.Chunks)
+	}
+	if diff := cmp.Diff(entryKeys(key, h), storedKeys(t, kr)); diff != "" {
+		t.Errorf("stored keys (-want +got):\n%s", diff)
+	}
+	// Every value - including the header - must fit in one entry (Windows
+	// Credential Manager limits blobs to 2560 bytes).
+	for _, k := range storedKeys(t, kr) {
+		item, err := kr.Get(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(item.Data) > c.maxEntrySize {
+			t.Errorf("entry %q is %d bytes, over the %d byte limit", k, len(item.Data), c.maxEntrySize)
+		}
 	}
 
-	_, _, gotChain, err := c.GetCredentials(ctx, c.Config)
+	_, gotCert, gotChain, err := c.GetCredentials(ctx, c.Config)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if diff := cmp.Diff(certPEM, gotCert); diff != "" {
+		t.Errorf("cert mismatch (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff(chainPEM, gotChain); diff != "" {
 		t.Errorf("chain mismatch (-want +got):\n%s", diff)
 	}
 
 	// Deleting removes the chunk entries too.
-	chunks := chainChunkCount(kr, key)
 	if err := c.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for i := range chunks {
-		if _, err := kr.Get(chainKey(key, i)); !errors.Is(err, keyring.ErrKeyNotFound) {
-			t.Errorf("chain chunk %d not deleted: %v", i, err)
-		}
+	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after delete (-want +got):\n%s", diff)
 	}
 }
 
-func TestRestoreRemovesStaleChunks(t *testing.T) {
+func TestHeaderTooLarge(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	c.maxEntrySize = 64
+
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err == nil {
+		t.Fatal("StoreCert: expected error for header over the entry size limit")
+	}
+	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after failed store (-want +got):\n%s", diff)
+	}
+}
+
+func TestRestoreReplacesGeneration(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
 	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
 	key := cache.CredentialKey(c.Config)
 
-	// First store with many chunks, then re-store with a single chunk.
-	c.maxEntrySize = 64
+	// First store with many chunks, then re-store with fewer.
+	c.maxEntrySize = 512
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
-	c.maxEntrySize = len(chainPEM)
+	c.maxEntrySize = 0
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
 
-	keys, err := kr.Keys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	sort.Strings(keys)
-	want := []string{key, chainKey(key, 0)}
-	sort.Strings(want)
-	if diff := cmp.Diff(want, keys); diff != "" {
+	// Only the new generation remains.
+	h := storedHeader(t, kr, key)
+	if diff := cmp.Diff(entryKeys(key, h), storedKeys(t, kr)); diff != "" {
 		t.Errorf("keys after re-store (-want +got):\n%s", diff)
 	}
-
-	_, _, gotChain, err := c.GetCredentials(ctx, c.Config)
-	if err != nil {
+	if _, _, _, err := c.GetCredentials(ctx, c.Config); err != nil {
 		t.Fatal(err)
-	}
-	if diff := cmp.Diff(chainPEM, gotChain); diff != "" {
-		t.Errorf("chain mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestSplicedChain(t *testing.T) {
+// hookKeyring runs hook (once) when an item matching match is about to be,
+// or has just been, set.
+type hookKeyring struct {
+	keyring.Keyring
+	match  func(keyring.Item) bool
+	before bool
+	hook   func()
+}
+
+func (h *hookKeyring) Set(item keyring.Item) error {
+	fire := h.hook != nil && h.match(item)
+	if fire && h.before {
+		f := h.hook
+		h.hook = nil
+		f()
+	}
+	if err := h.Keyring.Set(item); err != nil {
+		return err
+	}
+	if fire && !h.before {
+		f := h.hook
+		h.hook = nil
+		f()
+	}
+	return nil
+}
+
+func TestConcurrentStores(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name string
+		// before fires the second store just before the first store's
+		// header is written (the first store wins); otherwise just after
+		// (the second store wins, then the first runs its cleanup).
+		before bool
+	}{
+		{name: "second store between first header and cleanup", before: false},
+		{name: "second store between first chunks and header", before: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			arr := keyring.NewArrayKeyring(nil)
+			hk := &hookKeyring{Keyring: arr, before: tc.before}
+
+			// Two stores for the same identity with different payload
+			// lengths: a short credential (no chain) and a long one.
+			short, privS, certS, _ := newTestCredential(t, hk)
+			long, privL, certL, chainL := newTestCredential(t, arr)
+			short.maxEntrySize, long.maxEntrySize = 512, 512
+			key := cache.CredentialKey(short.Config)
+
+			hk.match = func(item keyring.Item) bool { return item.Key == key }
+			hk.hook = func() {
+				if err := long.StoreCert(ctx, privL, certL, chainL); err != nil {
+					t.Fatalf("concurrent StoreCert: %v", err)
+				}
+			}
+			if err := short.StoreCert(ctx, privS, certS, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			// Whichever store won, its header must point at intact chunks.
+			wantCert, roots := certL, long.Roots
+			if tc.before {
+				wantCert, roots = certS, short.Roots
+			}
+			reader := &Cache{Roots: roots, Config: short.Config, Keyring: arr}
+			_, gotCert, _, err := reader.GetCredentials(ctx, reader.Config)
+			if err != nil {
+				t.Fatalf("GetCredentials: %v", err)
+			}
+			if diff := cmp.Diff(wantCert, gotCert); diff != "" {
+				t.Errorf("cert mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestReplacedWhileReading(t *testing.T) {
 	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
 	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
-	c.maxEntrySize = 64
+	c.maxEntrySize = 512
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
 	key := cache.CredentialKey(c.Config)
 
-	// Simulate a concurrent store replacing a chunk after the envelope was
-	// written.
-	if err := kr.Set(keyring.Item{Key: chainKey(key, 0), Data: []byte("other chain data")}); err != nil {
+	// Simulate a concurrent store having removed this generation's chunks
+	// after the header was read.
+	h := storedHeader(t, kr, key)
+	if err := kr.Remove(dataKey(key, h.Generation, 0)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -306,6 +440,31 @@ func TestSplicedChain(t *testing.T) {
 	// The entry is left for the concurrent writer rather than deleted.
 	if _, err := kr.Get(key); err != nil {
 		t.Errorf("credential entry was deleted: %v", err)
+	}
+}
+
+func TestCorruptChunk(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	c.maxEntrySize = 512
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+	key := cache.CredentialKey(c.Config)
+
+	h := storedHeader(t, kr, key)
+	if err := kr.Set(keyring.Item{Key: dataKey(key, h.Generation, 0), Data: []byte("corrupt")}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
+	}
+	// Generations are immutable, so a mismatch is corruption - deleted.
+	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after corrupt read (-want +got):\n%s", diff)
 	}
 }
 
@@ -357,53 +516,64 @@ func TestKeyringUnavailable(t *testing.T) {
 func TestMalformedEntry(t *testing.T) {
 	ctx := context.Background()
 
-	kr := keyring.NewArrayKeyring(nil)
-	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
-	key := cache.CredentialKey(c.Config)
-	// e.g. an entry written by an incompatible build, with chain chunks
-	// alongside it.
-	for _, item := range []keyring.Item{
-		{Key: key, Data: []byte("not json")},
-		{Key: chainKey(key, 0), Data: []byte("chunk")},
-		{Key: chainKey(key, 1), Data: []byte("chunk")},
-	} {
-		if err := kr.Set(item); err != nil {
-			t.Fatal(err)
-		}
-	}
+	for _, tc := range []struct {
+		name   string
+		header []byte
+	}{{
+		name:   "not json",
+		header: []byte("not json"),
+	}, {
+		// Valid JSON from another envelope version must not be reported as
+		// a usable credential.
+		name:   "unsupported version",
+		header: []byte(`{"version":1,"notAfter":"2099-01-01T00:00:00Z","meta":{"committerEmail":"user@example.com"}}`),
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := keyring.NewArrayKeyring(nil)
+			c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+			key := cache.CredentialKey(c.Config)
+			// e.g. an entry written by an incompatible build, with chunks
+			// alongside it (both the current and the old v1 layout).
+			for _, item := range []keyring.Item{
+				{Key: key, Data: tc.header},
+				{Key: dataKey(key, "old", 0), Data: []byte("chunk")},
+				{Key: key + "/chain/0", Data: []byte("chunk")},
+			} {
+				if err := kr.Set(item); err != nil {
+					t.Fatal(err)
+				}
+			}
 
-	// List reports the unreadable entry instead of hiding it.
-	entries, err := c.List(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []api.CredentialInfo{{ID: key}}
-	if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
-		t.Errorf("List (-want +got):\n%s", diff)
-	}
-	if len(entries) == 1 && entries[0].Error == "" {
-		t.Error("List: expected Error to be set for unreadable entry")
-	}
+			// List reports the unreadable entry instead of hiding it.
+			entries, err := c.List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []api.CredentialInfo{{ID: key}}
+			if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
+				t.Errorf("List (-want +got):\n%s", diff)
+			}
+			if len(entries) == 1 && entries[0].Error == "" {
+				t.Error("List: expected Error to be set for unreadable entry")
+			}
 
-	// Malformed entries are a miss, not an error, and are removed along
-	// with their chain chunks.
-	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
-		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
-	}
-	keys, err := kr.Keys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff := cmp.Diff([]string{}, keys, cmpopts.EquateEmpty()); diff != "" {
-		t.Errorf("keys after malformed read (-want +got):\n%s", diff)
-	}
+			// Malformed entries are a miss, not an error, and are removed
+			// along with everything stored under them.
+			if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+				t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
+			}
+			if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("keys after malformed read (-want +got):\n%s", diff)
+			}
 
-	// The identity can be re-cached afterwards.
-	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
-		t.Fatalf("StoreCert: %v", err)
-	}
-	if _, _, _, err := c.GetCredentials(ctx, c.Config); err != nil {
-		t.Errorf("GetCredentials after re-store: %v", err)
+			// The identity can be re-cached afterwards.
+			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+				t.Fatalf("StoreCert: %v", err)
+			}
+			if _, _, _, err := c.GetCredentials(ctx, c.Config); err != nil {
+				t.Errorf("GetCredentials after re-store: %v", err)
+			}
+		})
 	}
 }
 
