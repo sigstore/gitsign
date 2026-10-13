@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -413,7 +414,52 @@ func TestConcurrentStores(t *testing.T) {
 			if diff := cmp.Diff(wantCert, gotCert); diff != "" {
 				t.Errorf("cert mismatch (-want +got):\n%s", diff)
 			}
+
+			if !tc.before {
+				// The first store saw it had been superseded and removed its
+				// own generation, leaving nothing orphaned.
+				h := storedHeader(t, arr, key)
+				if diff := cmp.Diff(entryKeys(key, h), storedKeys(t, arr)); diff != "" {
+					t.Errorf("stored keys (-want +got):\n%s", diff)
+				}
+			}
 		})
+	}
+}
+
+func TestCollectGenerations(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	key := cache.CredentialKey(c.Config)
+
+	// Unreferenced generations, e.g. orphaned when two concurrent stores
+	// replaced the same header: one old enough to collect, and one young
+	// enough that a concurrent store may be about to publish it.
+	oldGen, err := newGenerationAt(time.Now().Add(-2 * generationGrace))
+	if err != nil {
+		t.Fatal(err)
+	}
+	youngGen, err := newGenerationAt(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{dataKey(key, oldGen, 0), dataKey(key, youngGen, 0)} {
+		if err := kr.Set(keyring.Item{Key: k, Data: []byte("chunk")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+
+	h := storedHeader(t, kr, key)
+	want := append(entryKeys(key, h), dataKey(key, youngGen, 0))
+	sort.Strings(want)
+	if diff := cmp.Diff(want, storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys after store (-want +got):\n%s", diff)
 	}
 }
 
@@ -725,5 +771,60 @@ func TestDeleteRemovesAllGenerations(t *testing.T) {
 				t.Errorf("keys after delete (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestDeleteOrphanedData(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
+	ctx := context.Background()
+
+	c, _, _, _ := newTestCredential(t, kr)
+	key := cache.CredentialKey(c.Config)
+
+	// Chunks with no header, e.g. left by an interrupted store, can still
+	// be cleared for the identity.
+	if err := kr.Set(keyring.Item{Key: dataKey(key, "orphan", 0), Data: []byte("chunk")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Delete(ctx); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after delete (-want +got):\n%s", diff)
+	}
+
+	// With nothing left, it's a miss.
+	if err := c.Delete(ctx); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("Delete: want ErrNotFound, got %v", err)
+	}
+}
+
+// failRemoveKeyring fails to remove keys matching fail.
+type failRemoveKeyring struct {
+	keyring.Keyring
+	fail func(string) bool
+}
+
+func (f failRemoveKeyring) Remove(key string) error {
+	if f.fail(key) {
+		return errors.New("access denied")
+	}
+	return f.Keyring.Remove(key)
+}
+
+func TestDeleteReportsChunkFailures(t *testing.T) {
+	ctx := context.Background()
+
+	arr := keyring.NewArrayKeyring(nil)
+	c, priv, certPEM, chainPEM := newTestCredential(t, arr)
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+
+	// Failing to remove a chunk (which holds private-key material) must not
+	// be reported as a successful clear.
+	c.Keyring = failRemoveKeyring{Keyring: arr, fail: func(k string) bool { return strings.Contains(k, dataKeyMarker) }}
+	if err := c.Delete(ctx); err == nil {
+		t.Fatal("Delete: expected error when a chunk can't be removed")
 	}
 }

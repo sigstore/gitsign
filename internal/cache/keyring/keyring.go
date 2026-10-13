@@ -36,6 +36,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,6 +61,13 @@ const (
 	// payload is split across entries and the header must fit in one.
 	defaultMaxEntrySize = 2000
 
+	// generationGrace is how long an unreferenced generation is left alone
+	// before StoreCert garbage-collects it. A concurrent store writes its
+	// chunks before its header, so a young unreferenced generation may still
+	// be about to become current; a store never takes anywhere near this
+	// long.
+	generationGrace = 5 * time.Minute
+
 	envelopeVersion = 2
 )
 
@@ -69,9 +77,10 @@ type header struct {
 	Version  int       `json:"version"`
 	NotAfter time.Time `json:"notAfter"`
 	// Generation names the payload chunks written by one StoreCert call
-	// (<key>/data/<generation>/<i>). Chunks are never modified after being
-	// written, so concurrent stores can't corrupt each other: a reader
-	// either sees a complete generation or a miss.
+	// (<key>/data/<generation>/<i>), prefixed with its creation time so
+	// superseded generations can be garbage-collected. Chunks are never
+	// modified after being written, so concurrent stores can't corrupt each
+	// other: a reader either sees a complete generation or a miss.
 	Generation string `json:"generation"`
 	Chunks     int    `json:"chunks"`
 	// SHA256 is the hex SHA-256 of the reassembled payload.
@@ -331,13 +340,47 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		return fmt.Errorf("error storing credential in keyring: %w", err)
 	}
 
-	// Best-effort: remove the replaced generation. Only ever the one this
-	// call observed - never chunks a concurrent store may still reference.
-	if prev != nil && prev.Generation != gen {
+	collectGenerations(kr, key, gen, prev)
+	return nil
+}
+
+// collectGenerations removes, best effort, payload generations that are no
+// longer referenced after a store of generation own:
+//
+//   - prev, the generation this store replaced;
+//   - own, if a concurrent store has already published a newer header;
+//   - any other unreferenced generation older than generationGrace, e.g.
+//     one orphaned when two concurrent stores replaced the same header.
+//
+// It never removes the current header's generation, or a young generation a
+// concurrent store may be about to publish.
+func collectGenerations(kr keyring.Keyring, key, own string, prev *header) {
+	if prev != nil && prev.Generation != own {
 		deleteChunks(kr, key, prev.Generation, prev.Chunks)
 	}
 
-	return nil
+	item, err := kr.Get(key)
+	if err != nil {
+		return
+	}
+	cur, err := readHeader(item)
+	if err != nil {
+		return
+	}
+	keys, err := kr.Keys()
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-generationGrace)
+	for _, k := range keys {
+		gen, ok := generationOf(key, k)
+		if !ok || gen == cur.Generation {
+			continue
+		}
+		if gen == own || generationTime(gen).Before(cutoff) {
+			_ = kr.Remove(k)
+		}
+	}
 }
 
 // List enumerates stored credentials.
@@ -392,14 +435,19 @@ func (c *Cache) Delete(_ context.Context) error {
 	key := cache.CredentialKey(c.Config)
 	// Check existence explicitly - Remove semantics for missing keys vary
 	// between backends.
-	if _, err := kr.Get(key); err != nil {
-		if errors.Is(err, keyring.ErrKeyNotFound) {
-			return fmt.Errorf("%w: no entry for identity", cache.ErrNotFound)
-		}
+	_, err = kr.Get(key)
+	if err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return fmt.Errorf("error reading credential from keyring: %w", err)
 	}
-	if err := deleteAllForKey(kr, key); err != nil {
+	headerFound := err == nil
+	// Remove everything for the identity even without a header, so data
+	// orphaned by an interrupted or racing store can still be cleared.
+	removed, err := deleteAllForKey(kr, key)
+	if err != nil {
 		return fmt.Errorf("error deleting credential from keyring: %w", err)
+	}
+	if !headerFound && removed == 0 {
+		return fmt.Errorf("%w: no entry for identity", cache.ErrNotFound)
 	}
 	return nil
 }
@@ -438,29 +486,38 @@ func isCredentialKey(key string) bool {
 // deleteEntry removes the credential header and everything stored under it.
 // Best-effort.
 func deleteEntry(kr keyring.Keyring, key string) {
-	_ = deleteAllForKey(kr, key)
+	_, _ = deleteAllForKey(kr, key)
 }
 
 // deleteAllForKey removes the credential header and every chunk stored under
 // it, of any generation (found by enumeration, best effort). Removing only
 // the generation named by a header read earlier would race with StoreCert: a
 // concurrent writer could publish a new header that the removal deletes,
-// orphaning the new generation's chunks. Returns any error removing the
-// header entry itself.
-func deleteAllForKey(kr keyring.Keyring, key string) error {
+// orphaning the new generation's chunks. Returns how many chunk entries were
+// removed (header removal isn't counted - Remove semantics for missing keys
+// vary between backends), and any errors enumerating or removing entries -
+// failing to remove a chunk would leave private-key material behind.
+func deleteAllForKey(kr keyring.Keyring, key string) (int, error) {
+	removed := 0
 	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
-		return err
+		return removed, err
 	}
 	keys, err := kr.Keys()
 	if err != nil {
-		return nil
+		return removed, fmt.Errorf("error listing keyring entries: %w", err)
 	}
+	var errs []error
 	for _, k := range keys {
-		if strings.HasPrefix(k, key+"/") {
-			_ = kr.Remove(k)
+		if !strings.HasPrefix(k, key+"/") {
+			continue
+		}
+		if err := kr.Remove(k); err == nil {
+			removed++
+		} else if !errors.Is(err, keyring.ErrKeyNotFound) {
+			errs = append(errs, fmt.Errorf("error deleting keyring entry %q: %w", k, err))
 		}
 	}
-	return nil
+	return removed, errors.Join(errs...)
 }
 
 func deleteChunks(kr keyring.Keyring, key, gen string, chunks int) {
@@ -470,11 +527,42 @@ func deleteChunks(kr keyring.Keyring, key, gen string, chunks int) {
 }
 
 func newGeneration() (string, error) {
+	return newGenerationAt(time.Now())
+}
+
+// newGenerationAt returns a unique generation ID: the creation time (hex unix
+// nanoseconds) followed by random bytes.
+func newGenerationAt(t time.Time) (string, error) {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("error generating credential generation: %w", err)
 	}
-	return hex.EncodeToString(b), nil
+	return fmt.Sprintf("%016x-%s", t.UnixNano(), hex.EncodeToString(b)), nil
+}
+
+// generationTime returns when a generation was created. Unparseable IDs
+// (e.g. from an older layout) are treated as infinitely old.
+func generationTime(gen string) time.Time {
+	ts, _, ok := strings.Cut(gen, "-")
+	if !ok {
+		return time.Time{}
+	}
+	n, err := strconv.ParseInt(ts, 16, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.Unix(0, n)
+}
+
+// generationOf returns the generation of payload chunk key k for credential
+// key.
+func generationOf(key, k string) (string, bool) {
+	rest, ok := strings.CutPrefix(k, key+dataKeyMarker)
+	if !ok {
+		return "", false
+	}
+	gen, _, ok := strings.Cut(rest, "/")
+	return gen, ok
 }
 
 func digest(b []byte) string {
