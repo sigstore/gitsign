@@ -142,6 +142,39 @@ func readHeader(item keyring.Item) (*header, error) {
 // errUnsupportedEntry marks an entry written by an incompatible build.
 var errUnsupportedEntry = errors.New("unsupported keyring entry")
 
+var (
+	// errReplaced means a header's chunks disappeared while reading, most
+	// likely because a concurrent StoreCert replaced the generation.
+	errReplaced = errors.New("credential replaced while reading")
+	// errCorrupt means the stored payload doesn't match its header.
+	errCorrupt = errors.New("stored credential is corrupt")
+)
+
+// loadPayload reassembles and decodes the payload referenced by h. It never
+// modifies the keyring.
+func loadPayload(kr keyring.Keyring, key string, h *header) (*payload, error) {
+	var raw []byte
+	for i := range h.Chunks {
+		item, err := kr.Get(dataKey(key, h.Generation, i))
+		if err != nil {
+			if errors.Is(err, keyring.ErrKeyNotFound) {
+				return nil, errReplaced
+			}
+			return nil, fmt.Errorf("error reading credential chunk %d: %w", i, err)
+		}
+		raw = append(raw, item.Data...)
+	}
+	// Generations are immutable, so a mismatch means the entry is corrupt.
+	if digest(raw) != h.SHA256 {
+		return nil, errCorrupt
+	}
+	p := new(payload)
+	if err := json.Unmarshal(raw, p); err != nil {
+		return nil, fmt.Errorf("%w: %w", errCorrupt, err)
+	}
+	return p, nil
+}
+
 // GetCredentials returns the cached credential for the identity described by
 // cfg. Expired or invalid entries are deleted and reported as a miss/error.
 func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
@@ -165,41 +198,33 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 	if err != nil {
 		// e.g. an entry written by an incompatible build - treat as a miss so
 		// it's replaced on the next store.
-		_ = deleteAllForKey(kr, key)
+		deleteEntry(kr, key)
 		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
 	}
 
 	// Cheap expiry check before doing any crypto - the credential is only
 	// useful for the lifetime of the cert.
 	if time.Now().Add(30 * time.Second).After(h.NotAfter) {
-		deleteEntry(kr, key, h)
+		deleteEntry(kr, key)
 		return nil, nil, nil, fmt.Errorf("%w: stored cert expired", cache.ErrNotFound)
 	}
 
-	raw, err := readChunks(kr, key, h)
-	if err != nil {
-		if errors.Is(err, keyring.ErrKeyNotFound) {
-			// Most likely a concurrent StoreCert replaced this generation
-			// after we read the header. Don't delete - the entry now in place
-			// is probably valid; just miss this time.
-			return nil, nil, nil, fmt.Errorf("%w: credential replaced while reading", cache.ErrNotFound)
-		}
+	p, err := loadPayload(kr, key, h)
+	switch {
+	case errors.Is(err, errReplaced):
+		// Don't delete - the entry now in place is probably valid; just miss
+		// this time.
+		return nil, nil, nil, fmt.Errorf("%w: %w", cache.ErrNotFound, err)
+	case errors.Is(err, errCorrupt):
+		deleteEntry(kr, key)
+		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
+	case err != nil:
 		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
-	}
-	// Generations are immutable, so a mismatch means the entry is corrupt.
-	if digest(raw) != h.SHA256 {
-		deleteEntry(kr, key, h)
-		return nil, nil, nil, fmt.Errorf("%w: stored credential is corrupt (entry deleted)", cache.ErrNotFound)
-	}
-	p := new(payload)
-	if err := json.Unmarshal(raw, p); err != nil {
-		deleteEntry(kr, key, h)
-		return nil, nil, nil, fmt.Errorf("%w: malformed credential (entry deleted): %w", cache.ErrNotFound, err)
 	}
 
 	certPEM := []byte(p.Cert)
 	if err := cache.ValidateCert(certPEM, c.Roots, c.Intermediates); err != nil {
-		deleteEntry(kr, key, h)
+		deleteEntry(kr, key)
 		return nil, nil, nil, err
 	}
 
@@ -213,7 +238,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		Chain:      chain,
 	})
 	if err != nil {
-		deleteEntry(kr, key, h)
+		deleteEntry(kr, key)
 		return nil, nil, nil, fmt.Errorf("error unmarshalling private key (entry deleted): %w", err)
 	}
 
@@ -342,6 +367,12 @@ func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 			out = append(out, api.CredentialInfo{ID: key, Error: err.Error()})
 			continue
 		}
+		// Check the payload is actually usable (without modifying anything),
+		// so an entry with missing or corrupt chunks isn't reported valid.
+		if _, err := loadPayload(kr, key, h); err != nil {
+			out = append(out, api.CredentialInfo{ID: key, NotAfter: h.NotAfter, Meta: h.Meta, Error: err.Error()})
+			continue
+		}
 		out = append(out, api.CredentialInfo{
 			ID:       key,
 			NotAfter: h.NotAfter,
@@ -361,24 +392,15 @@ func (c *Cache) Delete(_ context.Context) error {
 	key := cache.CredentialKey(c.Config)
 	// Check existence explicitly - Remove semantics for missing keys vary
 	// between backends.
-	item, err := kr.Get(key)
-	if err != nil {
+	if _, err := kr.Get(key); err != nil {
 		if errors.Is(err, keyring.ErrKeyNotFound) {
 			return fmt.Errorf("%w: no entry for identity", cache.ErrNotFound)
 		}
 		return fmt.Errorf("error reading credential from keyring: %w", err)
 	}
-	h, err := readHeader(item)
-	if err != nil {
-		if err := deleteAllForKey(kr, key); err != nil {
-			return fmt.Errorf("error deleting credential from keyring: %w", err)
-		}
-		return nil
-	}
-	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+	if err := deleteAllForKey(kr, key); err != nil {
 		return fmt.Errorf("error deleting credential from keyring: %w", err)
 	}
-	deleteChunks(kr, key, h.Generation, h.Chunks)
 	return nil
 }
 
@@ -413,28 +435,18 @@ func isCredentialKey(key string) bool {
 	return ok && !strings.Contains(rest, "/")
 }
 
-func readChunks(kr keyring.Keyring, key string, h *header) ([]byte, error) {
-	var raw []byte
-	for i := range h.Chunks {
-		item, err := kr.Get(dataKey(key, h.Generation, i))
-		if err != nil {
-			return nil, fmt.Errorf("error reading credential chunk %d: %w", i, err)
-		}
-		raw = append(raw, item.Data...)
-	}
-	return raw, nil
+// deleteEntry removes the credential header and everything stored under it.
+// Best-effort.
+func deleteEntry(kr keyring.Keyring, key string) {
+	_ = deleteAllForKey(kr, key)
 }
 
-// deleteEntry removes the credential header and its chunks. All deletions
-// are best-effort.
-func deleteEntry(kr keyring.Keyring, key string, h *header) {
-	_ = kr.Remove(key)
-	deleteChunks(kr, key, h.Generation, h.Chunks)
-}
-
-// deleteAllForKey removes an entry whose header can't be decoded, along with
-// anything stored under it (found by enumeration, best effort). Returns any
-// error removing the header entry itself.
+// deleteAllForKey removes the credential header and every chunk stored under
+// it, of any generation (found by enumeration, best effort). Removing only
+// the generation named by a header read earlier would race with StoreCert: a
+// concurrent writer could publish a new header that the removal deletes,
+// orphaning the new generation's chunks. Returns any error removing the
+// header entry itself.
 func deleteAllForKey(kr keyring.Keyring, key string) error {
 	if err := kr.Remove(key); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return err

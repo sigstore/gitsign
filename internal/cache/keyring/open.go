@@ -52,5 +52,8 @@ func openSystemKeyring() (keyring.Keyring, error) {
 	if errors.Is(err, keyring.ErrNoAvailImpl) && runtime.GOOS == "darwin" {
 		return nil, fmt.Errorf("macOS Keychain support requires gitsign to be built with cgo (CGO_ENABLED=1): %w", err)
 	}
-	return kr, err
+	if err != nil {
+		return nil, err
+	}
+	return wrapBackend(kr), nil
 }

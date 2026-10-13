@@ -20,6 +20,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -628,5 +629,101 @@ func TestDelete(t *testing.T) {
 	}
 	if diff := cmp.Diff([]api.CredentialInfo{}, entries); diff != "" {
 		t.Errorf("List after DeleteAll (-want +got):\n%s", diff)
+	}
+}
+
+func TestListValidatesPayload(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name    string
+		corrupt func(t *testing.T, kr keyring.Keyring, key string, h *header)
+	}{{
+		name: "missing chunk",
+		corrupt: func(t *testing.T, kr keyring.Keyring, key string, h *header) {
+			if err := kr.Remove(dataKey(key, h.Generation, 0)); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}, {
+		name: "corrupt chunk",
+		corrupt: func(t *testing.T, kr keyring.Keyring, key string, h *header) {
+			if err := kr.Set(keyring.Item{Key: dataKey(key, h.Generation, 0), Data: []byte("corrupt")}); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := keyring.NewArrayKeyring(nil)
+			c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+			c.maxEntrySize = 512
+			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+				t.Fatal(err)
+			}
+			key := cache.CredentialKey(c.Config)
+			tc.corrupt(t, kr, key, storedHeader(t, kr, key))
+			before := storedKeys(t, kr)
+
+			entries, err := c.List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The header's metadata is still reported, alongside the error.
+			want := []api.CredentialInfo{wantInfo(t, c, certPEM)}
+			if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
+				t.Errorf("List (-want +got):\n%s", diff)
+			}
+			if len(entries) == 1 && entries[0].Error == "" {
+				t.Error("List: expected Error for an entry with an unusable payload")
+			}
+			// List never modifies the keyring.
+			if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
+				t.Errorf("keys changed by List (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeleteRemovesAllGenerations(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name   string
+		caOpts []fakeca.Option
+		delete func(c *Cache) error
+	}{{
+		name:   "Delete",
+		delete: func(c *Cache) error { return c.Delete(ctx) },
+	}, {
+		// Expired entries are deleted on read.
+		name:   "expired on read",
+		caOpts: []fakeca.Option{fakeca.NotBefore(time.Now().Add(-2 * time.Hour)), fakeca.NotAfter(time.Now().Add(-time.Hour))},
+		delete: func(c *Cache) error {
+			if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+				return fmt.Errorf("GetCredentials: want ErrNotFound, got %w", err)
+			}
+			return nil
+		},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			kr := keyring.NewArrayKeyring(nil)
+			c, priv, certPEM, chainPEM := newTestCredential(t, kr, tc.caOpts...)
+			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+				t.Fatal(err)
+			}
+			key := cache.CredentialKey(c.Config)
+			// Chunks of another generation, e.g. from a concurrent store
+			// whose header hasn't been (or was just) replaced.
+			if err := kr.Set(keyring.Item{Key: dataKey(key, "concurrent", 0), Data: []byte("chunk")}); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := tc.delete(c); err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("keys after delete (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

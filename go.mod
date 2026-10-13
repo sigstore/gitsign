@@ -6,6 +6,7 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/coreos/go-systemd/v22 v22.7.0
+	github.com/danieljoos/wincred v1.2.3
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-billy/v5 v5.9.1
 	github.com/go-git/go-git/v5 v5.19.1
@@ -113,7 +114,6 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
-	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20250730155240-ffadbf3f398c // indirect
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect

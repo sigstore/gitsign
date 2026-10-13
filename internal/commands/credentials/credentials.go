@@ -89,13 +89,16 @@ func newList(cfg *config.Config) *cobra.Command {
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 8, 2, ' ', 0)
 			fmt.Fprintln(w, "EMAIL\tISSUER\tCLIENTID\tCONNECTOR\tFULCIO\tEXPIRES\tSTATUS")
 			for _, e := range entries {
-				if e.Error != "" {
-					fmt.Fprintf(w, "-\t-\t-\t-\t-\t-\tunreadable: %s\n", e.Error)
-					continue
-				}
 				status := "valid"
-				if time.Now().After(e.NotAfter) {
+				switch {
+				case e.Error != "":
+					status = "unreadable: " + e.Error
+				case time.Now().After(e.NotAfter):
 					status = "expired"
+				}
+				expires := "-"
+				if !e.NotAfter.IsZero() {
+					expires = e.NotAfter.Local().Format(time.RFC3339)
 				}
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					orDash(e.Meta.CommitterEmail),
@@ -103,7 +106,7 @@ func newList(cfg *config.Config) *cobra.Command {
 					orDash(e.Meta.ClientID),
 					orDash(e.Meta.ConnectorID),
 					orDash(e.Meta.Fulcio),
-					e.NotAfter.Local().Format(time.RFC3339),
+					expires,
 					status,
 				)
 			}
