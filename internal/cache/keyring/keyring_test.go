@@ -527,8 +527,10 @@ func TestValidationFailure(t *testing.T) {
 	// Reads with roots from a different CA must fail and remove the entry.
 	other := fakeca.New(fakeca.IsCA)
 	c.Roots = other.ChainPool()
-	if _, _, _, err := c.GetCredentials(ctx, c.Config); err == nil {
-		t.Fatal("GetCredentials: expected error with wrong roots")
+	// An invalid cert is a miss (so signing falls back quietly), not an
+	// error.
+	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
+		t.Fatalf("GetCredentials: want ErrNotFound with wrong roots, got %v", err)
 	}
 	if _, err := kr.Get(cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrKeyNotFound) {
 		t.Errorf("credential entry not deleted: %v", err)

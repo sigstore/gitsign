@@ -99,8 +99,8 @@ signs:
 release:
   prerelease: allow
   draft: true # allow for manual edits
-  # The draft is created up front by the release workflow so the per-OS
-  # release jobs can upload into it concurrently.
+  # The draft is created up front by the release workflow, and the per-OS
+  # release jobs upload into it one at a time.
   use_existing_draft: true
   mode: replace # this config owns the release notes
   github:

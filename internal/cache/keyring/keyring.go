@@ -234,7 +234,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 	certPEM := []byte(p.Cert)
 	if err := cache.ValidateCert(certPEM, c.Roots, c.Intermediates); err != nil {
 		deleteEntry(kr, key)
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
 	}
 
 	var chain []byte
@@ -248,7 +248,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 	})
 	if err != nil {
 		deleteEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("error unmarshalling private key (entry deleted): %w", err)
+		return nil, nil, nil, fmt.Errorf("%w: error unmarshalling private key (entry deleted): %w", cache.ErrNotFound, err)
 	}
 
 	return privateKey, certPEM, chain, nil

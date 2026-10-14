@@ -9,8 +9,9 @@ on:
 permissions: {}
 
 jobs:
-  # Create the draft release up front so the per-OS release jobs below can
-  # upload into it concurrently instead of racing to create it.
+  # Create the draft release up front so both per-OS release jobs below
+  # upload into the same draft (and to refuse re-releasing over a published
+  # release).
   draft:
     runs-on: ubuntu-latest
 
@@ -44,6 +45,11 @@ jobs:
 
     strategy:
       fail-fast: false
+      # Run one leg at a time: each goreleaser run read-modify-writes the
+      # release metadata, so concurrent legs could clobber the release notes
+      # with a stale body. Order doesn't matter - the second leg sees the
+      # first's update.
+      max-parallel: 1
       matrix:
         include:
           # linux, windows, freebsd, gitsign-credential-cache, packages, and
