@@ -169,7 +169,7 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 // payload and the public key, but returned uuids of entries that matched
 // either.
 func (c *Client) findTLogEntriesByPK(ctx context.Context, pubKey []byte) (uuids []string, err error) {
-	params := index.NewSearchIndexParamsWithContext(ctx)
+	params := index.NewSearchIndexParams()
 	params.Query = &models.SearchIndex{}
 
 	params.Query.PublicKey = &models.SearchIndexPublicKey{
@@ -177,7 +177,7 @@ func (c *Client) findTLogEntriesByPK(ctx context.Context, pubKey []byte) (uuids 
 		Format:  conv.Pointer(models.SearchIndexPublicKeyFormatX509),
 	}
 
-	searchIndex, err := c.Index.SearchIndex(params)
+	searchIndex, err := c.Index.SearchIndexContext(ctx, params)
 	if err != nil {
 		return nil, err
 	}
