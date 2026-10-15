@@ -67,6 +67,9 @@ const (
 	// be about to become current; a store never takes anywhere near this
 	// long.
 	generationGrace = 5 * time.Minute
+	// maxPublishAttempts bounds how often StoreCert republishes after its
+	// payload was garbage-collected while it stalled.
+	maxPublishAttempts = 3
 
 	envelopeVersion = 2
 )
@@ -106,6 +109,8 @@ type Cache struct {
 	Keyring keyring.Keyring
 	// maxEntrySize overrides the per-entry size limit. For testing.
 	maxEntrySize int
+	// clock overrides the time used to stamp new generations. For testing.
+	clock func() time.Time
 
 	kr keyring.Keyring
 }
@@ -126,6 +131,13 @@ func (c *Cache) keyring() (keyring.Keyring, error) {
 		c.kr = kr
 	}
 	return c.kr, nil
+}
+
+func (c *Cache) now() time.Time {
+	if c.clock != nil {
+		return c.clock()
+	}
+	return time.Now()
 }
 
 func (c *Cache) entrySize() int {
@@ -283,26 +295,11 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		return fmt.Errorf("error marshalling credential: %w", err)
 	}
 
-	gen, err := newGeneration()
-	if err != nil {
-		return err
-	}
 	chunks := chunk(raw, c.entrySize())
 	meta := cache.MetadataFromConfig(cfg)
-	h := &header{
-		Version:    envelopeVersion,
-		NotAfter:   notAfter,
-		Generation: gen,
-		Chunks:     len(chunks),
-		SHA256:     digest(raw),
-		Meta:       meta,
-	}
-	rawHeader, err := json.Marshal(h)
-	if err != nil {
-		return fmt.Errorf("error marshalling credential header: %w", err)
-	}
-	if len(rawHeader) > c.entrySize() {
-		return fmt.Errorf("credential metadata too large for a keyring entry (%d > %d bytes)", len(rawHeader), c.entrySize())
+	label := serviceName
+	if meta.CommitterEmail != "" {
+		label = fmt.Sprintf("%s (%s)", serviceName, meta.CommitterEmail)
 	}
 
 	// Remember the generation being replaced so its chunks can be cleaned up
@@ -312,36 +309,93 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		prev, _ = readHeader(item)
 	}
 
-	label := serviceName
-	if meta.CommitterEmail != "" {
-		label = fmt.Sprintf("%s (%s)", serviceName, meta.CommitterEmail)
-	}
+	// Another store's garbage collection can remove our chunks if we stall
+	// for longer than generationGrace between writing them and publishing
+	// the header. There's no cross-process lock for OS keyrings, so instead
+	// verify after publishing and republish under a fresh generation if our
+	// payload was collected. A successful store therefore always leaves a
+	// readable credential (or has been superseded by a newer one).
+	ours := map[string]bool{}
+	for range maxPublishAttempts {
+		gen, err := newGenerationAt(c.now())
+		if err != nil {
+			return err
+		}
+		ours[gen] = true
+		h := &header{
+			Version:    envelopeVersion,
+			NotAfter:   notAfter,
+			Generation: gen,
+			Chunks:     len(chunks),
+			SHA256:     digest(raw),
+			Meta:       meta,
+		}
+		rawHeader, err := json.Marshal(h)
+		if err != nil {
+			return fmt.Errorf("error marshalling credential header: %w", err)
+		}
+		if len(rawHeader) > c.entrySize() {
+			return fmt.Errorf("credential metadata too large for a keyring entry (%d > %d bytes)", len(rawHeader), c.entrySize())
+		}
 
-	// Store chunks first so that a reader never sees a header pointing at
-	// chunks that don't exist yet.
-	for i, ch := range chunks {
+		// Store chunks first so that a reader never sees a header pointing
+		// at chunks that don't exist yet.
+		for i, ch := range chunks {
+			if err := kr.Set(keyring.Item{
+				Key:         dataKey(key, gen, i),
+				Data:        ch,
+				Label:       label,
+				Description: "gitsign signing credential data",
+			}); err != nil {
+				deleteChunks(kr, key, gen, i)
+				return fmt.Errorf("error storing credential in keyring: %w", err)
+			}
+		}
 		if err := kr.Set(keyring.Item{
-			Key:         dataKey(key, gen, i),
-			Data:        ch,
+			Key:         key,
+			Data:        rawHeader,
 			Label:       label,
-			Description: "gitsign signing credential data",
+			Description: "gitsign signing credential",
 		}); err != nil {
-			deleteChunks(kr, key, gen, i)
+			deleteChunks(kr, key, gen, len(chunks))
 			return fmt.Errorf("error storing credential in keyring: %w", err)
 		}
-	}
-	if err := kr.Set(keyring.Item{
-		Key:         key,
-		Data:        rawHeader,
-		Label:       label,
-		Description: "gitsign signing credential",
-	}); err != nil {
+
+		if published(kr, key, h) {
+			collectGenerations(kr, key, gen, prev)
+			return nil
+		}
+		// Our payload was collected while we stalled. Drop what's left of
+		// it and try again.
 		deleteChunks(kr, key, gen, len(chunks))
-		return fmt.Errorf("error storing credential in keyring: %w", err)
 	}
 
-	collectGenerations(kr, key, gen, prev)
-	return nil
+	// Don't leave our header pointing at a missing payload.
+	if item, err := kr.Get(key); err == nil {
+		if cur, err := readHeader(item); err == nil && ours[cur.Generation] {
+			_ = kr.Remove(key)
+		}
+	}
+	return errors.New("error storing credential in keyring: stored data was removed by a concurrent store")
+}
+
+// published reports whether a just-published header h left a usable
+// credential: either h is current and its payload loads, or a concurrent
+// store has since superseded it with its own.
+func published(kr keyring.Keyring, key string, h *header) bool {
+	item, err := kr.Get(key)
+	if err != nil {
+		return false
+	}
+	cur, err := readHeader(item)
+	if err != nil {
+		return false
+	}
+	if cur.Generation != h.Generation {
+		return true
+	}
+	_, err = loadPayload(kr, key, h)
+	return err == nil
 }
 
 // collectGenerations removes, best effort, payload generations that are no
@@ -524,10 +578,6 @@ func deleteChunks(kr keyring.Keyring, key, gen string, chunks int) {
 	for i := range chunks {
 		_ = kr.Remove(dataKey(key, gen, i))
 	}
-}
-
-func newGeneration() (string, error) {
-	return newGenerationAt(time.Now())
 }
 
 // newGenerationAt returns a unique generation ID: the creation time (hex unix

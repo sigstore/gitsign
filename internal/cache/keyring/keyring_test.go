@@ -830,3 +830,92 @@ func TestDeleteReportsChunkFailures(t *testing.T) {
 		t.Fatal("Delete: expected error when a chunk can't be removed")
 	}
 }
+
+func TestStorePausedPastGrace(t *testing.T) {
+	ctx := context.Background()
+
+	arr := keyring.NewArrayKeyring(nil)
+	hk := &hookKeyring{Keyring: arr, before: true}
+
+	// Writer A stalls between writing its chunks and publishing its header
+	// for longer than generationGrace (simulated by stamping its
+	// generations in the past), so writer B's garbage collection removes
+	// A's unpublished chunks.
+	a, privA, certA, chainA := newTestCredential(t, hk)
+	b, privB, certB, chainB := newTestCredential(t, arr)
+	a.maxEntrySize, b.maxEntrySize = 512, 512
+	a.clock = func() time.Time { return time.Now().Add(-2 * generationGrace) }
+	key := cache.CredentialKey(a.Config)
+
+	hk.match = func(item keyring.Item) bool { return item.Key == key }
+	hk.hook = func() {
+		if err := b.StoreCert(ctx, privB, certB, chainB); err != nil {
+			t.Fatalf("concurrent StoreCert: %v", err)
+		}
+		// Confirm B really collected A's paused generation.
+		for _, k := range storedKeys(t, arr) {
+			if gen, ok := generationOf(key, k); ok && gen != storedHeader(t, arr, key).Generation {
+				t.Fatalf("expected B to collect A's paused chunks, found %q", k)
+			}
+		}
+	}
+
+	// A notices its payload was collected and republishes, so its success
+	// means a readable credential.
+	if err := a.StoreCert(ctx, privA, certA, chainA); err != nil {
+		t.Fatalf("StoreCert: %v", err)
+	}
+	reader := &Cache{Roots: a.Roots, Config: a.Config, Keyring: arr}
+	_, gotCert, gotChain, err := reader.GetCredentials(ctx, reader.Config)
+	if err != nil {
+		t.Fatalf("GetCredentials: %v", err)
+	}
+	if diff := cmp.Diff(certA, gotCert); diff != "" {
+		t.Errorf("cert mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(chainA, gotChain); diff != "" {
+		t.Errorf("chain mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// collectingKeyring removes every payload chunk just before any header is
+// written, simulating a store that is garbage-collected on every attempt.
+type collectingKeyring struct {
+	keyring.Keyring
+	header string
+}
+
+func (k collectingKeyring) Set(item keyring.Item) error {
+	if item.Key == k.header {
+		keys, err := k.Keys()
+		if err != nil {
+			return err
+		}
+		for _, key := range keys {
+			if strings.Contains(key, dataKeyMarker) {
+				if err := k.Remove(key); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return k.Keyring.Set(item)
+}
+
+func TestStoreCollectedEveryAttempt(t *testing.T) {
+	ctx := context.Background()
+
+	arr := keyring.NewArrayKeyring(nil)
+	c, priv, certPEM, chainPEM := newTestCredential(t, arr)
+	c.Keyring = collectingKeyring{Keyring: arr, header: cache.CredentialKey(c.Config)}
+
+	// If the payload never survives, the store reports failure instead of
+	// success with an unreadable credential...
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err == nil {
+		t.Fatal("StoreCert: expected error when the payload is collected every attempt")
+	}
+	// ...and doesn't leave a header pointing at missing data.
+	if diff := cmp.Diff([]string{}, storedKeys(t, arr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after failed store (-want +got):\n%s", diff)
+	}
+}
