@@ -46,11 +46,9 @@ func newTestClient(t *testing.T) *cache.Client {
 	t.Cleanup(func() { l.Close() })
 	srv := rpc.NewServer()
 	srv.Register(service.NewService())
-	go func() {
-		for {
-			srv.Accept(l)
-		}
-	}()
+	// Accept loops internally and returns once the listener is closed on
+	// cleanup; calling it in a loop would spin on the closed listener.
+	go srv.Accept(l)
 
 	rpcClient, err := rpc.Dial("unix", path)
 	if err != nil {

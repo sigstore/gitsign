@@ -88,9 +88,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # The container image doesn't depend on the GitHub release, so it's
-  # published independently with only the permissions it needs.
+  # The container image doesn't depend on the binaries, so it's published in
+  # parallel with them with only the permissions it needs - but only once the
+  # draft job has accepted the tag, so re-running against a published release
+  # can't overwrite the released image tag.
   image:
+    needs: draft
+
     runs-on: ubuntu-latest
 
     permissions:
