@@ -36,6 +36,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -56,10 +57,15 @@ const (
 	// dataKeyMarker distinguishes payload chunk entries from credential
 	// header entries.
 	dataKeyMarker = "/data/"
-	// defaultMaxEntrySize bounds individual keyring entry values. Windows
+	// winCredMaxEntrySize bounds individual keyring entry values on Windows:
 	// Credential Manager limits credential blobs to 2560 bytes, so the
 	// payload is split across entries and the header must fit in one.
-	defaultMaxEntrySize = 2000
+	winCredMaxEntrySize = 2000
+	// defaultMaxEntrySize is used elsewhere. The Keychain and Secret Service
+	// have no comparable limit, so a credential fits in a single chunk -
+	// which matters on macOS, where each item has its own access control
+	// and prompts separately after a gitsign upgrade.
+	defaultMaxEntrySize = 64 << 10
 
 	envelopeVersion = 2
 )
@@ -125,6 +131,9 @@ func (c *Cache) keyring() (keyring.Keyring, error) {
 func (c *Cache) entrySize() int {
 	if c.maxEntrySize > 0 {
 		return c.maxEntrySize
+	}
+	if runtime.GOOS == "windows" {
+		return winCredMaxEntrySize
 	}
 	return defaultMaxEntrySize
 }
@@ -392,11 +401,17 @@ func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error listing keyring entries: %w", err)
 	}
+	present := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		present[k] = true
+	}
 	out := []api.CredentialInfo{}
+	headers := map[string]bool{}
 	for _, key := range keys {
 		if !isCredentialKey(key) {
 			continue
 		}
+		headers[key] = true
 		// Report unreadable entries rather than hiding them, so they can be
 		// found and cleared.
 		item, err := kr.Get(key)
@@ -409,10 +424,12 @@ func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 			out = append(out, api.CredentialInfo{ID: key, Error: err.Error()})
 			continue
 		}
-		// Check the payload is actually usable (without modifying anything),
-		// so an entry with missing or corrupt chunks isn't reported valid.
-		if _, err := loadPayload(kr, key, h); err != nil {
-			out = append(out, api.CredentialInfo{ID: key, NotAfter: h.NotAfter, Meta: h.Meta, Error: err.Error()})
+		// Only headers are read: check the payload's chunks exist using the
+		// key list, rather than reading (and decrypting) every private key
+		// just to list entries - which on macOS could prompt once per item.
+		if missing := missingChunks(present, key, h); missing > 0 {
+			out = append(out, api.CredentialInfo{ID: key, NotAfter: h.NotAfter, Meta: h.Meta,
+				Error: fmt.Sprintf("%d of %d credential data entries missing", missing, h.Chunks)})
 			continue
 		}
 		out = append(out, api.CredentialInfo{
@@ -421,7 +438,43 @@ func (c *Cache) List(_ context.Context) ([]api.CredentialInfo, error) {
 			Meta:     h.Meta,
 		})
 	}
+	// Report data left without a header (e.g. by an interrupted or racing
+	// store), so it isn't invisible; `credentials clear` removes it.
+	orphans := map[string]int{}
+	for _, k := range keys {
+		if id, ok := credentialKeyOf(k); ok && !headers[id] {
+			orphans[id]++
+		}
+	}
+	for id, n := range orphans {
+		out = append(out, api.CredentialInfo{ID: id, Error: fmt.Sprintf("orphaned credential data (%d entries) with no credential", n)})
+	}
 	return out, nil
+}
+
+// missingChunks returns how many of h's payload chunks aren't in present.
+func missingChunks(present map[string]bool, key string, h *header) int {
+	missing := 0
+	for i := range h.Chunks {
+		if !present[dataKey(key, h.Generation, i)] {
+			missing++
+		}
+	}
+	return missing
+}
+
+// credentialKeyOf returns the credential key that a chunk (or other
+// sub-entry) key k is stored under.
+func credentialKeyOf(k string) (string, bool) {
+	rest, ok := strings.CutPrefix(k, credentialKeyPrefix)
+	if !ok {
+		return "", false
+	}
+	id, _, ok := strings.Cut(rest, "/")
+	if !ok {
+		return "", false
+	}
+	return credentialKeyPrefix + id, true
 }
 
 // Delete removes the credential for the identity described by the configured

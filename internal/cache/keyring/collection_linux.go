@@ -31,7 +31,8 @@ func defaultCollection() string {
 	}
 	var path dbus.ObjectPath
 	err = conn.Object("org.freedesktop.secrets", "/org/freedesktop/secrets").
-		Call("org.freedesktop.Secret.Service.ReadAlias", 0, "default").
+		// Don't D-Bus-activate a Secret Service just to resolve the alias.
+		Call("org.freedesktop.Secret.Service.ReadAlias", dbus.FlagNoAutoStart, "default").
 		Store(&path)
 	if err != nil {
 		return fallbackCollection

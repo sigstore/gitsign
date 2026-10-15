@@ -157,12 +157,14 @@ func (c *Client) DeleteAll(_ context.Context) error {
 // DaemonKey returns the daemon cache key for the identity described by cfg:
 // the shared config-derived CredentialKey, prefixed with the hostname so that
 // hosts sharing a daemon socket (e.g. forwarded over SSH) each get their own
-// credential.
+// credential. Only the short hostname is used, since the domain part can
+// change with the network (e.g. boron.lan vs boron.local on macOS).
 func DaemonKey(cfg *config.Config) (string, error) {
 	host, err := os.Hostname()
 	if err != nil {
 		return "", fmt.Errorf("error getting hostname: %w", err)
 	}
+	host, _, _ = strings.Cut(host, ".")
 	return host + "@" + CredentialKey(cfg), nil
 }
 

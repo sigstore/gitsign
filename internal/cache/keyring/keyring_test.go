@@ -20,6 +20,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -134,6 +136,13 @@ func wantInfo(t *testing.T, c *Cache, certPEM []byte) api.CredentialInfo {
 		Meta:     cache.MetadataFromConfig(c.Config),
 	}
 }
+
+// errorSet compares CredentialInfo.Error only by whether it is set, so tests
+// can expect an error without depending on its text.
+var errorSet = cmp.FilterPath(func(p cmp.Path) bool {
+	sf, ok := p.Last().(cmp.StructField)
+	return ok && sf.Name() == "Error"
+}, cmp.Comparer(func(a, b string) bool { return (a == "") == (b == "") }))
 
 // byID sorts List output for stable comparison.
 var byID = cmpopts.SortSlices(func(a, b api.CredentialInfo) bool { return a.ID < b.ID })
@@ -277,8 +286,9 @@ func TestChunking(t *testing.T) {
 
 	key := cache.CredentialKey(c.Config)
 	h := storedHeader(t, kr, key)
-	if h.Chunks < 2 {
-		t.Fatalf("expected multiple chunks, got %d", h.Chunks)
+	// Sanity check that the payload really was split.
+	if diff := cmp.Diff(true, h.Chunks > 1); diff != "" {
+		t.Fatalf("expected multiple chunks, got %d (-want +got):\n%s", h.Chunks, diff)
 	}
 	if diff := cmp.Diff(entryKeys(key, h), storedKeys(t, kr)); diff != "" {
 		t.Errorf("stored keys (-want +got):\n%s", diff)
@@ -618,12 +628,9 @@ func TestMalformedEntry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []api.CredentialInfo{{ID: key}}
-			if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
+			want := []api.CredentialInfo{{ID: key, Error: "set"}}
+			if diff := cmp.Diff(want, entries, errorSet); diff != "" {
 				t.Errorf("List (-want +got):\n%s", diff)
-			}
-			if len(entries) == 1 && entries[0].Error == "" {
-				t.Error("List: expected Error to be set for unreadable entry")
 			}
 
 			// Malformed entries are a miss, not an error.
@@ -700,56 +707,57 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestListValidatesPayload(t *testing.T) {
+func TestListChecksChunks(t *testing.T) {
 	ctx := context.Background()
 
-	for _, tc := range []struct {
-		name    string
-		corrupt func(t *testing.T, kr keyring.Keyring, key string, h *header)
-	}{{
-		name: "missing chunk",
-		corrupt: func(t *testing.T, kr keyring.Keyring, key string, h *header) {
-			if err := kr.Remove(dataKey(key, h.Generation, 0)); err != nil {
-				t.Fatal(err)
-			}
-		},
-	}, {
-		name: "corrupt chunk",
-		corrupt: func(t *testing.T, kr keyring.Keyring, key string, h *header) {
-			if err := kr.Set(keyring.Item{Key: dataKey(key, h.Generation, 0), Data: []byte("corrupt")}); err != nil {
-				t.Fatal(err)
-			}
-		},
-	}} {
-		t.Run(tc.name, func(t *testing.T) {
-			kr := keyring.NewArrayKeyring(nil)
-			c, priv, certPEM, chainPEM := newTestCredential(t, kr)
-			c.maxEntrySize = 512
-			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
-				t.Fatal(err)
-			}
-			key := cache.CredentialKey(c.Config)
-			tc.corrupt(t, kr, key, storedHeader(t, kr, key))
-			before := storedKeys(t, kr)
-
-			entries, err := c.List(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// The header's metadata is still reported, alongside the error.
-			want := []api.CredentialInfo{wantInfo(t, c, certPEM)}
-			if diff := cmp.Diff(want, entries, cmpopts.IgnoreFields(api.CredentialInfo{}, "Error")); diff != "" {
-				t.Errorf("List (-want +got):\n%s", diff)
-			}
-			if len(entries) == 1 && entries[0].Error == "" {
-				t.Error("List: expected Error for an entry with an unusable payload")
-			}
-			// List never modifies the keyring.
-			if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
-				t.Errorf("keys changed by List (-want +got):\n%s", diff)
-			}
-		})
+	kr := keyring.NewArrayKeyring(nil)
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	c.maxEntrySize = 512
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
 	}
+	key := cache.CredentialKey(c.Config)
+
+	// A missing chunk is reported (with the header's metadata) without
+	// reading any payload.
+	if err := kr.Remove(dataKey(key, storedHeader(t, kr, key).Generation, 0)); err != nil {
+		t.Fatal(err)
+	}
+	// Data with no header at all, e.g. left by an interrupted store.
+	orphan := cache.CredentialKey(testConfig("orphan@example.com"))
+	if err := kr.Set(keyring.Item{Key: dataKey(orphan, "gen", 0), Data: []byte("chunk")}); err != nil {
+		t.Fatal(err)
+	}
+	before := storedKeys(t, kr)
+
+	// Payload reads would fail loudly, proving List only reads headers.
+	c.Keyring = noPayloadReads{Keyring: kr}
+	entries, err := c.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing := wantInfo(t, c, certPEM)
+	missing.Error = "set"
+	want := []api.CredentialInfo{missing, {ID: orphan, Error: "set"}}
+	if diff := cmp.Diff(want, entries, errorSet, byID); diff != "" {
+		t.Errorf("List (-want +got):\n%s", diff)
+	}
+	// List never modifies the keyring.
+	if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys changed by List (-want +got):\n%s", diff)
+	}
+}
+
+// noPayloadReads fails any read of a payload chunk.
+type noPayloadReads struct {
+	keyring.Keyring
+}
+
+func (n noPayloadReads) Get(key string) (keyring.Item, error) {
+	if strings.Contains(key, dataKeyMarker) {
+		return keyring.Item{}, fmt.Errorf("unexpected payload read of %q", key)
+	}
+	return n.Keyring.Get(key)
 }
 
 func TestDeleteRemovesAllGenerations(t *testing.T) {
@@ -922,5 +930,22 @@ func TestCollectorPausedAfterEnumeration(t *testing.T) {
 	// The expired orphan was still collected.
 	if _, err := arr.Get(dataKey(key, expiredGen, 0)); !errors.Is(err, keyring.ErrKeyNotFound) {
 		t.Errorf("expired orphan not collected: %v", err)
+	}
+}
+
+func TestSingleChunkOffWindows(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows Credential Manager needs chunking")
+	}
+	kr := keyring.NewArrayKeyring(nil)
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	if err := c.StoreCert(context.Background(), priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+	// One header plus one chunk, so macOS prompts once per item, not per
+	// Windows-sized chunk.
+	key := cache.CredentialKey(c.Config)
+	if diff := cmp.Diff([]string{key, dataKey(key, storedHeader(t, kr, key).Generation, 0)}, storedKeys(t, kr), cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+		t.Errorf("stored keys (-want +got):\n%s", diff)
 	}
 }
