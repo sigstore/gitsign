@@ -20,7 +20,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -187,26 +186,44 @@ func TestExpiredCert(t *testing.T) {
 		fakeca.NotBefore(time.Now().Add(-2*time.Hour)),
 		fakeca.NotAfter(time.Now().Add(-time.Hour)),
 	)
-
 	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 		t.Fatal(err)
 	}
+	before := storedKeys(t, kr)
 
 	// Expired cert is a miss, not an error...
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
 		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
 	}
+	// ...that leaves the keyring untouched...
+	if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys changed by GetCredentials (-want +got):\n%s", diff)
+	}
+	// ...and the next store replaces it and collects the expired data.
+	assertReplacedByStore(t, kr, c.Config)
+}
 
-	// ...and the entries are removed.
-	if _, err := kr.Get(cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrKeyNotFound) {
-		t.Errorf("credential entry not deleted: %v", err)
+// assertReplacedByStore stores a fresh credential for cfg and checks it
+// becomes current with nothing else left under its key.
+func assertReplacedByStore(t *testing.T, kr keyring.Keyring, cfg *config.Config) {
+	t.Helper()
+	ctx := context.Background()
+
+	fresh, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	fresh.Config = cfg
+	if err := fresh.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatalf("StoreCert: %v", err)
 	}
-	entries, err := c.List(ctx)
+	key := cache.CredentialKey(cfg)
+	if diff := cmp.Diff(entryKeys(key, storedHeader(t, kr, key)), storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys after store (-want +got):\n%s", diff)
+	}
+	_, gotCert, _, err := fresh.GetCredentials(ctx, cfg)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("GetCredentials after store: %v", err)
 	}
-	if diff := cmp.Diff([]api.CredentialInfo{}, entries); diff != "" {
-		t.Errorf("List (-want +got):\n%s", diff)
+	if diff := cmp.Diff(certPEM, gotCert); diff != "" {
+		t.Errorf("cert mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -435,17 +452,18 @@ func TestCollectGenerations(t *testing.T) {
 	key := cache.CredentialKey(c.Config)
 
 	// Unreferenced generations, e.g. orphaned when two concurrent stores
-	// replaced the same header: one old enough to collect, and one young
-	// enough that a concurrent store may be about to publish it.
-	oldGen, err := newGenerationAt(time.Now().Add(-2 * generationGrace))
+	// replaced the same header: one whose cert has expired (useless, so
+	// collected), and one whose cert is still valid (a concurrent store may
+	// be about to publish it, so kept).
+	expiredGen, err := newGeneration(time.Now().Add(-time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
-	youngGen, err := newGenerationAt(time.Now())
+	validGen, err := newGeneration(time.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range []string{dataKey(key, oldGen, 0), dataKey(key, youngGen, 0)} {
+	for _, k := range []string{dataKey(key, expiredGen, 0), dataKey(key, validGen, 0)} {
 		if err := kr.Set(keyring.Item{Key: k, Data: []byte("chunk")}); err != nil {
 			t.Fatal(err)
 		}
@@ -456,7 +474,7 @@ func TestCollectGenerations(t *testing.T) {
 	}
 
 	h := storedHeader(t, kr, key)
-	want := append(entryKeys(key, h), dataKey(key, youngGen, 0))
+	want := append(entryKeys(key, h), dataKey(key, validGen, 0))
 	sort.Strings(want)
 	if diff := cmp.Diff(want, storedKeys(t, kr)); diff != "" {
 		t.Errorf("keys after store (-want +got):\n%s", diff)
@@ -506,13 +524,14 @@ func TestCorruptChunk(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	before := storedKeys(t, kr)
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
 		t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
 	}
-	// Generations are immutable, so a mismatch is corruption - deleted.
-	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
-		t.Errorf("keys after corrupt read (-want +got):\n%s", diff)
+	if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys changed by GetCredentials (-want +got):\n%s", diff)
 	}
+	assertReplacedByStore(t, kr, c.Config)
 }
 
 func TestValidationFailure(t *testing.T) {
@@ -524,16 +543,17 @@ func TestValidationFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reads with roots from a different CA must fail and remove the entry.
+	// Reads with roots from a different CA fail validation. An invalid cert
+	// is a miss (so signing falls back quietly), not an error, and the read
+	// leaves the keyring untouched.
 	other := fakeca.New(fakeca.IsCA)
 	c.Roots = other.ChainPool()
-	// An invalid cert is a miss (so signing falls back quietly), not an
-	// error.
+	before := storedKeys(t, kr)
 	if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
 		t.Fatalf("GetCredentials: want ErrNotFound with wrong roots, got %v", err)
 	}
-	if _, err := kr.Get(cache.CredentialKey(c.Config)); !errors.Is(err, keyring.ErrKeyNotFound) {
-		t.Errorf("credential entry not deleted: %v", err)
+	if diff := cmp.Diff(before, storedKeys(t, kr)); diff != "" {
+		t.Errorf("keys changed by GetCredentials (-want +got):\n%s", diff)
 	}
 }
 
@@ -606,18 +626,18 @@ func TestMalformedEntry(t *testing.T) {
 				t.Error("List: expected Error to be set for unreadable entry")
 			}
 
-			// Malformed entries are a miss, not an error, and are removed
-			// along with everything stored under them.
+			// Malformed entries are a miss, not an error.
 			if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
 				t.Fatalf("GetCredentials: want ErrNotFound, got %v", err)
 			}
-			if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("keys after malformed read (-want +got):\n%s", diff)
-			}
 
-			// The identity can be re-cached afterwards.
+			// The next store replaces the entry and collects everything
+			// left under it, from either layout.
 			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
 				t.Fatalf("StoreCert: %v", err)
+			}
+			if diff := cmp.Diff(entryKeys(key, storedHeader(t, kr, key)), storedKeys(t, kr)); diff != "" {
+				t.Errorf("keys after store (-want +got):\n%s", diff)
 			}
 			if _, _, _, err := c.GetCredentials(ctx, c.Config); err != nil {
 				t.Errorf("GetCredentials after re-store: %v", err)
@@ -733,46 +753,25 @@ func TestListValidatesPayload(t *testing.T) {
 }
 
 func TestDeleteRemovesAllGenerations(t *testing.T) {
+	kr := keyring.NewArrayKeyring(nil)
 	ctx := context.Background()
 
-	for _, tc := range []struct {
-		name   string
-		caOpts []fakeca.Option
-		delete func(c *Cache) error
-	}{{
-		name:   "Delete",
-		delete: func(c *Cache) error { return c.Delete(ctx) },
-	}, {
-		// Expired entries are deleted on read.
-		name:   "expired on read",
-		caOpts: []fakeca.Option{fakeca.NotBefore(time.Now().Add(-2 * time.Hour)), fakeca.NotAfter(time.Now().Add(-time.Hour))},
-		delete: func(c *Cache) error {
-			if _, _, _, err := c.GetCredentials(ctx, c.Config); !errors.Is(err, cache.ErrNotFound) {
-				return fmt.Errorf("GetCredentials: want ErrNotFound, got %w", err)
-			}
-			return nil
-		},
-	}} {
-		t.Run(tc.name, func(t *testing.T) {
-			kr := keyring.NewArrayKeyring(nil)
-			c, priv, certPEM, chainPEM := newTestCredential(t, kr, tc.caOpts...)
-			if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
-				t.Fatal(err)
-			}
-			key := cache.CredentialKey(c.Config)
-			// Chunks of another generation, e.g. from a concurrent store
-			// whose header hasn't been (or was just) replaced.
-			if err := kr.Set(keyring.Item{Key: dataKey(key, "concurrent", 0), Data: []byte("chunk")}); err != nil {
-				t.Fatal(err)
-			}
+	c, priv, certPEM, chainPEM := newTestCredential(t, kr)
+	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err != nil {
+		t.Fatal(err)
+	}
+	key := cache.CredentialKey(c.Config)
+	// Chunks of another generation, e.g. from a concurrent store whose
+	// header hasn't been (or was just) replaced.
+	if err := kr.Set(keyring.Item{Key: dataKey(key, "concurrent", 0), Data: []byte("chunk")}); err != nil {
+		t.Fatal(err)
+	}
 
-			if err := tc.delete(c); err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("keys after delete (-want +got):\n%s", diff)
-			}
-		})
+	if err := c.Delete(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{}, storedKeys(t, kr), cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("keys after delete (-want +got):\n%s", diff)
 	}
 }
 
@@ -831,40 +830,84 @@ func TestDeleteReportsChunkFailures(t *testing.T) {
 	}
 }
 
-func TestStorePausedPastGrace(t *testing.T) {
+// pausingKeyring runs hook (once) when Keys is called while armed, after
+// enumerating but before returning - pausing a collector between reading the
+// keyring and deleting from it.
+type pausingKeyring struct {
+	keyring.Keyring
+	armed bool
+	hook  func()
+}
+
+func (p *pausingKeyring) Keys() ([]string, error) {
+	keys, err := p.Keyring.Keys()
+	if p.armed && p.hook != nil {
+		f := p.hook
+		p.hook = nil
+		f()
+	}
+	return keys, err
+}
+
+func (p *pausingKeyring) Set(item keyring.Item) error {
+	return p.Keyring.Set(item)
+}
+
+func TestCollectorPausedAfterEnumeration(t *testing.T) {
 	ctx := context.Background()
 
+	// Writer A writes its chunks and stalls before publishing. Collector B
+	// stores, reads the current header, and enumerates the keyring - seeing
+	// A's chunks as unreferenced - then pauses. A publishes and finishes.
+	// When B resumes, its view is stale; A's now-current chunks must
+	// survive. The handoffs below are sequential, so the keyring is never
+	// accessed concurrently.
 	arr := keyring.NewArrayKeyring(nil)
-	hk := &hookKeyring{Keyring: arr, before: true}
+	chunksWritten, publish, aDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 
-	// Writer A stalls between writing its chunks and publishing its header
-	// for longer than generationGrace (simulated by stamping its
-	// generations in the past), so writer B's garbage collection removes
-	// A's unpublished chunks.
-	a, privA, certA, chainA := newTestCredential(t, hk)
+	a, privA, certA, chainA := newTestCredential(t, arr)
 	b, privB, certB, chainB := newTestCredential(t, arr)
 	a.maxEntrySize, b.maxEntrySize = 512, 512
-	a.clock = func() time.Time { return time.Now().Add(-2 * generationGrace) }
 	key := cache.CredentialKey(a.Config)
 
-	hk.match = func(item keyring.Item) bool { return item.Key == key }
-	hk.hook = func() {
-		if err := b.StoreCert(ctx, privB, certB, chainB); err != nil {
-			t.Fatalf("concurrent StoreCert: %v", err)
-		}
-		// Confirm B really collected A's paused generation.
-		for _, k := range storedKeys(t, arr) {
-			if gen, ok := generationOf(key, k); ok && gen != storedHeader(t, arr, key).Generation {
-				t.Fatalf("expected B to collect A's paused chunks, found %q", k)
-			}
-		}
+	// Seed an expired orphan so B's collection has real work to do.
+	expiredGen, err := newGeneration(time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := arr.Set(keyring.Item{Key: dataKey(key, expiredGen, 0), Data: []byte("chunk")}); err != nil {
+		t.Fatal(err)
 	}
 
-	// A notices its payload was collected and republishes, so its success
-	// means a readable credential.
-	if err := a.StoreCert(ctx, privA, certA, chainA); err != nil {
-		t.Fatalf("StoreCert: %v", err)
+	// A stalls just before writing its header.
+	a.Keyring = &hookKeyring{
+		Keyring: arr,
+		before:  true,
+		match:   func(item keyring.Item) bool { return item.Key == key },
+		hook: func() {
+			close(chunksWritten)
+			<-publish
+		},
 	}
+	go func() { aDone <- a.StoreCert(ctx, privA, certA, chainA) }()
+	<-chunksWritten
+
+	// B pauses after enumerating, letting A publish and finish.
+	b.Keyring = &pausingKeyring{
+		Keyring: arr,
+		armed:   true,
+		hook: func() {
+			close(publish)
+			if err := <-aDone; err != nil {
+				t.Errorf("A StoreCert: %v", err)
+			}
+		},
+	}
+	if err := b.StoreCert(ctx, privB, certB, chainB); err != nil {
+		t.Fatalf("B StoreCert: %v", err)
+	}
+
+	// A published last, so its credential is current - and still readable.
 	reader := &Cache{Roots: a.Roots, Config: a.Config, Keyring: arr}
 	_, gotCert, gotChain, err := reader.GetCredentials(ctx, reader.Config)
 	if err != nil {
@@ -876,46 +919,8 @@ func TestStorePausedPastGrace(t *testing.T) {
 	if diff := cmp.Diff(chainA, gotChain); diff != "" {
 		t.Errorf("chain mismatch (-want +got):\n%s", diff)
 	}
-}
-
-// collectingKeyring removes every payload chunk just before any header is
-// written, simulating a store that is garbage-collected on every attempt.
-type collectingKeyring struct {
-	keyring.Keyring
-	header string
-}
-
-func (k collectingKeyring) Set(item keyring.Item) error {
-	if item.Key == k.header {
-		keys, err := k.Keys()
-		if err != nil {
-			return err
-		}
-		for _, key := range keys {
-			if strings.Contains(key, dataKeyMarker) {
-				if err := k.Remove(key); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return k.Keyring.Set(item)
-}
-
-func TestStoreCollectedEveryAttempt(t *testing.T) {
-	ctx := context.Background()
-
-	arr := keyring.NewArrayKeyring(nil)
-	c, priv, certPEM, chainPEM := newTestCredential(t, arr)
-	c.Keyring = collectingKeyring{Keyring: arr, header: cache.CredentialKey(c.Config)}
-
-	// If the payload never survives, the store reports failure instead of
-	// success with an unreadable credential...
-	if err := c.StoreCert(ctx, priv, certPEM, chainPEM); err == nil {
-		t.Fatal("StoreCert: expected error when the payload is collected every attempt")
-	}
-	// ...and doesn't leave a header pointing at missing data.
-	if diff := cmp.Diff([]string{}, storedKeys(t, arr), cmpopts.EquateEmpty()); diff != "" {
-		t.Errorf("keys after failed store (-want +got):\n%s", diff)
+	// The expired orphan was still collected.
+	if _, err := arr.Get(dataKey(key, expiredGen, 0)); !errors.Is(err, keyring.ErrKeyNotFound) {
+		t.Errorf("expired orphan not collected: %v", err)
 	}
 }

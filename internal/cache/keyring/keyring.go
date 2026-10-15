@@ -20,7 +20,7 @@
 // Credentials are cached per identity, keyed by cache.CredentialKey (the
 // gitsign configuration used to obtain them). Multiple identities can be
 // stored concurrently; entries live for the lifetime of the certificate and
-// are removed lazily on read once expired.
+// are cleaned up by the next store for the identity once expired.
 //
 // On macOS the Keychain is accessed via Security.framework, which requires
 // gitsign to be built with cgo.
@@ -61,16 +61,6 @@ const (
 	// payload is split across entries and the header must fit in one.
 	defaultMaxEntrySize = 2000
 
-	// generationGrace is how long an unreferenced generation is left alone
-	// before StoreCert garbage-collects it. A concurrent store writes its
-	// chunks before its header, so a young unreferenced generation may still
-	// be about to become current; a store never takes anywhere near this
-	// long.
-	generationGrace = 5 * time.Minute
-	// maxPublishAttempts bounds how often StoreCert republishes after its
-	// payload was garbage-collected while it stalled.
-	maxPublishAttempts = 3
-
 	envelopeVersion = 2
 )
 
@@ -80,10 +70,11 @@ type header struct {
 	Version  int       `json:"version"`
 	NotAfter time.Time `json:"notAfter"`
 	// Generation names the payload chunks written by one StoreCert call
-	// (<key>/data/<generation>/<i>), prefixed with its creation time so
-	// superseded generations can be garbage-collected. Chunks are never
-	// modified after being written, so concurrent stores can't corrupt each
-	// other: a reader either sees a complete generation or a miss.
+	// (<key>/data/<generation>/<i>), prefixed with the cert's NotAfter so
+	// unreferenced generations can be garbage-collected once they're useless.
+	// Chunks are never modified after being written, so concurrent stores
+	// can't corrupt each other: a reader either sees a complete generation or
+	// a miss.
 	Generation string `json:"generation"`
 	Chunks     int    `json:"chunks"`
 	// SHA256 is the hex SHA-256 of the reassembled payload.
@@ -109,8 +100,6 @@ type Cache struct {
 	Keyring keyring.Keyring
 	// maxEntrySize overrides the per-entry size limit. For testing.
 	maxEntrySize int
-	// clock overrides the time used to stamp new generations. For testing.
-	clock func() time.Time
 
 	kr keyring.Keyring
 }
@@ -131,13 +120,6 @@ func (c *Cache) keyring() (keyring.Keyring, error) {
 		c.kr = kr
 	}
 	return c.kr, nil
-}
-
-func (c *Cache) now() time.Time {
-	if c.clock != nil {
-		return c.clock()
-	}
-	return time.Now()
 }
 
 func (c *Cache) entrySize() int {
@@ -197,7 +179,12 @@ func loadPayload(kr keyring.Keyring, key string, h *header) (*payload, error) {
 }
 
 // GetCredentials returns the cached credential for the identity described by
-// cfg. Expired or invalid entries are deleted and reported as a miss/error.
+// cfg. Expired or invalid entries are reported as a miss.
+//
+// Reads never modify the keyring: deleting an entry seen as stale could race
+// with a concurrent store and delete its freshly written credential instead.
+// A miss is followed by a new credential being stored, which replaces the
+// entry and garbage-collects the old data.
 func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.PrivateKey, []byte, []byte, error) {
 	if cfg == nil {
 		cfg = c.Config
@@ -217,36 +204,27 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 
 	h, err := readHeader(item)
 	if err != nil {
-		// e.g. an entry written by an incompatible build - treat as a miss so
-		// it's replaced on the next store.
-		deleteEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
+		// e.g. an entry written by an incompatible build.
+		return nil, nil, nil, fmt.Errorf("%w: %w", cache.ErrNotFound, err)
 	}
 
 	// Cheap expiry check before doing any crypto - the credential is only
 	// useful for the lifetime of the cert.
 	if time.Now().Add(30 * time.Second).After(h.NotAfter) {
-		deleteEntry(kr, key)
 		return nil, nil, nil, fmt.Errorf("%w: stored cert expired", cache.ErrNotFound)
 	}
 
 	p, err := loadPayload(kr, key, h)
 	switch {
-	case errors.Is(err, errReplaced):
-		// Don't delete - the entry now in place is probably valid; just miss
-		// this time.
+	case errors.Is(err, errReplaced), errors.Is(err, errCorrupt):
 		return nil, nil, nil, fmt.Errorf("%w: %w", cache.ErrNotFound, err)
-	case errors.Is(err, errCorrupt):
-		deleteEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
 	case err != nil:
 		return nil, nil, nil, fmt.Errorf("error reading credential from keyring: %w", err)
 	}
 
 	certPEM := []byte(p.Cert)
 	if err := cache.ValidateCert(certPEM, c.Roots, c.Intermediates); err != nil {
-		deleteEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("%w: %w (entry deleted)", cache.ErrNotFound, err)
+		return nil, nil, nil, fmt.Errorf("%w: %w", cache.ErrNotFound, err)
 	}
 
 	var chain []byte
@@ -259,8 +237,7 @@ func (c *Cache) GetCredentials(_ context.Context, cfg *config.Config) (crypto.Pr
 		Chain:      chain,
 	})
 	if err != nil {
-		deleteEntry(kr, key)
-		return nil, nil, nil, fmt.Errorf("%w: error unmarshalling private key (entry deleted): %w", cache.ErrNotFound, err)
+		return nil, nil, nil, fmt.Errorf("%w: error unmarshalling private key: %w", cache.ErrNotFound, err)
 	}
 
 	return privateKey, certPEM, chain, nil
@@ -309,129 +286,97 @@ func (c *Cache) StoreCert(_ context.Context, priv crypto.PrivateKey, cert, chain
 		prev, _ = readHeader(item)
 	}
 
-	// Another store's garbage collection can remove our chunks if we stall
-	// for longer than generationGrace between writing them and publishing
-	// the header. There's no cross-process lock for OS keyrings, so instead
-	// verify after publishing and republish under a fresh generation if our
-	// payload was collected. A successful store therefore always leaves a
-	// readable credential (or has been superseded by a newer one).
-	ours := map[string]bool{}
-	for range maxPublishAttempts {
-		gen, err := newGenerationAt(c.now())
-		if err != nil {
-			return err
-		}
-		ours[gen] = true
-		h := &header{
-			Version:    envelopeVersion,
-			NotAfter:   notAfter,
-			Generation: gen,
-			Chunks:     len(chunks),
-			SHA256:     digest(raw),
-			Meta:       meta,
-		}
-		rawHeader, err := json.Marshal(h)
-		if err != nil {
-			return fmt.Errorf("error marshalling credential header: %w", err)
-		}
-		if len(rawHeader) > c.entrySize() {
-			return fmt.Errorf("credential metadata too large for a keyring entry (%d > %d bytes)", len(rawHeader), c.entrySize())
-		}
+	gen, err := newGeneration(notAfter)
+	if err != nil {
+		return err
+	}
+	h := &header{
+		Version:    envelopeVersion,
+		NotAfter:   notAfter,
+		Generation: gen,
+		Chunks:     len(chunks),
+		SHA256:     digest(raw),
+		Meta:       meta,
+	}
+	rawHeader, err := json.Marshal(h)
+	if err != nil {
+		return fmt.Errorf("error marshalling credential header: %w", err)
+	}
+	if len(rawHeader) > c.entrySize() {
+		return fmt.Errorf("credential metadata too large for a keyring entry (%d > %d bytes)", len(rawHeader), c.entrySize())
+	}
 
-		// Store chunks first so that a reader never sees a header pointing
-		// at chunks that don't exist yet.
-		for i, ch := range chunks {
-			if err := kr.Set(keyring.Item{
-				Key:         dataKey(key, gen, i),
-				Data:        ch,
-				Label:       label,
-				Description: "gitsign signing credential data",
-			}); err != nil {
-				deleteChunks(kr, key, gen, i)
-				return fmt.Errorf("error storing credential in keyring: %w", err)
-			}
-		}
+	// Store chunks first so that a reader never sees a header pointing at
+	// chunks that don't exist yet.
+	for i, ch := range chunks {
 		if err := kr.Set(keyring.Item{
-			Key:         key,
-			Data:        rawHeader,
+			Key:         dataKey(key, gen, i),
+			Data:        ch,
 			Label:       label,
-			Description: "gitsign signing credential",
+			Description: "gitsign signing credential data",
 		}); err != nil {
-			deleteChunks(kr, key, gen, len(chunks))
+			deleteChunks(kr, key, gen, i)
 			return fmt.Errorf("error storing credential in keyring: %w", err)
 		}
-
-		if published(kr, key, h) {
-			collectGenerations(kr, key, gen, prev)
-			return nil
-		}
-		// Our payload was collected while we stalled. Drop what's left of
-		// it and try again.
+	}
+	if err := kr.Set(keyring.Item{
+		Key:         key,
+		Data:        rawHeader,
+		Label:       label,
+		Description: "gitsign signing credential",
+	}); err != nil {
 		deleteChunks(kr, key, gen, len(chunks))
+		return fmt.Errorf("error storing credential in keyring: %w", err)
 	}
 
-	// Don't leave our header pointing at a missing payload.
-	if item, err := kr.Get(key); err == nil {
-		if cur, err := readHeader(item); err == nil && ours[cur.Generation] {
-			_ = kr.Remove(key)
-		}
-	}
-	return errors.New("error storing credential in keyring: stored data was removed by a concurrent store")
+	collectGenerations(kr, key, gen, prev)
+	return nil
 }
 
-// published reports whether a just-published header h left a usable
-// credential: either h is current and its payload loads, or a concurrent
-// store has since superseded it with its own.
-func published(kr keyring.Keyring, key string, h *header) bool {
-	item, err := kr.Get(key)
-	if err != nil {
-		return false
-	}
-	cur, err := readHeader(item)
-	if err != nil {
-		return false
-	}
-	if cur.Generation != h.Generation {
-		return true
-	}
-	_, err = loadPayload(kr, key, h)
-	return err == nil
-}
-
-// collectGenerations removes, best effort, payload generations that are no
-// longer referenced after a store of generation own:
+// collectGenerations removes, best effort, data that is no longer referenced
+// after a store of generation own:
 //
 //   - prev, the generation this store replaced;
 //   - own, if a concurrent store has already published a newer header;
-//   - any other unreferenced generation older than generationGrace, e.g.
-//     one orphaned when two concurrent stores replaced the same header.
+//   - any other unreferenced generation whose cert has expired, e.g. one
+//     orphaned when two concurrent stores replaced the same header;
+//   - leftovers from older entry layouts.
 //
-// It never removes the current header's generation, or a young generation a
-// concurrent store may be about to publish.
+// None of these can be the payload of a usable credential: prev and a
+// superseded own generation are never published again, and an expired
+// generation can't be used even if it is (or becomes) current. That makes
+// collection safe without cross-process coordination, even if this
+// collector's view of the current header is stale by the time it deletes.
 func collectGenerations(kr keyring.Keyring, key, own string, prev *header) {
 	if prev != nil && prev.Generation != own {
 		deleteChunks(kr, key, prev.Generation, prev.Chunks)
 	}
 
-	item, err := kr.Get(key)
-	if err != nil {
-		return
-	}
-	cur, err := readHeader(item)
-	if err != nil {
-		return
+	current := ""
+	if item, err := kr.Get(key); err == nil {
+		if cur, err := readHeader(item); err == nil {
+			current = cur.Generation
+		}
 	}
 	keys, err := kr.Keys()
 	if err != nil {
 		return
 	}
-	cutoff := time.Now().Add(-generationGrace)
+	now := time.Now()
 	for _, k := range keys {
-		gen, ok := generationOf(key, k)
-		if !ok || gen == cur.Generation {
+		if !strings.HasPrefix(k, key+"/") {
 			continue
 		}
-		if gen == own || generationTime(gen).Before(cutoff) {
+		gen, ok := generationOf(key, k)
+		switch {
+		case !ok:
+			// Not a payload chunk: left over from an older layout.
+			_ = kr.Remove(k)
+		case gen == current:
+		case gen == own && current != "":
+			// Superseded by a concurrent store.
+			_ = kr.Remove(k)
+		case generationNotAfter(gen).Before(now):
 			_ = kr.Remove(k)
 		}
 	}
@@ -537,12 +482,6 @@ func isCredentialKey(key string) bool {
 	return ok && !strings.Contains(rest, "/")
 }
 
-// deleteEntry removes the credential header and everything stored under it.
-// Best-effort.
-func deleteEntry(kr keyring.Keyring, key string) {
-	_, _ = deleteAllForKey(kr, key)
-}
-
 // deleteAllForKey removes the credential header and every chunk stored under
 // it, of any generation (found by enumeration, best effort). Removing only
 // the generation named by a header read earlier would race with StoreCert: a
@@ -580,19 +519,20 @@ func deleteChunks(kr keyring.Keyring, key, gen string, chunks int) {
 	}
 }
 
-// newGenerationAt returns a unique generation ID: the creation time (hex unix
-// nanoseconds) followed by random bytes.
-func newGenerationAt(t time.Time) (string, error) {
+// newGeneration returns a unique generation ID for a credential whose cert
+// expires at notAfter: the expiry (hex unix nanoseconds) followed by random
+// bytes.
+func newGeneration(notAfter time.Time) (string, error) {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("error generating credential generation: %w", err)
 	}
-	return fmt.Sprintf("%016x-%s", t.UnixNano(), hex.EncodeToString(b)), nil
+	return fmt.Sprintf("%016x-%s", notAfter.UnixNano(), hex.EncodeToString(b)), nil
 }
 
-// generationTime returns when a generation was created. Unparseable IDs
-// (e.g. from an older layout) are treated as infinitely old.
-func generationTime(gen string) time.Time {
+// generationNotAfter returns when a generation's cert expires. Unparseable
+// IDs (e.g. from an older layout) are treated as expired.
+func generationNotAfter(gen string) time.Time {
 	ts, _, ok := strings.Cut(gen, "-")
 	if !ok {
 		return time.Time{}

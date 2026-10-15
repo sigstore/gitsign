@@ -41,9 +41,9 @@ func openSystemKeyring() (keyring.Keyring, error) {
 		KeychainTrustApplication:       true,
 		KeychainSynchronizable:         false,
 		KeychainAccessibleWhenUnlocked: true,
-		// Linux: use the default collection instead of creating a
+		// Linux: use the user's default collection instead of creating a
 		// gitsign-specific one (which would prompt for a new password).
-		LibSecretCollectionName: "login",
+		LibSecretCollectionName: defaultCollection(),
 		WinCredPrefix:           serviceName,
 		KWalletAppID:            serviceName,
 		KWalletFolder:           serviceName,

@@ -28,8 +28,9 @@ export GITSIGN_CREDENTIAL_CACHE_MODE=system
 
 The first `git commit -S` runs the normal OIDC flow and stores the resulting
 credential; subsequent signatures reuse it until the certificate expires.
-Expired or invalid entries are removed automatically the next time they are
-read. If the keyring is unavailable (e.g. locked, or no D-Bus session on a
+Expired or invalid entries are treated as a cache miss: the new credential
+obtained afterwards replaces them, and their data is cleaned up then. If the
+keyring is unavailable (e.g. locked, or no D-Bus session on a
 headless Linux host), gitsign falls back to the normal OIDC flow.
 
 ## Platform notes
@@ -111,7 +112,8 @@ keyring.
 - Unlike the in-memory daemon, keyring entries are persisted (encrypted at
   rest by the OS) and survive reboots. The exposure window is bounded by the
   certificate lifetime — expired entries are useless for signing and are
-  cleaned up lazily on the next read — but entries for identities you stop
+  cleaned up the next time a credential is stored for that identity — but
+  entries for identities you stop
   using may linger until then (or until you run
   `gitsign credentials clear --all`).
 - Do not use credential caching on shared systems.

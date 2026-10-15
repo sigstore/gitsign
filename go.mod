@@ -13,6 +13,7 @@ require (
 	github.com/go-openapi/runtime v0.32.6
 	github.com/go-openapi/strfmt v0.27.0
 	github.com/go-openapi/swag/conv v0.27.3
+	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2
 	github.com/google/go-cmp v0.7.0
 	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
@@ -153,7 +154,6 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.27.3 // indirect
 	github.com/go-openapi/validate v0.26.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
