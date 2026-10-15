@@ -97,6 +97,8 @@ func (o *options) Run(_ io.Writer, args []string) error {
 		return fmt.Errorf("%w: %q", git.ErrUnsupportedSignatureType, p.Type)
 	}
 
+	defaultCertIdentity(&o.CertVerifyOptions, repo, *h)
+
 	v, err := gitsign.NewVerifierWithCosignOpts(ctx, o.Config, &o.CertVerifyOptions)
 	if err != nil {
 		return err
@@ -109,6 +111,25 @@ func (o *options) Run(_ io.Writer, args []string) error {
 	PrintSummary(os.Stdout, summary)
 
 	return nil
+}
+
+// defaultCertIdentity fills opts.CertIdentity with h's committer email when
+// the caller didn't specify an identity to verify against (neither
+// --certificate-identity nor --certificate-identity-regexp). This mirrors
+// the identity Fulcio embeds for interactive keyless signing, so verifying a
+// commit against its own committer no longer requires spelling out
+// --certificate-identity by hand. An explicit --certificate-identity or
+// --certificate-identity-regexp is left untouched.
+// See https://github.com/sigstore/gitsign/issues/293.
+func defaultCertIdentity(opts *cosignopts.CertVerifyOptions, repo *gogit.Repository, h plumbing.Hash) {
+	if opts.CertIdentity != "" || opts.CertIdentityRegexp != "" {
+		return
+	}
+	commitObj, err := repo.CommitObject(h)
+	if err != nil || commitObj.Committer.Email == "" {
+		return
+	}
+	opts.CertIdentity = commitObj.Committer.Email
 }
 
 func PrintSummary(w io.Writer, summary *git.VerificationSummary) {

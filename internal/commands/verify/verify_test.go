@@ -21,6 +21,7 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	cosignopts "github.com/sigstore/cosign/v3/cmd/cosign/cli/options"
 	"github.com/sigstore/gitsign/pkg/git"
 )
 
@@ -70,4 +71,64 @@ hi
 	if !errors.Is(err, git.ErrUnsupportedSignatureType) {
 		t.Fatalf("want error wrapping ErrUnsupportedSignatureType, got %v", err)
 	}
+}
+
+// TestDefaultCertIdentity confirms verify defaults --certificate-identity to
+// the target commit's committer email when the caller didn't set
+// --certificate-identity or --certificate-identity-regexp explicitly, and
+// leaves an explicit setting alone. See
+// https://github.com/sigstore/gitsign/issues/293.
+func TestDefaultCertIdentity(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo, err := gogit.PlainInit(tmpDir, false)
+	if err != nil {
+		t.Fatalf("PlainInit: %v", err)
+	}
+
+	raw := []byte(`tree b333504b8cf3d9c314fed2cc242c5c38e89534a5
+author Alice <alice@example.com> 1700000000 +0000
+committer Alice <alice@example.com> 1700000000 +0000
+
+hi
+`)
+	obj := repo.Storer.NewEncodedObject()
+	obj.SetType(plumbing.CommitObject)
+	w, err := obj.Writer()
+	if err != nil {
+		t.Fatalf("obj.Writer: %v", err)
+	}
+	if _, err := w.Write(raw); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	h, err := repo.Storer.SetEncodedObject(obj)
+	if err != nil {
+		t.Fatalf("SetEncodedObject: %v", err)
+	}
+
+	t.Run("empty identity defaults to committer email", func(t *testing.T) {
+		opts := &cosignopts.CertVerifyOptions{}
+		defaultCertIdentity(opts, repo, h)
+		if want := "alice@example.com"; opts.CertIdentity != want {
+			t.Errorf("CertIdentity = %q, want %q", opts.CertIdentity, want)
+		}
+	})
+
+	t.Run("explicit identity is not overwritten", func(t *testing.T) {
+		opts := &cosignopts.CertVerifyOptions{CertIdentity: "bob@example.com"}
+		defaultCertIdentity(opts, repo, h)
+		if want := "bob@example.com"; opts.CertIdentity != want {
+			t.Errorf("CertIdentity = %q, want unchanged %q", opts.CertIdentity, want)
+		}
+	})
+
+	t.Run("explicit identity-regexp suppresses the default", func(t *testing.T) {
+		opts := &cosignopts.CertVerifyOptions{CertIdentityRegexp: ".*@example.com"}
+		defaultCertIdentity(opts, repo, h)
+		if opts.CertIdentity != "" {
+			t.Errorf("CertIdentity = %q, want empty when CertIdentityRegexp is set", opts.CertIdentity)
+		}
+	})
 }
