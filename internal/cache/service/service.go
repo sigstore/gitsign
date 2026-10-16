@@ -20,14 +20,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/patrickmn/go-cache"
+	gocache "github.com/patrickmn/go-cache"
+	"github.com/sigstore/gitsign/internal/cache"
 	"github.com/sigstore/gitsign/internal/cache/api"
 	"github.com/sigstore/gitsign/internal/fulcio"
-	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 type Service struct {
-	store *cache.Cache
+	store *gocache.Cache
 }
 
 const (
@@ -35,16 +35,45 @@ const (
 	cleanupInterval   = 1 * time.Minute
 )
 
+// record is what's stored per credential - the credential itself plus
+// metadata for enumeration.
+type record struct {
+	Credential *api.Credential
+	Info       api.CredentialInfo
+}
+
 func NewService() *Service {
 	s := &Service{
-		store: cache.New(defaultExpiration, cleanupInterval),
+		store: gocache.New(defaultExpiration, cleanupInterval),
 	}
 	return s
 }
 
+// store saves the credential with a TTL matching the certificate lifetime,
+// overwriting any existing entry for the ID.
+func (s *Service) storeCredential(id string, cred *api.Credential, meta api.Metadata) error {
+	notAfter, err := cache.NotAfter(cred.Cert)
+	if err != nil {
+		return err
+	}
+	ttl := time.Until(notAfter)
+	if ttl <= 0 {
+		return fmt.Errorf("certificate is already expired (NotAfter: %s)", notAfter)
+	}
+	s.store.Set(id, &record{
+		Credential: cred,
+		Info: api.CredentialInfo{
+			ID:       id,
+			NotAfter: notAfter,
+			Meta:     meta,
+		},
+	}, ttl)
+	return nil
+}
+
 func (s *Service) StoreCredential(req api.StoreCredentialRequest, resp *api.Credential) error {
 	fmt.Println("Store", req.ID)
-	if err := s.store.Add(req.ID, req.Credential, 10*time.Minute); err != nil {
+	if err := s.storeCredential(req.ID, req.Credential, req.Meta); err != nil {
 		return err
 	}
 	*resp = *req.Credential
@@ -57,11 +86,11 @@ func (s *Service) GetCredential(req api.GetCredentialRequest, resp *api.Credenti
 	i, ok := s.store.Get(req.ID)
 	if ok {
 		fmt.Println("gitsign-credential-cache: found credential!")
-		cred, ok := i.(*api.Credential)
+		rec, ok := i.(*record)
 		if !ok {
 			return fmt.Errorf("unknown credential type %T", i)
 		}
-		*resp = *cred
+		*resp = *rec.Credential
 		return nil
 	}
 
@@ -77,19 +106,43 @@ func (s *Service) GetCredential(req api.GetCredentialRequest, resp *api.Credenti
 	if err != nil {
 		return fmt.Errorf("error getting new identity: %w", err)
 	}
-	privPEM, err := cryptoutils.MarshalPrivateKeyToPEM(id.PrivateKey)
+	cred, err := cache.EncodeCredential(id.PrivateKey, id.CertPEM, id.ChainPEM)
 	if err != nil {
 		return err
 	}
-	cred := &api.Credential{
-		PrivateKey: privPEM,
-		Cert:       id.CertPEM,
-		Chain:      id.ChainPEM,
-	}
-	if err := s.store.Add(req.ID, cred, 10*time.Minute); err != nil {
+	if err := s.storeCredential(req.ID, cred, cache.MetadataFromConfig(req.Config)); err != nil {
 		// We still generated the credential just fine, so only log the error.
 		fmt.Printf("error storing credential: %v\n", err)
 	}
 	*resp = *cred
+	return nil
+}
+
+func (s *Service) ListCredentials(_ api.ListCredentialsRequest, resp *[]api.CredentialInfo) error {
+	fmt.Println("List")
+	out := []api.CredentialInfo{}
+	for _, item := range s.store.Items() {
+		rec, ok := item.Object.(*record)
+		if !ok {
+			continue
+		}
+		out = append(out, rec.Info)
+	}
+	*resp = out
+	return nil
+}
+
+func (s *Service) DeleteCredential(req api.DeleteCredentialRequest, _ *api.DeleteCredentialsResponse) error {
+	fmt.Println("Delete", req.ID)
+	if _, ok := s.store.Get(req.ID); !ok {
+		return fmt.Errorf("%q not found", req.ID)
+	}
+	s.store.Delete(req.ID)
+	return nil
+}
+
+func (s *Service) DeleteAllCredentials(_ api.DeleteAllCredentialsRequest, _ *api.DeleteCredentialsResponse) error {
+	fmt.Println("DeleteAll")
+	s.store.Flush()
 	return nil
 }

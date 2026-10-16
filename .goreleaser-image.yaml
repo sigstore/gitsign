@@ -1,0 +1,44 @@
+project_name: gitsign
+version: 2
+
+# Container image only - binaries and the GitHub release are published by
+# .goreleaser.yaml and .goreleaser-darwin.yaml. See
+# .github/workflows/release.yml.
+
+gomod:
+  proxy: true
+
+builds:
+  - skip: true
+
+kos:
+  - id: gitsign
+    repositories:
+      - github.com/sigstore/gitsign
+    tags:
+      - 'v{{ .Version }}'
+    ldflags:
+      - "-s -w -extldflags=-zrelro -extldflags=-znow -buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
+    main: .
+    bare: true
+    preserve_import_paths: false
+    base_import_paths: false
+    sbom: spdx
+    # then it have a shell
+    base_image: cgr.dev/chainguard/git:latest-dev
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm
+
+checksum:
+  disable: true
+
+changelog:
+  disable: true
+
+source:
+  enabled: false
+
+release:
+  disable: true

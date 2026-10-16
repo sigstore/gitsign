@@ -1,0 +1,70 @@
+project_name: gitsign
+version: 2
+
+# macOS gitsign binaries. These need cgo for native Keychain access
+# (credentialCacheMode: system), so they must be built on a macOS host.
+# Everything else is released by .goreleaser.yaml; both configs publish into
+# the same draft release - see .github/workflows/release.yml.
+
+gomod:
+  proxy: true
+
+builds:
+  - id: gitsign-darwin
+    binary: gitsign
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    env:
+      - CGO_ENABLED=1
+    flags:
+      - -trimpath
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    # No -z linker flags: they're ELF-only and the darwin external linker
+    # rejects them.
+    ldflags:
+      - "-s -w"
+      - "-buildid= -X github.com/sigstore/gitsign/pkg/version.gitVersion={{ .Version }}"
+
+archives:
+  - id: binary
+    formats:
+      - binary
+
+checksum:
+  # Distinct from checksums.txt, which is published by .goreleaser.yaml.
+  name_template: 'checksums-darwin.txt'
+
+# Release notes and the source archive are published by .goreleaser.yaml.
+changelog:
+  disable: true
+
+source:
+  enabled: false
+
+sboms:
+  - id: binaries
+    artifacts: binary
+
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_YES=true
+    signature: '${artifact}.bundle'
+    args:
+      - sign-blob
+      - '--bundle=${signature}'
+      - '${artifact}'
+    artifacts: binary
+    output: true
+
+release:
+  prerelease: allow
+  draft: true
+  use_existing_draft: true
+  mode: keep-existing # release notes come from .goreleaser.yaml
+  github:
+    owner: sigstore
+    name: gitsign

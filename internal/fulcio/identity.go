@@ -23,14 +23,14 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
-	"net/rpc"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/sigstore/cosign/v3/pkg/providers"
 	"github.com/sigstore/gitsign/internal/cache"
+	"github.com/sigstore/gitsign/internal/cache/keyring"
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	"github.com/sigstore/gitsign/internal/signerverifier"
@@ -56,27 +56,8 @@ type Identity struct {
 }
 
 func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.Writer) (*Identity, error) {
-	var cacheClient *cache.Client
-
-	cachePath := os.Getenv("GITSIGN_CREDENTIAL_CACHE")
-	if cachePath != "" {
-		absPath, err := filepath.Abs(cachePath)
-		if err != nil {
-			return nil, fmt.Errorf("error resolving cache path: %w", err)
-		}
-		rpcClient, err := rpc.Dial("unix", absPath)
-		if err != nil {
-			return nil, fmt.Errorf("error creating RPC socket client: %w", err)
-		}
-		roots, intermediates, err := fulcioroots.NewFromConfig(ctx, cfg)
-		if err != nil {
-			return nil, fmt.Errorf("error loading certificate roots: %w", err)
-		}
-		cacheClient = &cache.Client{
-			Client:        rpcClient,
-			Roots:         roots,
-			Intermediates: intermediates,
-		}
+	cacheClient := cacheFromConfig(ctx, cfg, out)
+	if cacheClient != nil {
 		priv, cert, chain, err := cacheClient.GetCredentials(ctx, cfg)
 		if err == nil {
 			return &Identity{
@@ -85,9 +66,11 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 				ChainPEM:   chain,
 			}, nil
 		}
-		// Only print error on failure - if there's a problem fetching
-		// from the cache just fall through to normal OIDC.
-		fmt.Fprintf(out, "error getting cached creds: %v\n", err) // nolint:errcheck
+		// Only print unexpected errors - a plain cache miss (e.g. first
+		// use) is normal. Either way fall through to normal OIDC.
+		if !errors.Is(err, cache.ErrNotFound) {
+			fmt.Fprintf(out, "error getting cached creds: %v\n", err) // nolint:errcheck
+		}
 	}
 
 	idf := &IdentityFactory{
@@ -106,6 +89,51 @@ func NewIdentity(ctx context.Context, cfg *config.Config, in io.Reader, out io.W
 	}
 
 	return id, nil
+}
+
+// cacheFromConfig returns the configured credential cache, or nil if caching
+// is disabled or can't be set up. Cache setup problems (bad mode, unreachable
+// daemon, root loading) are reported but never fail signing - gitsign falls
+// back to the normal OIDC flow.
+func cacheFromConfig(ctx context.Context, cfg *config.Config, out io.Writer) cache.Cache {
+	c, err := newCacheClient(ctx, cfg)
+	if err != nil {
+		fmt.Fprintf(out, "error setting up credential cache, continuing without it: %v\n", err) // nolint:errcheck
+		// Return an untyped nil: c may hold a typed nil (e.g. *cache.Client).
+		return nil
+	}
+	return c
+}
+
+// newCacheClient returns the credential cache backend selected by the config,
+// or nil if credential caching is disabled.
+func newCacheClient(ctx context.Context, cfg *config.Config) (cache.Cache, error) {
+	switch strings.ToLower(cfg.CredentialCacheMode) {
+	case "system":
+		roots, intermediates, err := fulcioroots.NewFromConfig(ctx, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("error loading certificate roots: %w", err)
+		}
+		return &keyring.Cache{
+			Roots:         roots,
+			Intermediates: intermediates,
+			Config:        cfg,
+		}, nil
+	case "", "socket":
+		if cfg.CredentialCache == "" {
+			if cfg.CredentialCacheMode == "" {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("credential cache mode %q requires a socket path (set GITSIGN_CREDENTIAL_CACHE)", cfg.CredentialCacheMode)
+		}
+		roots, intermediates, err := fulcioroots.NewFromConfig(ctx, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("error loading certificate roots: %w", err)
+		}
+		return cache.NewClient(cfg.CredentialCache, cfg, roots, intermediates)
+	default:
+		return nil, fmt.Errorf("unknown credential cache mode %q (expected one of: system, socket)", cfg.CredentialCacheMode)
+	}
 }
 
 // Certificate gets the identity's certificate.
@@ -186,7 +214,7 @@ func (i *Identity) SignerVerifier() (*signerverifier.CertSignerVerifier, error) 
 	}, nil
 }
 
-func (i *Identity) CacheCert(ctx context.Context, cacheClient *cache.Client) error {
+func (i *Identity) CacheCert(ctx context.Context, cacheClient cache.Cache) error {
 	return cacheClient.StoreCert(ctx, i.PrivateKey, i.CertPEM, i.ChainPEM)
 }
 
