@@ -75,9 +75,9 @@ func UploadInTotoAttestation(ctx context.Context, rekorClient *client.Rekor, sig
 // GetEntry fetches the log entry for the given UUID (or shard-prefixed entry
 // ID), checking that the server returned the entry that was asked for.
 func GetEntry(ctx context.Context, rekorClient *client.Rekor, entryUUID string) (*models.LogEntryAnon, error) {
-	params := entries.NewGetLogEntryByUUIDParamsWithContext(ctx)
+	params := entries.NewGetLogEntryByUUIDParams()
 	params.SetEntryUUID(entryUUID)
-	resp, err := rekorClient.Entries.GetLogEntryByUUID(params)
+	resp, err := rekorClient.Entries.GetLogEntryByUUIDContext(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +97,9 @@ func GetEntry(ctx context.Context, rekorClient *client.Rekor, entryUUID string) 
 }
 
 func upload(ctx context.Context, rekorClient *client.Rekor, pe models.ProposedEntry) (*models.LogEntryAnon, error) {
-	params := entries.NewCreateLogEntryParamsWithContext(ctx)
+	params := entries.NewCreateLogEntryParams()
 	params.SetProposedEntry(pe)
-	resp, err := rekorClient.Entries.CreateLogEntry(params)
+	resp, err := rekorClient.Entries.CreateLogEntryContext(ctx, params)
 	if err != nil {
 		// If the entry already exists we get a specific error back. Fetch the
 		// existing entry, verify its inclusion proof, and succeed.
