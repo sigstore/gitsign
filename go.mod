@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/coreos/go-oidc/v3 v3.20.0
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/danieljoos/wincred v1.2.3
 	github.com/github/smimesign v0.2.0
