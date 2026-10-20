@@ -15,14 +15,14 @@ workflows:
         - 'actions/setup-go@v7.0.0'
         - 'anchore/sbom-action@v0.24.3'
         - 'docker/login-action@v4.6.0'
-        - 'goreleaser/goreleaser-action@v7.2.3'
+        - 'goreleaser/goreleaser-action@v7.3.0'
         - 'sigstore/cosign-installer@v4.1.2'
     '.github/workflows/validate-release.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-go@v7.0.0'
         - 'anchore/sbom-action@v0.24.3'
-        - 'goreleaser/goreleaser-action@v7.2.3'
+        - 'goreleaser/goreleaser-action@v7.3.0'
         - 'sigstore/cosign-installer@v4.1.2'
     '.github/workflows/verify.yml':
         - 'actions/checkout@v7.0.1'
@@ -71,9 +71,9 @@ dependencies:
         commit: 'sha1-ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a'
         owner_id: 35628013
         repo_id: 232539879
-    'goreleaser/goreleaser-action@v7.2.3':
-        ref: 'v7.2.3'
-        commit: 'sha1-f06c13b6b1a9625abc9e6e439d9c05a8f2190e94'
+    'goreleaser/goreleaser-action@v7.3.0':
+        ref: 'v7.3.0'
+        commit: 'sha1-a4f02ab5355a589de60d917a659ce617ed19b3de'
         owner_id: 24697112
         repo_id: 209873006
     'sigstore/cosign-installer@v4.1.2':
