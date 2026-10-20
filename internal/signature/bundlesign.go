@@ -227,10 +227,35 @@ func (c *validatingRekorClient) CreateLogEntry(params *entries.CreateLogEntryPar
 	if !ok {
 		return nil, errors.New("rekor response missing log entry")
 	}
-	if entry.Verification == nil || entry.Verification.InclusionProof == nil || entry.Verification.InclusionProof.RootHash == nil {
-		return nil, errors.New("rekor log entry is missing an inclusion proof")
+	if err := checkInclusionProof(entry); err != nil {
+		return nil, err
 	}
 	return resp, nil
+}
+
+// GetLogEntryByUUID is used by sigstore-go to fetch the existing entry when
+// CreateLogEntry returns a 409 Conflict.
+func (c *validatingRekorClient) GetLogEntryByUUID(params *entries.GetLogEntryByUUIDParams, opts ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	resp, err := c.inner.GetLogEntryByUUID(params, opts...)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Payload) == 0 {
+		return nil, errors.New("rekor response missing log entry")
+	}
+	for _, entry := range resp.Payload {
+		if err := checkInclusionProof(entry); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
+
+func checkInclusionProof(entry models.LogEntryAnon) error {
+	if entry.Verification == nil || entry.Verification.InclusionProof == nil || entry.Verification.InclusionProof.RootHash == nil {
+		return errors.New("rekor log entry is missing an inclusion proof")
+	}
+	return nil
 }
 
 // samePublicKey reports whether two public keys are equal, using the key's own
