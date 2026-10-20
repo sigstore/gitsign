@@ -13,7 +13,7 @@ require (
 	github.com/go-openapi/runtime v0.33.3
 	github.com/go-openapi/strfmt v0.27.3
 	github.com/go-openapi/swag/conv v0.29.2
-	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2
+	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
