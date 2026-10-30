@@ -1,6 +1,6 @@
 module github.com/sigstore/gitsign
 
-go 1.27.0
+go 1.27.3
 
 require (
 	github.com/99designs/keyring v1.2.2
