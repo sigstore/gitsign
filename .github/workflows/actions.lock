@@ -14,7 +14,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-go@v7.0.0'
         - 'anchore/sbom-action@v0.24.3'
-        - 'docker/login-action@v4.6.0'
+        - 'docker/login-action@v4.7.0'
         - 'goreleaser/goreleaser-action@v7.3.0'
         - 'sigstore/cosign-installer@v4.1.2'
     '.github/workflows/validate-release.yml':
@@ -61,9 +61,9 @@ dependencies:
         commit: 'sha1-66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c'
         owner_id: 16208487
         repo_id: 399925381
-    'docker/login-action@v4.6.0':
-        ref: 'v4.6.0'
-        commit: 'sha1-dbcb813823bdd20940b903addbd779551569679f'
+    'docker/login-action@v4.7.0':
+        ref: 'v4.7.0'
+        commit: 'sha1-81c6f93d4bc991e510b342a00b419b3bb4efc5c6'
         owner_id: 5429470
         repo_id: 287743349
     'golangci/golangci-lint-action@v9.3.0':
