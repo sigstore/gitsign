@@ -24,6 +24,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/strfmt"
@@ -113,6 +114,16 @@ func (c *Client) WriteMessage(ctx context.Context, message, signature []byte, ce
 	return tlog.Upload(ctx, c.Rekor, signature, checkSum, pem)
 }
 
+// errNoMatchingEntry is returned when the search index has no entry matching
+// the commit SHA + cert.
+var errNoMatchingEntry = errors.New("could not find matching tlog entry")
+
+// searchRetryDelays are the waits between search attempts when no matching
+// entry is found. Rekor updates its search index asynchronously, so an entry
+// uploaded moments ago (e.g. verifying right after signing) may not be
+// searchable yet.
+var searchRetryDelays = []time.Duration{500 * time.Millisecond, time.Second, 2 * time.Second, 4 * time.Second}
+
 func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	h := sha256.New()
 	h.Write(data)
@@ -123,6 +134,23 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 		return nil, err
 	}
 
+	for _, delay := range searchRetryDelays {
+		e, err := c.lookup(ctx, hash, pem, cert)
+		if !errors.Is(err, errNoMatchingEntry) {
+			return e, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+	return c.lookup(ctx, hash, pem, cert)
+}
+
+// lookup searches the Rekor index for entries signed by cert and returns the
+// one whose payload hash matches hash.
+func (c *Client) lookup(ctx context.Context, hash string, pem []byte, cert *x509.Certificate) (*models.LogEntryAnon, error) {
 	uuids, err := c.findTLogEntriesByPK(ctx, pem)
 	if err != nil {
 		return nil, err
@@ -161,7 +189,7 @@ func (c *Client) get(ctx context.Context, data []byte, cert *x509.Certificate) (
 		}
 	}
 
-	return nil, errors.New("could not find matching tlog entry")
+	return nil, errNoMatchingEntry
 }
 
 // findTLogEntriesByPK is roughly equivalent to cosign.FindTLogEntriesByPayload,

@@ -319,6 +319,10 @@ func (f fakeRekorClient) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...en
 	return f.resp, nil
 }
 
+func (f fakeRekorClient) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	return &entries.GetLogEntryByUUIDOK{Payload: f.resp.Payload}, nil
+}
+
 func logEntryResponse(entry models.LogEntryAnon) *entries.CreateLogEntryCreated {
 	const uuid = "test-uuid"
 	return &entries.CreateLogEntryCreated{ETag: uuid, Payload: models.LogEntry{uuid: entry}}
@@ -339,6 +343,12 @@ func TestValidatingRekorClient(t *testing.T) {
 	}
 	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).CreateLogEntry(nil); err == nil {
 		t.Error("expected entry without inclusion proof to be rejected")
+	}
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withProof)}}).GetLogEntryByUUID(nil); err != nil {
+		t.Errorf("expected fetched entry with inclusion proof to pass, got: %v", err)
+	}
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).GetLogEntryByUUID(nil); err == nil {
+		t.Error("expected fetched entry without inclusion proof to be rejected")
 	}
 }
 
