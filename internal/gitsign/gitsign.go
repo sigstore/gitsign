@@ -28,11 +28,13 @@ import (
 	"github.com/sigstore/gitsign/internal/config"
 	"github.com/sigstore/gitsign/internal/fulcio/fulcioroots"
 	rekorinternal "github.com/sigstore/gitsign/internal/rekor"
+	"github.com/sigstore/gitsign/internal/sigstore/localcache"
 	"github.com/sigstore/gitsign/pkg/git"
 	"github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
+	"github.com/sigstore/sigstore/pkg/tuf"
 )
 
 type Verifier struct {
@@ -118,7 +120,7 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 	// and warn if missing.
 	var certverifier cert.Verifier
 	if opts != nil {
-		ctpub, err := cosign.GetCTLogPubs(ctx)
+		ctpub, err := getCTLogPubs(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error getting CT log public key: %w", err)
 		}
@@ -165,7 +167,7 @@ func NewVerifierWithCosignOpts(ctx context.Context, cfg *config.Config, opts *co
 		// verification is disabled.
 		var ctPubs *cosign.TrustedTransparencyLogPubKeys
 		if !ignoreSCT {
-			ctPubs, err = cosign.GetCTLogPubs(ctx)
+			ctPubs, err = getCTLogPubs(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("error getting CT log public keys: %w", err)
 			}
@@ -226,4 +228,35 @@ func (v *Verifier) verifyLegacy(ctx context.Context, data []byte, sig []byte, de
 	}
 
 	return summary, nil
+}
+
+// getCTLogPubs returns the CT log public keys used for SCT verification. When a
+// local sigstore-go-style trusted_root.json is present (see
+// internal/sigstore/localcache), the keys are loaded from it instead of going
+// through cosign's TUF-backed loader, whose embedded root has a short lifetime
+// and breaks once expired. Falls back to cosign.GetCTLogPubs when no local
+// cache is configured.
+func getCTLogPubs(ctx context.Context) (*cosign.TrustedTransparencyLogPubKeys, error) {
+	path, ok := localcache.TrustedRootPath()
+	if !ok {
+		return cosign.GetCTLogPubs(ctx)
+	}
+	tr, err := root.NewTrustedRootFromPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("loading trusted root %s: %w", path, err)
+	}
+	keys := cosign.NewTrustedTransparencyLogPubKeys()
+	for _, log := range tr.CTLogs() {
+		pem, err := cryptoutils.MarshalPublicKeyToPEM(log.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("marshalling CT log public key: %w", err)
+		}
+		if err := keys.AddTransparencyLogPubKey(pem, tuf.Active); err != nil {
+			return nil, fmt.Errorf("adding CT log public key: %w", err)
+		}
+	}
+	if len(keys.Keys) == 0 {
+		return nil, fmt.Errorf("no CT log public keys in trusted root %s", path)
+	}
+	return &keys, nil
 }
