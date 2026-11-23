@@ -26,7 +26,7 @@ require (
 	github.com/sigstore/protobuf-specs v0.5.2
 	github.com/sigstore/rekor v1.5.5
 	github.com/sigstore/sigstore v1.11.4
-	github.com/sigstore/sigstore-go v1.3.0
+	github.com/sigstore/sigstore-go v1.4.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/crypto/openpgp v0.1.0-deprecated
@@ -114,7 +114,7 @@ require (
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/digitorus/pkcs7 v0.0.0-20250730155240-ffadbf3f398c // indirect
+	github.com/digitorus/pkcs7 v0.0.0-20260821105541-05f79448fa77 // indirect
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/cli v29.7.2+incompatible // indirect
@@ -217,12 +217,12 @@ require (
 	github.com/sassoftware/relic/v8 v8.2.0 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
-	github.com/sigstore/rekor-tiles/v2 v2.3.0 // indirect
+	github.com/sigstore/rekor-tiles/v2 v2.4.0 // indirect
 	github.com/sigstore/sigstore/pkg/signature/kms/aws v1.11.4 // indirect
 	github.com/sigstore/sigstore/pkg/signature/kms/azure v1.11.4 // indirect
 	github.com/sigstore/sigstore/pkg/signature/kms/gcp v1.11.4 // indirect
 	github.com/sigstore/sigstore/pkg/signature/kms/hashivault v1.11.4 // indirect
-	github.com/sigstore/timestamp-authority/v2 v2.1.5 // indirect
+	github.com/sigstore/timestamp-authority/v2 v2.2.0 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
