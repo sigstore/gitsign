@@ -10,7 +10,7 @@ require (
 	github.com/github/smimesign v0.2.0
 	github.com/go-git/go-billy/v5 v5.9.2
 	github.com/go-git/go-git/v5 v5.19.3
-	github.com/go-openapi/runtime v0.33.4
+	github.com/go-openapi/runtime v0.33.5
 	github.com/go-openapi/strfmt v0.27.4
 	github.com/go-openapi/swag/conv v0.29.2
 	github.com/godbus/dbus v4.1.0+incompatible
@@ -22,13 +22,13 @@ require (
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/sigstore/cosign/v3 v3.1.4
-	github.com/sigstore/fulcio v1.10.0
+	github.com/sigstore/fulcio v1.10.1
 	github.com/sigstore/protobuf-specs v0.5.2
 	github.com/sigstore/rekor v1.5.5
 	github.com/sigstore/sigstore v1.11.4
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	golang.org/x/crypto/openpgp v0.1.0-deprecated
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
@@ -137,7 +137,7 @@ require (
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
 	github.com/go-openapi/jsonreference v1.0.3 // indirect
 	github.com/go-openapi/loads v0.25.3 // indirect
-	github.com/go-openapi/runtime/server-middleware v0.33.4 // indirect
+	github.com/go-openapi/runtime/server-middleware v0.33.5 // indirect
 	github.com/go-openapi/spec v1.0.1 // indirect
 	github.com/go-openapi/swag v0.29.2 // indirect
 	github.com/go-openapi/swag/cmdutils v0.29.2 // indirect
