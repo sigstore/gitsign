@@ -28,7 +28,7 @@ require (
 	github.com/sigstore/sigstore v1.11.4
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	golang.org/x/crypto/openpgp v0.1.0-deprecated
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
