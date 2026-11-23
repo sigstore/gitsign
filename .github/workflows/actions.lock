@@ -5,14 +5,14 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/ci.yaml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
     '.github/workflows/e2e.yaml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
     '.github/workflows/release.yml':
         - 'actions/attest-build-provenance@v4.2.2'
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'anchore/sbom-action@v0.24.3'
         - 'docker/login-action@v4.8.0'
         - 'goreleaser/goreleaser-action@v7.3.0'
@@ -20,13 +20,13 @@ workflows:
     '.github/workflows/validate-release.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'anchore/sbom-action@v0.24.3'
         - 'goreleaser/goreleaser-action@v7.3.0'
         - 'sigstore/cosign-installer@v4.1.3'
     '.github/workflows/verify.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'golangci/golangci-lint-action@v9.3.0'
 dependencies:
     'actions/attest-build-provenance@v4.2.2':
@@ -51,9 +51,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/setup-go@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+    'actions/setup-go@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-d8cbb8045d7f43706b9177cceb36c1f91a6644d5'
         owner_id: 44036562
         repo_id: 192624594
     'anchore/sbom-action@v0.24.3':
