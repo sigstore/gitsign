@@ -9,7 +9,7 @@ gitsign version [flags]
 ### Options
 
 ```
-  -h, --help   help for version
+  -h, --help[=true|false]   help for version
 ```
 
 ### SEE ALSO

@@ -18,8 +18,8 @@ gitsign show [revision] [flags]
 ### Options
 
 ```
-  -h, --help            help for show
-  -r, --remote string   git remote (used to populate subject) (default "origin")
+  -h, --help[=true|false]   help for show
+  -r, --remote string       git remote (used to populate subject) (default "origin")
 ```
 
 ### SEE ALSO

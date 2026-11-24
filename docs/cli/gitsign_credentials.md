@@ -13,7 +13,7 @@ the system keyring (`system`), or the gitsign-credential-cache daemon
 ### Options
 
 ```
-  -h, --help   help for credentials
+  -h, --help[=true|false]   help for credentials
 ```
 
 ### SEE ALSO

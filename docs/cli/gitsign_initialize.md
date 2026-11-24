@@ -40,9 +40,9 @@ gitsign initialize -mirror <url> -root <url>
 ### Options
 
 ```
-  -h, --help            help for initialize
-      --mirror string   GCS bucket to a Sigstore TUF repository, or HTTP(S) base URL, or file:/// for local filestore remote (air-gap) (default "https://tuf-repo-cdn.sigstore.dev")
-      --root string     path to trusted initial root. defaults to embedded root
+  -h, --help[=true|false]   help for initialize
+      --mirror string       GCS bucket to a Sigstore TUF repository, or HTTP(S) base URL, or file:/// for local filestore remote (air-gap) (default "https://tuf-repo-cdn.sigstore.dev")
+      --root string         path to trusted initial root. defaults to embedded root
 ```
 
 ### SEE ALSO

@@ -9,10 +9,10 @@ gitsign attest [flags]
 ### Options
 
 ```
-  -f, --filepath string   attestation filepath
-  -h, --help              help for attest
-      --objtype string    [commit | tree] - Git object type to attest (default "commit")
-      --type string       specify a predicate type URI
+  -f, --filepath string     attestation filepath
+  -h, --help[=true|false]   help for attest
+      --objtype string      [commit | tree] - Git object type to attest (default "commit")
+      --type string         specify a predicate type URI
 ```
 
 ### SEE ALSO
