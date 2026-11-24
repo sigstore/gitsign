@@ -9,7 +9,7 @@ gitsign credentials list [flags]
 ### Options
 
 ```
-  -h, --help   help for list
+  -h, --help[=true|false]   help for list
 ```
 
 ### SEE ALSO

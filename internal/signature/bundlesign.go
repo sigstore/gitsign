@@ -218,8 +218,8 @@ type validatingRekorClient struct {
 	inner sign.RekorClient
 }
 
-func (c *validatingRekorClient) CreateLogEntry(params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
-	resp, err := c.inner.CreateLogEntry(params, opts...)
+func (c *validatingRekorClient) CreateLogEntryContext(ctx context.Context, params *entries.CreateLogEntryParams, opts ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+	resp, err := c.inner.CreateLogEntryContext(ctx, params, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -233,10 +233,10 @@ func (c *validatingRekorClient) CreateLogEntry(params *entries.CreateLogEntryPar
 	return resp, nil
 }
 
-// GetLogEntryByUUID is used by sigstore-go to fetch the existing entry when
-// CreateLogEntry returns a 409 Conflict.
-func (c *validatingRekorClient) GetLogEntryByUUID(params *entries.GetLogEntryByUUIDParams, opts ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
-	resp, err := c.inner.GetLogEntryByUUID(params, opts...)
+// GetLogEntryByUUIDContext is used by sigstore-go to fetch the existing entry
+// when CreateLogEntryContext returns a 409 Conflict.
+func (c *validatingRekorClient) GetLogEntryByUUIDContext(ctx context.Context, params *entries.GetLogEntryByUUIDParams, opts ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+	resp, err := c.inner.GetLogEntryByUUIDContext(ctx, params, opts...)
 	if err != nil {
 		return nil, err
 	}

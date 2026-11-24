@@ -17,8 +17,8 @@ gitsign credentials clear [flags]
 ### Options
 
 ```
-      --all    remove all cached credentials
-  -h, --help   help for clear
+      --all[=true|false]    remove all cached credentials
+  -h, --help[=true|false]   help for clear
 ```
 
 ### SEE ALSO

@@ -315,11 +315,11 @@ type fakeRekorClient struct {
 	resp *entries.CreateLogEntryCreated
 }
 
-func (f fakeRekorClient) CreateLogEntry(_ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
+func (f fakeRekorClient) CreateLogEntryContext(_ context.Context, _ *entries.CreateLogEntryParams, _ ...entries.ClientOption) (*entries.CreateLogEntryCreated, error) {
 	return f.resp, nil
 }
 
-func (f fakeRekorClient) GetLogEntryByUUID(_ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
+func (f fakeRekorClient) GetLogEntryByUUIDContext(_ context.Context, _ *entries.GetLogEntryByUUIDParams, _ ...entries.ClientOption) (*entries.GetLogEntryByUUIDOK, error) {
 	return &entries.GetLogEntryByUUIDOK{Payload: f.resp.Payload}, nil
 }
 
@@ -338,16 +338,16 @@ func TestValidatingRekorClient(t *testing.T) {
 	}}
 	withoutProof := models.LogEntryAnon{}
 
-	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withProof)}}).CreateLogEntry(nil); err != nil {
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withProof)}}).CreateLogEntryContext(context.Background(), nil); err != nil {
 		t.Errorf("expected entry with inclusion proof to pass, got: %v", err)
 	}
-	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).CreateLogEntry(nil); err == nil {
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).CreateLogEntryContext(context.Background(), nil); err == nil {
 		t.Error("expected entry without inclusion proof to be rejected")
 	}
-	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withProof)}}).GetLogEntryByUUID(nil); err != nil {
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withProof)}}).GetLogEntryByUUIDContext(context.Background(), nil); err != nil {
 		t.Errorf("expected fetched entry with inclusion proof to pass, got: %v", err)
 	}
-	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).GetLogEntryByUUID(nil); err == nil {
+	if _, err := (&validatingRekorClient{inner: fakeRekorClient{resp: logEntryResponse(withoutProof)}}).GetLogEntryByUUIDContext(context.Background(), nil); err == nil {
 		t.Error("expected fetched entry without inclusion proof to be rejected")
 	}
 }

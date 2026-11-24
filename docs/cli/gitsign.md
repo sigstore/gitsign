@@ -9,15 +9,15 @@ gitsign [flags]
 ### Options
 
 ```
-  -a, --armor               create ascii armored output
-  -b, --detach-sign         make a detached signature
-  -h, --help                help for gitsign
-      --include-certs int   -3 is the same as -2, but omits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2. (default -2)
-  -u, --local-user string   use USER-ID to sign
-  -s, --sign                make a signature
-      --status-fd int       write special status strings to the file descriptor n. (default -1)
-  -v, --verify              verify a signature
-      --version             print Gitsign version
+  -a, --armor[=true|false]         create ascii armored output
+  -b, --detach-sign[=true|false]   make a detached signature
+  -h, --help[=true|false]          help for gitsign
+      --include-certs int          -3 is the same as -2, but omits issuer when cert has Authority Information Access extension. -2 includes all certs except root. -1 includes all certs. 0 includes no certs. 1 includes leaf cert. >1 includes n from the leaf. Default -2. (default -2)
+  -u, --local-user string          use USER-ID to sign
+  -s, --sign[=true|false]          make a signature
+      --status-fd int              write special status strings to the file descriptor n. (default -1)
+  -v, --verify[=true|false]        verify a signature
+      --version[=true|false]       print Gitsign version
 ```
 
 ### SEE ALSO
